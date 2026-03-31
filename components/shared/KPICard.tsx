@@ -53,8 +53,8 @@ export function KPICard({
       }
       whileTap={loading ? undefined : { scale: 0.98, transition: { duration: 0.1 } }}
     >
-      <Card className={cn('h-full', className)}>
-        <CardContent className="pt-6">
+      <Card className={cn('h-full active:scale-95 transition-transform', className)}>
+        <CardContent className="pt-4 md:pt-6 px-4 md:px-6">
           {loading ? (
             <>
               <Skeleton className="h-4 w-24 mb-3 animate-shimmer" />
@@ -71,7 +71,7 @@ export function KPICard({
                   <div className="text-zinc-400 dark:text-zinc-500">{icon}</div>
                 )}
               </div>
-              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-2">
+              <p className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-2">
                 {typeof value === 'number' ? <AnimatedNumber value={value} /> : value}
               </p>
               <div className="flex items-center gap-2 mt-1">

@@ -160,7 +160,7 @@ export default function ClosingPage() {
           <KPICard title="Cash Collected" value={formatCurrency(cashCollected)} loading={loading} />
         </KPICardGrid>
 
-        <div className="grid gap-4 lg:grid-cols-3 mb-6">
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-3 mb-6">
           <motion.div variants={chartVariants} initial="hidden" animate="visible">
             <Card>
               <CardHeader className="pb-2">
@@ -217,30 +217,32 @@ export default function ClosingPage() {
             ) : Object.keys(closerMap).length === 0 ? (
               <EmptyState title="No closer data" />
             ) : (
-              <Table>
-                <TableHeader>
-                  <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                    <TableHead>Closer</TableHead>
-                    <TableHead className="text-center">Meetings</TableHead>
-                    <TableHead className="text-center">Show Rate</TableHead>
-                    <TableHead className="text-center">Won</TableHead>
-                    <TableHead className="text-right">Cash Collected</TableHead>
-                  </AnimatedTableRow>
-                </TableHeader>
-                <TableBody>
-                  {Object.entries(closerMap).map(([name, stats], i) => (
-                    <AnimatedTableRow key={name} variants={rowVariants} initial="hidden" animate="visible" custom={i}>
-                      <TableCell className="font-medium text-sm">{name}</TableCell>
-                      <TableCell className="text-center text-sm">{stats.meetings}</TableCell>
-                      <TableCell className="text-center text-sm">{stats.showRate}%</TableCell>
-                      <TableCell className="text-center text-sm">{stats.won}</TableCell>
-                      <TableCell className="text-right font-semibold text-sm">
-                        {formatCurrency(stats.cash)}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                      <TableHead>Closer</TableHead>
+                      <TableHead className="text-center">Meetings</TableHead>
+                      <TableHead className="text-center hidden md:table-cell">Show Rate</TableHead>
+                      <TableHead className="text-center">Won</TableHead>
+                      <TableHead className="text-right">Cash Collected</TableHead>
                     </AnimatedTableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(closerMap).map(([name, stats], i) => (
+                      <AnimatedTableRow key={name} variants={rowVariants} initial="hidden" animate="visible" custom={i}>
+                        <TableCell className="font-medium text-sm">{name}</TableCell>
+                        <TableCell className="text-center text-sm">{stats.meetings}</TableCell>
+                        <TableCell className="text-center text-sm hidden md:table-cell">{stats.showRate}%</TableCell>
+                        <TableCell className="text-center text-sm">{stats.won}</TableCell>
+                        <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
+                          {formatCurrency(stats.cash)}
+                        </TableCell>
+                      </AnimatedTableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -260,34 +262,36 @@ export default function ClosingPage() {
             ) : filtered.length === 0 ? (
               <EmptyState title="No sessions found" />
             ) : (
-              <Table>
-                <TableHeader>
-                  <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Closer</TableHead>
-                    <TableHead className="text-center">Meetings</TableHead>
-                    <TableHead className="text-center">Showed</TableHead>
-                    <TableHead className="text-center">Won</TableHead>
-                    <TableHead className="text-center">Lost</TableHead>
-                    <TableHead className="text-right">Cash</TableHead>
-                  </AnimatedTableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((r, i) => (
-                    <AnimatedTableRow key={r.id} variants={rowVariants} initial="hidden" animate="visible" custom={i}>
-                      <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(r.date)}</TableCell>
-                      <TableCell className="text-sm font-medium">{r.closer_name}</TableCell>
-                      <TableCell className="text-center text-sm">{r.total_meetings}</TableCell>
-                      <TableCell className="text-center text-sm">{r.showed_meetings}</TableCell>
-                      <TableCell className="text-center text-sm text-emerald-600 dark:text-emerald-400 font-medium">{r.won_deals}</TableCell>
-                      <TableCell className="text-center text-sm text-red-600 dark:text-red-400">{r.lost_deals}</TableCell>
-                      <TableCell className="text-right font-semibold text-sm">
-                        {formatCurrency(r.cash_collected)}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Closer</TableHead>
+                      <TableHead className="text-center">Meetings</TableHead>
+                      <TableHead className="text-center hidden md:table-cell">Showed</TableHead>
+                      <TableHead className="text-center">Won</TableHead>
+                      <TableHead className="text-center hidden md:table-cell">Lost</TableHead>
+                      <TableHead className="text-right">Cash</TableHead>
                     </AnimatedTableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((r, i) => (
+                      <AnimatedTableRow key={r.id} variants={rowVariants} initial="hidden" animate="visible" custom={i}>
+                        <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(r.date)}</TableCell>
+                        <TableCell className="text-sm font-medium">{r.closer_name}</TableCell>
+                        <TableCell className="text-center text-sm">{r.total_meetings}</TableCell>
+                        <TableCell className="text-center text-sm hidden md:table-cell">{r.showed_meetings}</TableCell>
+                        <TableCell className="text-center text-sm text-emerald-600 dark:text-emerald-400 font-medium">{r.won_deals}</TableCell>
+                        <TableCell className="text-center text-sm text-red-600 dark:text-red-400 hidden md:table-cell">{r.lost_deals}</TableCell>
+                        <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
+                          {formatCurrency(r.cash_collected)}
+                        </TableCell>
+                      </AnimatedTableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

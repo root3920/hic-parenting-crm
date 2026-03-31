@@ -9,7 +9,7 @@ export default function AuthLayout({
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <TopNav />
       <main className="pt-14">
-        <div className="max-w-screen-2xl mx-auto px-8 py-6">
+        <div className="max-w-screen-2xl mx-auto px-4 py-4 md:px-8 md:py-6">
           {children}
         </div>
       </main>

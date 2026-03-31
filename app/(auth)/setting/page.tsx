@@ -205,36 +205,38 @@ export default function SettingPage() {
             ) : filtered.length === 0 ? (
               <EmptyState title="No setter reports" description="Reports will appear here once submitted." />
             ) : (
-              <Table>
-                <TableHeader>
-                  <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Setter</TableHead>
-                    <TableHead className="text-center">Convos</TableHead>
-                    <TableHead className="text-center">Qualified</TableHead>
-                    <TableHead className="text-center">DQ&apos;d</TableHead>
-                    <TableHead className="text-center">Hours</TableHead>
-                    <TableHead className="text-center">Score</TableHead>
-                  </AnimatedTableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((r, i) => (
-                    <AnimatedTableRow key={r.id} variants={rowVariants} initial="hidden" animate="visible" custom={i}>
-                      <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(r.date)}</TableCell>
-                      <TableCell className="text-sm font-medium">{r.setter_name}</TableCell>
-                      <TableCell className="text-center text-sm">{r.total_convos}</TableCell>
-                      <TableCell className="text-center">
-                        <StatusPill label={String(r.qualified_calls)} variant="success" />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {r.disqualified > 0 ? <StatusPill label={String(r.disqualified)} variant="danger" /> : <span className="text-xs text-zinc-400">0</span>}
-                      </TableCell>
-                      <TableCell className="text-center text-sm">{r.hours_worked}h</TableCell>
-                      <TableCell className="text-center">{performancePill(r.performance_score)}</TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Setter</TableHead>
+                      <TableHead className="text-center">Convos</TableHead>
+                      <TableHead className="text-center">Qualified</TableHead>
+                      <TableHead className="text-center hidden md:table-cell">DQ&apos;d</TableHead>
+                      <TableHead className="text-center hidden md:table-cell">Hours</TableHead>
+                      <TableHead className="text-center">Score</TableHead>
                     </AnimatedTableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((r, i) => (
+                      <AnimatedTableRow key={r.id} variants={rowVariants} initial="hidden" animate="visible" custom={i}>
+                        <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(r.date)}</TableCell>
+                        <TableCell className="text-sm font-medium">{r.setter_name}</TableCell>
+                        <TableCell className="text-center text-sm">{r.total_convos}</TableCell>
+                        <TableCell className="text-center">
+                          <StatusPill label={String(r.qualified_calls)} variant="success" />
+                        </TableCell>
+                        <TableCell className="text-center hidden md:table-cell">
+                          {r.disqualified > 0 ? <StatusPill label={String(r.disqualified)} variant="danger" /> : <span className="text-xs text-zinc-400">0</span>}
+                        </TableCell>
+                        <TableCell className="text-center text-sm hidden md:table-cell">{r.hours_worked}h</TableCell>
+                        <TableCell className="text-center">{performancePill(r.performance_score)}</TableCell>
+                      </AnimatedTableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -175,7 +175,7 @@ export default function SpcPage() {
               </motion.div>
             )}
 
-            <div className="grid gap-4 lg:grid-cols-2 mb-6">
+            <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 mb-6">
               <motion.div variants={chartVariants} initial="hidden" animate="visible">
                 <Card>
                   <CardHeader className="pb-2">
@@ -216,7 +216,7 @@ export default function SpcPage() {
                 <CardTitle className="text-sm font-semibold">Revenue Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                   {[
                     { label: 'Active MRR', value: formatCurrency(mrr) },
                     { label: 'Trial MRR Potential', value: formatCurrency(mrrPotential) },
@@ -249,46 +249,48 @@ export default function SpcPage() {
               ) : activeMembers.length === 0 ? (
                 <EmptyState title="No active members" description="Active subscribers will appear here." />
               ) : (
-                <Table>
-                  <TableHeader>
-                    <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Provider</TableHead>
-                      <TableHead>Joined</TableHead>
-                      <TableHead>Next Payment</TableHead>
-                    </AnimatedTableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activeMembers.map((m, i) => (
-                      <AnimatedTableRow
-                        key={m.id}
-                        variants={rowVariants}
-                        initial="hidden"
-                        animate="visible"
-                        custom={i}
-                        className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
-                      >
-                        <TableCell className="font-medium text-sm">{m.name}</TableCell>
-                        <TableCell className="text-xs text-zinc-500">{m.email}</TableCell>
-                        <TableCell>
-                          <StatusPill
-                            label={m.plan === 'annual' ? 'Annual' : 'Monthly'}
-                            variant={m.plan === 'annual' ? 'success' : 'info'}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-sm">
-                          {formatCurrency(m.amount)}
-                        </TableCell>
-                        <TableCell className="text-xs text-zinc-500">{m.provider}</TableCell>
-                        <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(m.joined_at)}</TableCell>
-                        <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(m.next_payment_date)}</TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="hidden md:table-cell">Email</TableHead>
+                        <TableHead>Plan</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="hidden md:table-cell">Provider</TableHead>
+                        <TableHead className="hidden md:table-cell">Joined</TableHead>
+                        <TableHead className="hidden md:table-cell">Next Payment</TableHead>
                       </AnimatedTableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {activeMembers.map((m, i) => (
+                        <AnimatedTableRow
+                          key={m.id}
+                          variants={rowVariants}
+                          initial="hidden"
+                          animate="visible"
+                          custom={i}
+                          className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                        >
+                          <TableCell className="font-medium text-sm">{m.name}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
+                          <TableCell>
+                            <StatusPill
+                              label={m.plan === 'annual' ? 'Annual' : 'Monthly'}
+                              variant={m.plan === 'annual' ? 'success' : 'info'}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
+                            {formatCurrency(m.amount)}
+                          </TableCell>
+                          <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{formatDate(m.joined_at)}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{formatDate(m.next_payment_date)}</TableCell>
+                        </AnimatedTableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -329,39 +331,41 @@ export default function SpcPage() {
                 ) : trialMembers.length === 0 ? (
                   <EmptyState title="No free trials" description="Trial members will appear here." />
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Trial Start</TableHead>
-                        <TableHead>Expires</TableHead>
-                        <TableHead>Days Left</TableHead>
-                        <TableHead>Payment Method</TableHead>
-                      </AnimatedTableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedTrials.map((m, i) => (
-                        <AnimatedTableRow
-                          key={m.id}
-                          variants={rowVariants}
-                          initial="hidden"
-                          animate="visible"
-                          custom={i}
-                          className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
-                        >
-                          <TableCell className="font-medium text-sm">{m.name}</TableCell>
-                          <TableCell className="text-xs text-zinc-500">{m.email}</TableCell>
-                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(m.joined_at)}</TableCell>
-                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap">
-                            {m.trial_end_date ? formatDate(m.trial_end_date) : '—'}
-                          </TableCell>
-                          <TableCell>{trialUrgencyPill(m)}</TableCell>
-                          <TableCell className="text-xs text-zinc-500">{m.provider}</TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead>Name</TableHead>
+                          <TableHead className="hidden md:table-cell">Email</TableHead>
+                          <TableHead className="hidden md:table-cell">Trial Start</TableHead>
+                          <TableHead>Expires</TableHead>
+                          <TableHead>Days Left</TableHead>
+                          <TableHead className="hidden md:table-cell">Payment Method</TableHead>
                         </AnimatedTableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedTrials.map((m, i) => (
+                          <AnimatedTableRow
+                            key={m.id}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="visible"
+                            custom={i}
+                            className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                          >
+                            <TableCell className="font-medium text-sm">{m.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{formatDate(m.joined_at)}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap">
+                              {m.trial_end_date ? formatDate(m.trial_end_date) : '—'}
+                            </TableCell>
+                            <TableCell>{trialUrgencyPill(m)}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                          </AnimatedTableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>

@@ -143,7 +143,7 @@ export default function DashboardPage() {
           />
         </KPICardGrid>
 
-        <div className="grid gap-4 lg:grid-cols-3 mb-6">
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-3 mb-6">
           <motion.div className="lg:col-span-2" variants={chartVariants} initial="hidden" animate="visible">
             <Card>
               <CardHeader className="pb-2">
@@ -200,38 +200,40 @@ export default function DashboardPage() {
             ) : !stats?.recentTransactions.length ? (
               <EmptyState title="No transactions yet" description="Transactions from Kajabi and GoHighLevel will appear here." />
             ) : (
-              <Table>
-                <TableHeader>
-                  <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Buyer</TableHead>
-                    <TableHead>Offer</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </AnimatedTableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats.recentTransactions.map((tx, i) => (
-                    <AnimatedTableRow key={tx.id} variants={rowVariants} initial="hidden" animate="visible" custom={i}>
-                      <TableCell className="text-xs text-zinc-500">{formatDate(tx.date)}</TableCell>
-                      <TableCell>
-                        <div className="text-sm font-medium">{tx.buyer_name}</div>
-                        <div className="text-xs text-zinc-400">{tx.buyer_email}</div>
-                      </TableCell>
-                      <TableCell className="text-sm max-w-48 truncate">{tx.offer_title}</TableCell>
-                      <TableCell>
-                        <StatusPill
-                          label={tx.source}
-                          variant={tx.source === 'Kajabi' ? 'info' : 'purple'}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-sm">
-                        {formatCurrency(tx.cost, tx.currency)}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Buyer</TableHead>
+                      <TableHead className="hidden md:table-cell">Offer</TableHead>
+                      <TableHead className="hidden md:table-cell">Source</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                     </AnimatedTableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.recentTransactions.map((tx, i) => (
+                      <AnimatedTableRow key={tx.id} variants={rowVariants} initial="hidden" animate="visible" custom={i}>
+                        <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(tx.date)}</TableCell>
+                        <TableCell>
+                          <div className="text-sm font-medium">{tx.buyer_name}</div>
+                          <div className="text-xs text-zinc-400 hidden md:block">{tx.buyer_email}</div>
+                        </TableCell>
+                        <TableCell className="text-sm max-w-48 truncate hidden md:table-cell">{tx.offer_title}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <StatusPill
+                            label={tx.source}
+                            variant={tx.source === 'Kajabi' ? 'info' : 'purple'}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
+                          {formatCurrency(tx.cost, tx.currency)}
+                        </TableCell>
+                      </AnimatedTableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

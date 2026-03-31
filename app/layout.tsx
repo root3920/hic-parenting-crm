@@ -1,7 +1,13 @@
 import type { Metadata } from 'next'
-import { GeistSans } from 'geist/font/sans'
+import { Poppins } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'sonner'
+
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-poppins',
+})
 
 export const metadata: Metadata = {
   title: 'HIC Parenting CRM',
@@ -14,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={GeistSans.variable}>
+    <html lang="en" className={poppins.variable}>
       <body className="font-sans antialiased bg-zinc-50 dark:bg-zinc-950">
         {children}
         <Toaster richColors position="top-right" />
