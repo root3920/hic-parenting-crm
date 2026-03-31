@@ -13,7 +13,7 @@ import { AnimatedNumber } from '@/components/motion/AnimatedNumber'
 // where children mount *after* the parent has already animated.
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } },
 }
 
 interface KPICardProps {
@@ -48,7 +48,7 @@ export function KPICard({
           : {
               scale: 1.02,
               boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
-              transition: { duration: 0.15, ease: 'easeOut' },
+              transition: { duration: 0.15, ease: 'easeOut' as const },
             }
       }
       whileTap={loading ? undefined : { scale: 0.98, transition: { duration: 0.1 } }}

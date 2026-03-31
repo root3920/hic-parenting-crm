@@ -39,7 +39,7 @@ interface DashboardStats {
 
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' } },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
 }
 
 export default function DashboardPage() {
@@ -161,7 +161,7 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={chartVariants} initial="hidden" animate="visible" transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' }}>
+          <motion.div variants={chartVariants} initial="hidden" animate="visible" transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' as const }}>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold">Quick Stats</CardTitle>

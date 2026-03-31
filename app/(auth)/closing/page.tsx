@@ -29,7 +29,7 @@ const CLOSERS = ['All', 'Cali Luna', 'Marcela HIC Parenting']
 
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' } },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
 }
 
 export default function ClosingPage() {
@@ -183,7 +183,7 @@ export default function ClosingPage() {
             variants={chartVariants}
             initial="hidden"
             animate="visible"
-            transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' }}
+            transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' as const }}
           >
             <Card>
               <CardHeader className="pb-2">

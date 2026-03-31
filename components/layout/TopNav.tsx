@@ -34,7 +34,7 @@ export function TopNav() {
       className="fixed top-0 inset-x-0 z-50 h-14 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex items-center"
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
+      transition={{ duration: 0.3, ease: 'easeOut' as const }}
     >
       <div className="w-full flex items-center px-8 gap-6">
         {/* Logo */}

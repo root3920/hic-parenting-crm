@@ -32,7 +32,7 @@ type Tab = 'overview' | 'active' | 'trials'
 
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' } },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
 }
 
 export default function SpcPage() {
@@ -159,7 +159,7 @@ export default function SpcPage() {
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
+                transition={{ duration: 0.3, ease: 'easeOut' as const }}
               >
                 <Alert className="mb-6 border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700">
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
@@ -193,7 +193,7 @@ export default function SpcPage() {
                 </Card>
               </motion.div>
 
-              <motion.div variants={chartVariants} initial="hidden" animate="visible" transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' }}>
+              <motion.div variants={chartVariants} initial="hidden" animate="visible" transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' as const }}>
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold">Members by Join Month</CardTitle>
@@ -301,7 +301,7 @@ export default function SpcPage() {
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
+                transition={{ duration: 0.3, ease: 'easeOut' as const }}
               >
                 <Alert className="mb-4 border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700">
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
