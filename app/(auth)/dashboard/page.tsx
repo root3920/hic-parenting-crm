@@ -22,8 +22,11 @@ import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
 import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTableRow'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
+
+const SPC_CUTOFF = '2026-03-27'
 
 interface DashboardStats {
   totalRevenue: number
@@ -33,6 +36,8 @@ interface DashboardStats {
   qualifiedCalls: number
   wonDeals: number
   mrr: number
+  mrrBefore: number
+  spcNewMembers: number
   recentTransactions: Transaction[]
   dailyRevenue: { date: string; revenue: number }[]
 }
@@ -64,7 +69,7 @@ export default function DashboardPage() {
       ])
 
       const transactions: Transaction[] = txResult.data ?? []
-      const members: { status: string; plan: string; amount: number }[] = spcResult.data ?? []
+      const members: { status: string; plan: string; amount: number; created_at: string }[] = spcResult.data ?? []
       const setterReports: { qualified_calls: number }[] = setterResult.data ?? []
       const closerReports: { won_deals: number; cash_collected: number }[] = closerResult.data ?? []
 
@@ -74,9 +79,22 @@ export default function DashboardPage() {
       const qualifiedCalls = setterReports.reduce((s, r) => s + (r.qualified_calls ?? 0), 0)
       const wonDeals = closerReports.reduce((s, r) => s + (r.won_deals ?? 0), 0)
 
-      const mrr = members
-        .filter((m) => m.status === 'active')
-        .reduce((s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount), 0)
+      const activeMembersList = members.filter((m) => m.status === 'active')
+      const mrr = activeMembersList.reduce(
+        (s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount),
+        0
+      )
+
+      const membersBefore = activeMembersList.filter(
+        (m) => (m.created_at?.slice(0, 10) ?? '') <= SPC_CUTOFF
+      )
+      const mrrBefore = membersBefore.reduce(
+        (s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount),
+        0
+      )
+      const spcNewMembers = activeMembersList.filter(
+        (m) => (m.created_at?.slice(0, 10) ?? '') > SPC_CUTOFF
+      ).length
 
       const dailyMap: Record<string, number> = {}
       transactions.forEach((t) => {
@@ -95,6 +113,8 @@ export default function DashboardPage() {
         qualifiedCalls,
         wonDeals,
         mrr,
+        mrrBefore,
+        spcNewMembers,
         recentTransactions: transactions.slice(0, 10),
         dailyRevenue,
       })
@@ -103,6 +123,12 @@ export default function DashboardPage() {
 
     fetchStats()
   }, [])
+
+  const arr = (stats?.mrr ?? 0) * 12
+  const mrrPct =
+    stats && stats.mrrBefore > 0
+      ? Math.round(((stats.mrr - stats.mrrBefore) / stats.mrrBefore) * 1000) / 10
+      : 0
 
   return (
     <PageTransition>
@@ -185,6 +211,75 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
         </div>
+
+        {/* SPC Growth Widget */}
+        <motion.div
+          variants={chartVariants}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.4, delay: 0.35, ease: 'easeOut' as const }}
+          className="mb-6"
+        >
+          <Link href="/spc" className="block group">
+            <Card className="border-l-4 border-l-[#185FA5] hover:shadow-md transition-shadow duration-200 cursor-pointer">
+              <CardContent className="py-4 px-5">
+                {loading ? (
+                  <div className="h-8 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                ) : (
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    {/* Members */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-base leading-none">👥</span>
+                      <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {stats?.activeMembers ?? 0} miembros activos
+                      </span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
+                        ↑{stats?.spcNewMembers ?? 0} nuevos
+                      </span>
+                    </div>
+
+                    <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 hidden sm:block" />
+
+                    {/* MRR */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-base leading-none">💰</span>
+                      <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {formatCurrency(stats?.mrr ?? 0)} MRR
+                      </span>
+                      {mrrPct > 0 && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
+                          ↑{mrrPct}%
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 hidden sm:block" />
+
+                    {/* ARR */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-base leading-none">📈</span>
+                      <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {formatCurrency(arr)} ARR
+                      </span>
+                    </div>
+
+                    <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 hidden sm:block" />
+
+                    {/* Churn */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-green-600">✓ 0% Churn</span>
+                    </div>
+
+                    {/* Right arrow hint */}
+                    <span className="ml-auto text-xs text-zinc-400 group-hover:text-[#185FA5] transition-colors hidden sm:block">
+                      Ver SPC →
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
+        </motion.div>
 
         <Card>
           <CardHeader className="pb-2">

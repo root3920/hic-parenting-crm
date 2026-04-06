@@ -25,21 +25,43 @@ import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
 import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTableRow'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LabelList,
+  Legend,
+} from 'recharts'
 
 export const dynamic = 'force-dynamic'
 
-type Tab = 'overview' | 'active' | 'trials'
+const CUTOFF = '2026-03-27'
+
+type Tab = 'growth' | 'overview' | 'active' | 'trials'
 
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
   visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
 }
 
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
 export default function SpcPage() {
   const supabase = useMemo(() => createClient(), [])
   const [members, setMembers] = useState<SpcMember[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [activeTab, setActiveTab] = useState<Tab>('growth')
 
   useEffect(() => {
     async function fetchMembers() {
@@ -94,6 +116,64 @@ export default function SpcPage() {
     return da - db
   })
 
+  // ── Growth tab calculations ──────────────────────────────────────────────
+  const membersBefore = activeMembers.filter(
+    (m) => (m.created_at?.slice(0, 10) ?? '') <= CUTOFF
+  )
+  const newSpcMembers = activeMembers
+    .filter((m) => (m.created_at?.slice(0, 10) ?? '') > CUTOFF)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+
+  const mrrBefore = membersBefore.reduce(
+    (s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount),
+    0
+  )
+  const arrBefore = mrrBefore * 12
+
+  const mrrBeforeMonthly = membersBefore
+    .filter((m) => m.plan === 'monthly')
+    .reduce((s, m) => s + m.amount, 0)
+  const mrrBeforeAnnual = membersBefore
+    .filter((m) => m.plan === 'annual')
+    .reduce((s, m) => s + m.amount / 12, 0)
+  const mrrNowMonthly = activeMembers
+    .filter((m) => m.plan === 'monthly')
+    .reduce((s, m) => s + m.amount, 0)
+  const mrrNowAnnual = activeMembers
+    .filter((m) => m.plan === 'annual')
+    .reduce((s, m) => s + m.amount / 12, 0)
+
+  const monthlyBefore = membersBefore.filter((m) => m.plan === 'monthly').length
+  const annualBefore = membersBefore.filter((m) => m.plan === 'annual').length
+
+  const deltaMembersCount = activeMembers.length - membersBefore.length
+  const deltaMembersPct =
+    membersBefore.length > 0
+      ? Math.round((deltaMembersCount / membersBefore.length) * 100)
+      : 0
+  const deltaMrr = mrr - mrrBefore
+  const deltaMrrPct =
+    mrrBefore > 0 ? Math.round((deltaMrr / mrrBefore) * 100 * 10) / 10 : 0
+  const deltaArr = arr - arrBefore
+
+  const progressMax = Math.max(monthlyCount, annualCount, 1)
+
+  const mrrChartData = [
+    {
+      label: 'Antes (Mar 27)',
+      monthly: parseFloat(mrrBeforeMonthly.toFixed(2)),
+      annual: parseFloat(mrrBeforeAnnual.toFixed(2)),
+      total: parseFloat((mrrBeforeMonthly + mrrBeforeAnnual).toFixed(2)),
+    },
+    {
+      label: 'Ahora',
+      monthly: parseFloat(mrrNowMonthly.toFixed(2)),
+      annual: parseFloat(mrrNowAnnual.toFixed(2)),
+      total: parseFloat((mrrNowMonthly + mrrNowAnnual).toFixed(2)),
+    },
+  ]
+  // ────────────────────────────────────────────────────────────────────────
+
   function trialUrgencyPill(m: SpcMember) {
     if (!m.trial_end_date) return <StatusPill label="No end date" variant="neutral" />
     const days = daysUntil(m.trial_end_date)
@@ -105,6 +185,7 @@ export default function SpcPage() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
+    { key: 'growth', label: 'Crecimiento' },
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
@@ -144,6 +225,287 @@ export default function SpcPage() {
             })}
           </nav>
         </div>
+
+        {/* ── CRECIMIENTO ───────────────────────────────────────────────── */}
+        {activeTab === 'growth' && (
+          <div className="space-y-6">
+            {/* 1. KPI Comparison Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Members */}
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Total Members
+                  </p>
+                  {loading ? (
+                    <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-sm text-muted-foreground">{membersBefore.length}</span>
+                        <span className="text-sm text-zinc-400">→</span>
+                        <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                          {activeMembers.length}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
+                        +{deltaMembersCount} nuevos · ↑{deltaMembersPct}%
+                      </span>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* MRR */}
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    MRR
+                  </p>
+                  {loading ? (
+                    <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-sm text-muted-foreground">{formatCurrency(mrrBefore)}</span>
+                        <span className="text-sm text-zinc-400">→</span>
+                        <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                          {formatCurrency(mrr)}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
+                        +{formatCurrency(deltaMrr)}/mo · ↑{deltaMrrPct}%
+                      </span>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* ARR Proyectado */}
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    ARR Proyectado
+                  </p>
+                  {loading ? (
+                    <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-sm text-muted-foreground">{formatCurrency(arrBefore)}</span>
+                        <span className="text-sm text-zinc-400">→</span>
+                        <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                          {formatCurrency(arr)}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
+                        +{formatCurrency(deltaArr)}/año
+                      </span>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Churn */}
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Churn
+                  </p>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-2xl font-semibold text-green-600">0</span>
+                    <span className="text-sm text-zinc-400">miembros</span>
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
+                    0% churn ✓
+                  </span>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 2. Two column section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left: Mensuales vs Anuales */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">Mensuales vs Anuales</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  {loading ? (
+                    <div className="space-y-4">
+                      <div className="h-8 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                      <div className="h-8 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Monthly */}
+                      <div>
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">Mensual</span>
+                          <span className="text-zinc-600 dark:text-zinc-400 font-medium">
+                            {monthlyBefore} → {monthlyCount}{' '}
+                            <span className="text-green-600 font-semibold">
+                              (+{monthlyCount - monthlyBefore})
+                            </span>
+                          </span>
+                        </div>
+                        <div className="h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: '#185FA5' }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(monthlyCount / progressMax) * 100}%` }}
+                            transition={{ duration: 0.7, ease: 'easeOut' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Annual */}
+                      <div>
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">Anual</span>
+                          <span className="text-zinc-600 dark:text-zinc-400 font-medium">
+                            {annualBefore} → {annualCount}{' '}
+                            <span className="text-zinc-500 font-normal">
+                              {annualCount === annualBefore ? '(sin cambio)' : `(+${annualCount - annualBefore})`}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: '#3B6D11' }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(annualCount / progressMax) * 100}%` }}
+                            transition={{ duration: 0.7, ease: 'easeOut', delay: 0.1 }}
+                          />
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">
+                        Todo el crecimiento vino de planes mensuales
+                      </p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Right: MRR Antes vs Ahora stacked bar */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">MRR Antes vs Ahora</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="h-52 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-lg" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={mrrChartData} margin={{ top: 28, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fontSize: 11, fill: '#71717a' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11, fill: '#71717a' }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={48}
+                          tickFormatter={(v) => `$${v}`}
+                        />
+                        <Tooltip
+                          formatter={(val, name) => [
+                            `$${Number(val).toFixed(2)}`,
+                            name === 'monthly' ? 'Mensual' : 'Anual (prorrateado)',
+                          ]}
+                          cursor={{ fill: '#f4f4f5' }}
+                        />
+                        <Legend
+                          iconType="circle"
+                          iconSize={8}
+                          formatter={(value) => (
+                            <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                              {value === 'monthly' ? 'Mensual' : 'Anual (prorrateado)'}
+                            </span>
+                          )}
+                        />
+                        <Bar dataKey="monthly" name="monthly" stackId="a" fill="#185FA5" maxBarSize={72} />
+                        <Bar dataKey="annual" name="annual" stackId="a" fill="#3B6D11" maxBarSize={72}>
+                          <LabelList
+                            dataKey="total"
+                            position="top"
+                            formatter={(v: unknown) => `$${Math.round(Number(v))}`}
+                            style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 3. New Members List */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">
+                  Nuevos miembros activos
+                  {!loading && (
+                    <span className="ml-2 text-xs font-normal text-zinc-500">
+                      ({newSpcMembers.length} desde Mar 27)
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="p-6 space-y-3">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ))}
+                  </div>
+                ) : newSpcMembers.length === 0 ? (
+                  <EmptyState title="Sin nuevos miembros" description="Los miembros que se unan después de Mar 27 aparecerán aquí." />
+                ) : (
+                  <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {newSpcMembers.map((m, i) => (
+                      <motion.div
+                        key={m.id}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: i * 0.05, ease: 'easeOut' }}
+                        className="flex items-center gap-3 px-5 py-3"
+                      >
+                        {/* Avatar */}
+                        <div className="flex-shrink-0 w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold">
+                          {getInitials(m.name)}
+                        </div>
+                        {/* Name */}
+                        <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 flex-1 min-w-0 truncate">
+                          {m.name}
+                        </span>
+                        {/* Plan badge */}
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium whitespace-nowrap">
+                          Mensual ${m.amount}
+                        </span>
+                        {/* Date */}
+                        <span className="text-xs text-zinc-400 whitespace-nowrap hidden sm:block">
+                          {formatDate(m.created_at)}
+                        </span>
+                        {/* Provider */}
+                        <span className="text-xs text-zinc-400 whitespace-nowrap hidden md:block text-right min-w-14">
+                          {m.provider}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* OVERVIEW */}
         {activeTab === 'overview' && (
