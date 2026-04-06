@@ -39,7 +39,16 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-const CUTOFF = '2026-03-27'
+const BASELINE = {
+  date: 'Mar 27, 2026',
+  totalMembers: 35,
+  monthlyMembers: 20,
+  annualMembers: 15,
+  mrr: 1527.50,
+  mrrMonthly: 940,
+  mrrAnnual: 587.50,
+  arr: 18330.00,
+}
 
 type Tab = 'growth' | 'overview' | 'active' | 'trials'
 
@@ -116,26 +125,7 @@ export default function SpcPage() {
     return da - db
   })
 
-  // ── Growth tab calculations ──────────────────────────────────────────────
-  const membersBefore = activeMembers.filter(
-    (m) => (m.created_at?.slice(0, 10) ?? '') <= CUTOFF
-  )
-  const newSpcMembers = activeMembers
-    .filter((m) => (m.created_at?.slice(0, 10) ?? '') > CUTOFF)
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-
-  const mrrBefore = membersBefore.reduce(
-    (s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount),
-    0
-  )
-  const arrBefore = mrrBefore * 12
-
-  const mrrBeforeMonthly = membersBefore
-    .filter((m) => m.plan === 'monthly')
-    .reduce((s, m) => s + m.amount, 0)
-  const mrrBeforeAnnual = membersBefore
-    .filter((m) => m.plan === 'annual')
-    .reduce((s, m) => s + m.amount / 12, 0)
+  // ── Growth tab calculations (baseline hardcoded from Mar 27 snapshot) ────
   const mrrNowMonthly = activeMembers
     .filter((m) => m.plan === 'monthly')
     .reduce((s, m) => s + m.amount, 0)
@@ -143,27 +133,26 @@ export default function SpcPage() {
     .filter((m) => m.plan === 'annual')
     .reduce((s, m) => s + m.amount / 12, 0)
 
-  const monthlyBefore = membersBefore.filter((m) => m.plan === 'monthly').length
-  const annualBefore = membersBefore.filter((m) => m.plan === 'annual').length
+  const newSpcMembers = [...activeMembers].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
+  )
 
-  const deltaMembersCount = activeMembers.length - membersBefore.length
-  const deltaMembersPct =
-    membersBefore.length > 0
-      ? Math.round((deltaMembersCount / membersBefore.length) * 100)
-      : 0
-  const deltaMrr = mrr - mrrBefore
-  const deltaMrrPct =
-    mrrBefore > 0 ? Math.round((deltaMrr / mrrBefore) * 100 * 10) / 10 : 0
-  const deltaArr = arr - arrBefore
+  const deltaMembersCount = activeMembers.length - BASELINE.totalMembers
+  const deltaMembersPct = parseFloat(
+    ((deltaMembersCount / BASELINE.totalMembers) * 100).toFixed(1)
+  )
+  const deltaMrr = mrr - BASELINE.mrr
+  const deltaMrrPct = parseFloat(((deltaMrr / BASELINE.mrr) * 100).toFixed(1))
+  const deltaArr = arr - BASELINE.arr
 
-  const progressMax = Math.max(monthlyCount, annualCount, 1)
+  const progressMax = Math.max(monthlyCount, BASELINE.monthlyMembers, 1)
 
   const mrrChartData = [
     {
       label: 'Antes (Mar 27)',
-      monthly: parseFloat(mrrBeforeMonthly.toFixed(2)),
-      annual: parseFloat(mrrBeforeAnnual.toFixed(2)),
-      total: parseFloat((mrrBeforeMonthly + mrrBeforeAnnual).toFixed(2)),
+      monthly: BASELINE.mrrMonthly,
+      annual: BASELINE.mrrAnnual,
+      total: BASELINE.mrr,
     },
     {
       label: 'Ahora',
@@ -242,7 +231,7 @@ export default function SpcPage() {
                   ) : (
                     <>
                       <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-sm text-muted-foreground">{membersBefore.length}</span>
+                        <span className="text-sm text-muted-foreground">{BASELINE.totalMembers}</span>
                         <span className="text-sm text-zinc-400">→</span>
                         <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
                           {activeMembers.length}
@@ -267,7 +256,7 @@ export default function SpcPage() {
                   ) : (
                     <>
                       <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-sm text-muted-foreground">{formatCurrency(mrrBefore)}</span>
+                        <span className="text-sm text-muted-foreground">{formatCurrency(BASELINE.mrr)}</span>
                         <span className="text-sm text-zinc-400">→</span>
                         <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
                           {formatCurrency(mrr)}
@@ -292,7 +281,7 @@ export default function SpcPage() {
                   ) : (
                     <>
                       <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-sm text-muted-foreground">{formatCurrency(arrBefore)}</span>
+                        <span className="text-sm text-muted-foreground">{formatCurrency(BASELINE.arr)}</span>
                         <span className="text-sm text-zinc-400">→</span>
                         <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
                           {formatCurrency(arr)}
@@ -343,9 +332,9 @@ export default function SpcPage() {
                         <div className="flex items-center justify-between text-sm mb-2">
                           <span className="font-medium text-zinc-700 dark:text-zinc-300">Mensual</span>
                           <span className="text-zinc-600 dark:text-zinc-400 font-medium">
-                            {monthlyBefore} → {monthlyCount}{' '}
+                            {BASELINE.monthlyMembers} → {monthlyCount}{' '}
                             <span className="text-green-600 font-semibold">
-                              (+{monthlyCount - monthlyBefore})
+                              (+{monthlyCount - BASELINE.monthlyMembers})
                             </span>
                           </span>
                         </div>
@@ -365,9 +354,9 @@ export default function SpcPage() {
                         <div className="flex items-center justify-between text-sm mb-2">
                           <span className="font-medium text-zinc-700 dark:text-zinc-300">Anual</span>
                           <span className="text-zinc-600 dark:text-zinc-400 font-medium">
-                            {annualBefore} → {annualCount}{' '}
+                            {BASELINE.annualMembers} → {annualCount}{' '}
                             <span className="text-zinc-500 font-normal">
-                              {annualCount === annualBefore ? '(sin cambio)' : `(+${annualCount - annualBefore})`}
+                              {annualCount === BASELINE.annualMembers ? '(sin cambio)' : `(+${annualCount - BASELINE.annualMembers})`}
                             </span>
                           </span>
                         </div>
