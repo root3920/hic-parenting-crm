@@ -38,6 +38,7 @@ interface DashboardStats {
   mrr: number
   mrrBefore: number
   spcNewMembers: number
+  churnRate: number
   recentTransactions: Transaction[]
   dailyRevenue: { date: string; revenue: number }[]
 }
@@ -56,22 +57,32 @@ export default function DashboardPage() {
     async function fetchStats() {
       const { from, to } = getMonthRange()
 
-      const [txResult, spcResult, setterResult, closerResult] = await Promise.all([
-        supabase
-          .from('transactions')
-          .select('*')
-          .gte('date', from)
-          .lte('date', to)
-          .order('date', { ascending: false }),
-        supabase.from('spc_members').select('*'),
-        supabase.from('setter_reports').select('qualified_calls').gte('date', from).lte('date', to),
-        supabase.from('closer_reports').select('won_deals, cash_collected').gte('date', from).lte('date', to),
-      ])
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10)
+
+      const [txResult, spcResult, setterResult, closerResult, cancelsResult] =
+        await Promise.all([
+          supabase
+            .from('transactions')
+            .select('*')
+            .gte('date', from)
+            .lte('date', to)
+            .order('date', { ascending: false }),
+          supabase.from('spc_members').select('*'),
+          supabase.from('setter_reports').select('qualified_calls').gte('date', from).lte('date', to),
+          supabase.from('closer_reports').select('won_deals, cash_collected').gte('date', from).lte('date', to),
+          supabase
+            .from('spc_cancellations')
+            .select('cancelled_at')
+            .gte('cancelled_at', thirtyDaysAgo),
+        ])
 
       const transactions: Transaction[] = txResult.data ?? []
       const members: { status: string; plan: string; amount: number; created_at: string }[] = spcResult.data ?? []
       const setterReports: { qualified_calls: number }[] = setterResult.data ?? []
       const closerReports: { won_deals: number; cash_collected: number }[] = closerResult.data ?? []
+      const recentCancels: { cancelled_at: string }[] = cancelsResult.data ?? []
 
       const totalRevenue = transactions.reduce((s, t) => s + t.cost, 0)
       const activeMembers = members.filter((m) => m.status === 'active').length
@@ -96,6 +107,13 @@ export default function DashboardPage() {
         (m) => (m.created_at?.slice(0, 10) ?? '') > SPC_CUTOFF
       ).length
 
+      const churnRate =
+        activeMembersList.length > 0
+          ? parseFloat(
+              ((recentCancels.length / activeMembersList.length) * 100).toFixed(1)
+            )
+          : 0
+
       const dailyMap: Record<string, number> = {}
       transactions.forEach((t) => {
         const d = formatShortDate(t.date)
@@ -115,6 +133,7 @@ export default function DashboardPage() {
         mrr,
         mrrBefore,
         spcNewMembers,
+        churnRate,
         recentTransactions: transactions.slice(0, 10),
         dailyRevenue,
       })
@@ -267,7 +286,18 @@ export default function DashboardPage() {
 
                     {/* Churn */}
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-green-600">✓ 0% Churn</span>
+                      <span
+                        className={`text-sm font-semibold ${
+                          (stats?.churnRate ?? 0) < 3
+                            ? 'text-green-600'
+                            : (stats?.churnRate ?? 0) <= 6
+                            ? 'text-amber-600'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {(stats?.churnRate ?? 0) === 0 ? '✓ ' : ''}
+                        {stats?.churnRate ?? 0}% Churn
+                      </span>
                     </div>
 
                     {/* Right arrow hint */}

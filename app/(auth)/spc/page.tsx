@@ -50,7 +50,20 @@ const BASELINE = {
   arr: 18330.00,
 }
 
-type Tab = 'growth' | 'overview' | 'active' | 'trials'
+interface SpcCancellation {
+  id: string
+  name: string
+  email: string
+  source: string
+  cancelled_at: string
+  subscribed_at: string
+  amount: number
+  plan: 'monthly' | 'annual'
+  cancel_type: 'paid_subscription' | 'trial'
+  created_at: string
+}
+
+type Tab = 'growth' | 'overview' | 'active' | 'trials' | 'cancellations'
 
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -66,25 +79,52 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
+function daysActive(subscribedAt: string, cancelledAt: string): number {
+  return Math.max(
+    0,
+    Math.floor(
+      (new Date(cancelledAt).getTime() - new Date(subscribedAt).getTime()) /
+        (1000 * 60 * 60 * 24)
+    )
+  )
+}
+
 export default function SpcPage() {
   const supabase = useMemo(() => createClient(), [])
   const [members, setMembers] = useState<SpcMember[]>([])
+  const [cancellations, setCancellations] = useState<SpcCancellation[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('growth')
 
   useEffect(() => {
-    async function fetchMembers() {
-      const { data } = await supabase
-        .from('spc_members')
-        .select('*')
-        .order('joined_at', { ascending: false })
-
-      setMembers(data ?? [])
+    async function fetchData() {
+      const [membersResult, cancelsResult] = await Promise.all([
+        supabase.from('spc_members').select('*').order('joined_at', { ascending: false }),
+        supabase
+          .from('spc_cancellations')
+          .select('*')
+          .order('cancelled_at', { ascending: false }),
+      ])
+      setMembers(membersResult.data ?? [])
+      setCancellations(cancelsResult.data ?? [])
       setLoading(false)
     }
-    fetchMembers()
+    fetchData()
   }, [])
 
+  // ── Date anchors ─────────────────────────────────────────────────────────
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10)
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10)
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toISOString()
+    .slice(0, 10)
+
+  // ── Members ───────────────────────────────────────────────────────────────
   const activeMembers = members.filter((m) => m.status === 'active')
   const trialMembers = members.filter((m) => m.status === 'trial')
 
@@ -124,6 +164,47 @@ export default function SpcPage() {
     const db = b.trial_end_date ? daysUntil(b.trial_end_date) : 9999
     return da - db
   })
+
+  // ── Cancellation metrics ─────────────────────────────────────────────────
+  const paidCancels = cancellations.filter((c) => c.cancel_type === 'paid_subscription')
+  const thisMonthCancels = cancellations.filter(
+    (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= firstOfMonth
+  )
+  const mrrLost = paidCancels
+    .filter((c) => (c.cancelled_at?.slice(0, 10) ?? '') >= sixtyDaysAgo)
+    .reduce((s, c) => s + c.amount, 0)
+
+  const cancels30d = cancellations.filter(
+    (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= thirtyDaysAgo
+  ).length
+  const churnRate =
+    activeMembers.length > 0
+      ? parseFloat(((cancels30d / activeMembers.length) * 100).toFixed(1))
+      : 0
+
+  const churnColor =
+    churnRate < 3
+      ? 'text-green-600'
+      : churnRate <= 6
+      ? 'text-amber-600'
+      : 'text-red-600'
+  const churnBadgeClass =
+    churnRate < 3
+      ? 'bg-green-100 text-green-700'
+      : churnRate <= 6
+      ? 'bg-amber-100 text-amber-700'
+      : 'bg-red-100 text-red-700'
+
+  // Last 6 months for cancellations chart
+  const last6Months: string[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    last6Months.push(d.toISOString().slice(0, 7))
+  }
+  const cancelsByMonth = last6Months.map((month) => ({
+    date: month.slice(5), // "MM" for display
+    revenue: cancellations.filter((c) => c.cancelled_at?.slice(0, 7) === month).length,
+  }))
 
   // ── Growth tab calculations (baseline hardcoded from Mar 27 snapshot) ────
   const mrrNowMonthly = activeMembers
@@ -178,6 +259,7 @@ export default function SpcPage() {
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
+    { key: 'cancellations', label: `Cancelaciones${!loading ? ` (${paidCancels.length})` : ''}` },
   ]
 
   return (
@@ -295,19 +377,27 @@ export default function SpcPage() {
                 </CardContent>
               </Card>
 
-              {/* Churn */}
+              {/* Churn — live from database */}
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
                     Churn
                   </p>
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-2xl font-semibold text-green-600">0</span>
-                    <span className="text-sm text-zinc-400">miembros</span>
-                  </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
-                    0% churn ✓
-                  </span>
+                  {loading ? (
+                    <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <span className={`text-2xl font-semibold ${churnColor}`}>
+                          {churnRate}%
+                        </span>
+                        <span className="text-sm text-zinc-400">mensual</span>
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${churnBadgeClass}`}>
+                        {thisMonthCancels.length} cancelaciones este mes
+                      </span>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -356,7 +446,9 @@ export default function SpcPage() {
                           <span className="text-zinc-600 dark:text-zinc-400 font-medium">
                             {BASELINE.annualMembers} → {annualCount}{' '}
                             <span className="text-zinc-500 font-normal">
-                              {annualCount === BASELINE.annualMembers ? '(sin cambio)' : `(+${annualCount - BASELINE.annualMembers})`}
+                              {annualCount === BASELINE.annualMembers
+                                ? '(sin cambio)'
+                                : `(+${annualCount - BASELINE.annualMembers})`}
                             </span>
                           </span>
                         </div>
@@ -467,23 +559,18 @@ export default function SpcPage() {
                         transition={{ duration: 0.3, delay: i * 0.05, ease: 'easeOut' }}
                         className="flex items-center gap-3 px-5 py-3"
                       >
-                        {/* Avatar */}
                         <div className="flex-shrink-0 w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold">
                           {getInitials(m.name)}
                         </div>
-                        {/* Name */}
                         <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 flex-1 min-w-0 truncate">
                           {m.name}
                         </span>
-                        {/* Plan badge */}
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium whitespace-nowrap">
                           Mensual ${m.amount}
                         </span>
-                        {/* Date */}
                         <span className="text-xs text-zinc-400 whitespace-nowrap hidden sm:block">
                           {formatDate(m.created_at)}
                         </span>
-                        {/* Provider */}
                         <span className="text-xs text-zinc-400 whitespace-nowrap hidden md:block text-right min-w-14">
                           {m.provider}
                         </span>
@@ -712,6 +799,211 @@ export default function SpcPage() {
                             </TableCell>
                             <TableCell>{trialUrgencyPill(m)}</TableCell>
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                          </AnimatedTableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ── CANCELACIONES ─────────────────────────────────────────────── */}
+        {activeTab === 'cancellations' && (
+          <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Total cancelaciones
+                  </p>
+                  {loading ? (
+                    <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                        {paidCancels.length}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">suscripciones pagadas</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Este mes
+                  </p>
+                  {loading ? (
+                    <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                        {thisMonthCancels.length}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">cancelaciones</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    MRR perdido
+                  </p>
+                  {loading ? (
+                    <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <p className="text-2xl font-semibold text-red-600">
+                        {formatCurrency(mrrLost)}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">últimos 60 días</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Churn mensual
+                  </p>
+                  {loading ? (
+                    <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <p className={`text-2xl font-semibold ${churnColor}`}>
+                        {churnRate}%
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">últimos 30 días</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Cancelaciones por mes chart */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Cancelaciones por mes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="h-52 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-lg" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={cancelsByMonth} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 11, fill: '#71717a' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11, fill: '#71717a' }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={28}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        formatter={(val) => [`${val} cancelaciones`, '']}
+                        cursor={{ fill: '#f4f4f5' }}
+                      />
+                      <Bar dataKey="revenue" fill="#A32D2D" radius={[3, 3, 0, 0]} maxBarSize={48} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Historial de cancelaciones table */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Historial de cancelaciones</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="p-6 space-y-2">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ))}
+                  </div>
+                ) : cancellations.length === 0 ? (
+                  <EmptyState title="Sin cancelaciones" description="Las cancelaciones aparecerán aquí." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead className="hidden md:table-cell">Email</TableHead>
+                          <TableHead>Plan</TableHead>
+                          <TableHead className="text-right">Monto</TableHead>
+                          <TableHead className="hidden md:table-cell">Plataforma</TableHead>
+                          <TableHead className="hidden lg:table-cell">Suscrito desde</TableHead>
+                          <TableHead className="hidden sm:table-cell">Canceló</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">Días activo</TableHead>
+                        </AnimatedTableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cancellations.map((c, i) => (
+                          <AnimatedTableRow
+                            key={c.id}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="visible"
+                            custom={i}
+                            className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                          >
+                            <TableCell>
+                              <div className="font-medium text-sm">{c.name}</div>
+                              <div className="text-xs text-zinc-400 mt-0.5">
+                                <span
+                                  className={cn(
+                                    'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium',
+                                    c.cancel_type === 'paid_subscription'
+                                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                                      : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                                  )}
+                                >
+                                  {c.cancel_type === 'paid_subscription' ? 'Pagado' : 'Trial'}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">
+                              {c.email}
+                            </TableCell>
+                            <TableCell>
+                              <StatusPill
+                                label={c.plan === 'annual' ? 'Annual' : 'Monthly'}
+                                variant={c.plan === 'annual' ? 'success' : 'info'}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
+                              {formatCurrency(c.amount)}
+                            </TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">
+                              {c.source}
+                            </TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">
+                              {c.subscribed_at ? formatDate(c.subscribed_at) : '—'}
+                            </TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
+                              {c.cancelled_at ? formatDate(c.cancelled_at) : '—'}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
+                              {c.subscribed_at && c.cancelled_at
+                                ? `${daysActive(c.subscribed_at, c.cancelled_at)}d`
+                                : '—'}
+                            </TableCell>
                           </AnimatedTableRow>
                         ))}
                       </TableBody>
