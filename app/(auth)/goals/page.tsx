@@ -164,9 +164,12 @@ export default function GoalsPage() {
             connectNulls
           />
           <Tooltip
-            formatter={(v) => (v != null ? `${Number(v).toFixed(1)}` : '—')}
+            formatter={(value) => {
+              if (typeof value !== 'number') return '—'
+              return `${value.toFixed(1)}%`
+            }}
             contentStyle={{ fontSize: 10, padding: '2px 6px' }}
-            labelFormatter={(l) => String(l)}
+            labelFormatter={(label) => String(label)}
           />
         </LineChart>
       </ResponsiveContainer>
