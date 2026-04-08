@@ -22,6 +22,8 @@ import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
 import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTableRow'
+import { KpiGoalCard } from '@/components/shared/KpiGoalCard'
+import { GOALS } from '@/lib/goals'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +67,30 @@ export default function ClosingPage() {
   const offersProposed = filtered.reduce((s, r) => s + r.offers_proposed, 0)
   const wonDeals = filtered.reduce((s, r) => s + r.won_deals, 0)
   const cashCollected = filtered.reduce((s, r) => s + r.cash_collected, 0)
+
+  const daysDiff = Math.max(1, Math.round(
+    (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60 * 24)
+  ))
+  const totalWeeks = daysDiff / 7
+
+  function computeCloserKPIs(closerReports: CloserReport[]) {
+    const m = closerReports.reduce((s, r) => s + r.total_meetings, 0)
+    const sh = closerReports.reduce((s, r) => s + r.showed_meetings, 0)
+    const of = closerReports.reduce((s, r) => s + r.offers_proposed, 0)
+    const wo = closerReports.reduce((s, r) => s + r.won_deals, 0)
+    return {
+      showRate: m > 0 ? (sh / m) * 100 : NaN,
+      offerRate: sh > 0 ? (of / sh) * 100 : NaN,
+      closeRate: of > 0 ? (wo / of) * 100 : NaN,
+      callsPerWeek: totalWeeks > 0 ? m / totalWeeks : NaN,
+    }
+  }
+
+  const caliReports = reports.filter((r) => r.closer_name === 'Cali Luna')
+  const marcelaReports = reports.filter((r) => r.closer_name === 'Marcela HIC Parenting')
+  const caliKPIs = computeCloserKPIs(caliReports)
+  const marcelaKPIs = computeCloserKPIs(marcelaReports)
+  const filteredKPIs = computeCloserKPIs(filtered)
 
   function pct(num: number, den: number, decimals = 1) {
     return den > 0 ? `${((num / den) * 100).toFixed(decimals)}%` : '—'
@@ -151,6 +177,36 @@ export default function ClosingPage() {
           </nav>
         </div>
 
+        {/* Goal KPI cards */}
+        {selectedCloser === 'All' ? (
+          <div className="space-y-4 mb-6">
+            {[
+              { name: 'Cali Luna', kpis: caliKPIs },
+              { name: 'Marcela HIC Parenting', kpis: marcelaKPIs },
+            ].map(({ name, kpis }) => (
+              <div key={name}>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 mb-3">
+                  {name}
+                </span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <KpiGoalCard label={GOALS.closing.showRate.label} description={GOALS.closing.showRate.description} value={kpis.showRate} unit="%" goal={GOALS.closing.showRate} isLoading={loading} />
+                  <KpiGoalCard label={GOALS.closing.offerRate.label} description={GOALS.closing.offerRate.description} value={kpis.offerRate} unit="%" goal={GOALS.closing.offerRate} isLoading={loading} />
+                  <KpiGoalCard label={GOALS.closing.closeRate.label} description={GOALS.closing.closeRate.description} value={kpis.closeRate} unit="%" goal={GOALS.closing.closeRate} isLoading={loading} />
+                  <KpiGoalCard label={GOALS.closing.callsPerWeek.label} description={GOALS.closing.callsPerWeek.description} value={kpis.callsPerWeek} unit="" goal={GOALS.closing.callsPerWeek} isLoading={loading} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <KpiGoalCard label={GOALS.closing.showRate.label} description={GOALS.closing.showRate.description} value={filteredKPIs.showRate} unit="%" goal={GOALS.closing.showRate} isLoading={loading} />
+            <KpiGoalCard label={GOALS.closing.offerRate.label} description={GOALS.closing.offerRate.description} value={filteredKPIs.offerRate} unit="%" goal={GOALS.closing.offerRate} isLoading={loading} />
+            <KpiGoalCard label={GOALS.closing.closeRate.label} description={GOALS.closing.closeRate.description} value={filteredKPIs.closeRate} unit="%" goal={GOALS.closing.closeRate} isLoading={loading} />
+            <KpiGoalCard label={GOALS.closing.callsPerWeek.label} description={GOALS.closing.callsPerWeek.description} value={filteredKPIs.callsPerWeek} unit="" goal={GOALS.closing.callsPerWeek} isLoading={loading} />
+          </div>
+        )}
+
+        {/* Raw count KPIs */}
         <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-3 mb-6">
           <KPICard title="Total Meetings" value={totalMeetings} loading={loading} />
           <KPICard title="Showed" value={showed} subtitle={`${showRatePct} show rate`} loading={loading} />

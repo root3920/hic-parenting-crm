@@ -22,6 +22,8 @@ import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
 import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTableRow'
+import { KpiGoalCard } from '@/components/shared/KpiGoalCard'
+import { GOALS } from '@/lib/goals'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,6 +76,11 @@ export default function SettingPage() {
   const proposalRatePct = pct(totalProposed, totalConvos)
   const followUpRatePct = pct(totalFollowUps, totalConvos)
   const outboundRatePct = pct(totalOutbound, totalConvos)
+
+  // Goal KPIs
+  const pitchRate = totalConvos > 0 ? (totalProposed / totalConvos) * 100 : NaN
+  const bookingRate = totalProposed > 0 ? (totalQualified / totalProposed) * 100 : NaN
+  const conversionGeneral = totalConvos > 0 ? (totalQualified / totalConvos) * 100 : NaN
 
   const chartData = filtered
     .slice()
@@ -129,6 +136,35 @@ export default function SettingPage() {
           </div>
         </PageHeader>
 
+        {/* Goal KPI cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <KpiGoalCard
+            label={GOALS.setting.pitchRate.label}
+            description={GOALS.setting.pitchRate.description}
+            value={pitchRate}
+            unit="%"
+            goal={GOALS.setting.pitchRate}
+            isLoading={loading}
+          />
+          <KpiGoalCard
+            label={GOALS.setting.bookingRate.label}
+            description={GOALS.setting.bookingRate.description}
+            value={bookingRate}
+            unit="%"
+            goal={GOALS.setting.bookingRate}
+            isLoading={loading}
+          />
+          <KpiGoalCard
+            label={GOALS.setting.conversionGeneral.label}
+            description={GOALS.setting.conversionGeneral.description}
+            value={conversionGeneral}
+            unit="%"
+            goal={GOALS.setting.conversionGeneral}
+            isLoading={loading}
+          />
+        </div>
+
+        {/* Raw count KPIs */}
         <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-3 mb-6">
           <KPICard title="Total Convos" value={totalConvos} loading={loading} />
           <KPICard title="Qualified Calls" value={totalQualified} subtitle={`${conversionRatePct} conversion`} loading={loading} />

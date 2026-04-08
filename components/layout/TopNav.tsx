@@ -11,6 +11,7 @@ import {
   DollarSign,
   MessageSquare,
   Handshake,
+  Target,
   Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/sales', label: 'Sales', icon: DollarSign },
   { href: '/setting', label: 'Setters', icon: MessageSquare },
   { href: '/closing', label: 'Closers', icon: Handshake },
+  { href: '/goals', label: 'Metas', icon: Target },
   { href: '/spc', label: 'SPC Members', icon: Users },
 ]
 
