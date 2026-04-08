@@ -164,7 +164,7 @@ export default function GoalsPage() {
             connectNulls
           />
           <Tooltip
-            formatter={(v: number) => (v != null ? `${v.toFixed(1)}` : '—')}
+            formatter={(v) => (v != null ? `${Number(v).toFixed(1)}` : '—')}
             contentStyle={{ fontSize: 10, padding: '2px 6px' }}
             labelFormatter={(l) => String(l)}
           />
