@@ -74,3 +74,54 @@ export interface DateRange {
   from: Date | undefined
   to: Date | undefined
 }
+
+export interface CsmReport {
+  id: string
+  date: string
+  csm_name: string
+  // Retención
+  r_solicitudes: number
+  r_saved: number
+  r_churn: number
+  r_pausas: number
+  r_cancel_reasons: string[] | null
+  r_notas: string | null
+  // Seguimiento
+  s_checkins: number
+  s_riesgo: number
+  s_wins: number
+  s_dudas: number
+  s_engagement: string
+  s_fricciones: string[] | null
+  s_notas: string | null
+  // Graduados
+  g_contactados: number
+  g_conversaciones: number
+  g_llamadas: number
+  g_seguimientos: number
+  g_sin_respuesta: number
+  g_referidos: number
+  g_oportunidades: string[] | null
+  g_objeciones: string[] | null
+  g_notas: string | null
+  // Soporte
+  t_recibidos: number
+  t_resueltos: number
+  t_pendientes: number
+  t_escalados: number
+  t_origen: string[] | null
+  t_notas: string | null
+  // Escalamientos
+  e_criticos: number
+  e_coaches: number
+  e_liderazgo: number
+  e_resueltos: number
+  e_caso_relevante: string | null
+  // Cierre
+  c_wins: string | null
+  c_riesgos: string | null
+  c_accion1: string | null
+  c_accion2: string | null
+  c_accion3: string | null
+  created_at: string
+}

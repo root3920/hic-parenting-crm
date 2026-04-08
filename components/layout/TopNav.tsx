@@ -13,10 +13,13 @@ import {
   Handshake,
   Target,
   Users,
+  UsersRound,
+  Plus,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -26,8 +29,9 @@ const navItems = [
   { href: '/sales', label: 'Sales', icon: DollarSign },
   { href: '/setting', label: 'Setters', icon: MessageSquare },
   { href: '/closing', label: 'Closers', icon: Handshake },
-  { href: '/goals', label: 'Metas', icon: Target },
   { href: '/spc', label: 'SPC Members', icon: Users },
+  { href: '/equipo/csm', label: 'Equipo', icon: UsersRound },
+  { href: '/goals', label: 'Metas', icon: Target },
 ]
 
 export function TopNav() {
@@ -35,12 +39,24 @@ export function TopNav() {
   const pathname = usePathname()
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false)
+  const quickMenuRef = useRef<HTMLDivElement>(null)
 
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
   }
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (quickMenuRef.current && !quickMenuRef.current.contains(e.target as Node)) {
+        setQuickMenuOpen(false)
+      }
+    }
+    if (quickMenuOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [quickMenuOpen])
 
   return (
     <>
@@ -89,6 +105,47 @@ export function TopNav() {
 
           {/* Right side */}
           <div className="flex items-center gap-2 shrink-0 ml-auto">
+
+            {/* Quick action + button (desktop only) */}
+            <div ref={quickMenuRef} className="relative hidden md:block">
+              <button
+                onClick={() => setQuickMenuOpen((v) => !v)}
+                className={cn(
+                  'flex items-center justify-center h-7 w-7 rounded-full border transition-colors',
+                  quickMenuOpen
+                    ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600'
+                    : 'border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200'
+                )}
+                aria-label="Quick actions"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+
+              <AnimatePresence>
+                {quickMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg z-50 py-1.5 overflow-hidden"
+                  >
+                    <Link
+                      href="/equipo/csm/nuevo"
+                      onClick={() => setQuickMenuOpen(false)}
+                      className="flex items-start gap-3 px-3.5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                      <FileText className="h-4 w-4 mt-0.5 text-zinc-400 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Reporte CSM diario</p>
+                        <p className="text-xs text-zinc-400 dark:text-zinc-500">Client Success HT</p>
+                      </div>
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <Link
               href="/settings"
               className={cn(
@@ -139,7 +196,6 @@ export function TopNav() {
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Overlay */}
             <motion.div
               className="fixed inset-0 z-40 bg-black/40 md:hidden"
               initial={{ opacity: 0 }}
@@ -148,7 +204,6 @@ export function TopNav() {
               transition={{ duration: 0.25, ease: 'easeOut' }}
               onClick={() => setIsOpen(false)}
             />
-            {/* Drawer */}
             <motion.div
               className="fixed top-0 left-0 z-50 h-full w-[280px] bg-white dark:bg-zinc-900 shadow-xl flex flex-col pt-14 md:hidden"
               initial={{ x: -280 }}
@@ -176,6 +231,15 @@ export function TopNav() {
                     </Link>
                   )
                 })}
+                {/* Quick action in mobile drawer */}
+                <Link
+                  href="/equipo/csm/nuevo"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-3 px-4 h-12 rounded-xl text-sm font-medium transition-colors text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  <FileText className="h-4 w-4 shrink-0" />
+                  Reporte CSM diario
+                </Link>
               </nav>
               <div className="px-3 pb-6 space-y-1 border-t border-zinc-200 dark:border-zinc-800 pt-4">
                 <Link
