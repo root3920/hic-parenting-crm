@@ -9,7 +9,7 @@ import {
   X,
   LayoutDashboard,
   DollarSign,
-  MessageSquare,
+
   Handshake,
   Target,
   Users,
@@ -28,7 +28,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/sales', label: 'Sales', icon: DollarSign },
-  { href: '/equipo/setter', label: 'Setters', icon: MessageSquare },
+
   { href: '/closing', label: 'Closers', icon: Handshake },
   { href: '/spc', label: 'SPC Members', icon: Users },
   { href: '/equipo/csm', label: 'Equipo', icon: UsersRound },
