@@ -9,7 +9,7 @@ import {
   X,
   LayoutDashboard,
   DollarSign,
-
+  Phone,
   Target,
   Users,
   UsersRound,
@@ -29,6 +29,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/sales', label: 'Sales', icon: DollarSign },
 
+  { href: '/llamadas', label: 'Llamadas', icon: Phone },
   { href: '/spc', label: 'SPC Members', icon: Users },
   { href: '/equipo/csm', label: 'Equipo', icon: UsersRound },
   { href: '/goals', label: 'Metas', icon: Target },

@@ -75,6 +75,30 @@ export interface DateRange {
   to: Date | undefined
 }
 
+export interface Call {
+  id: string
+  start_date: string
+  end_date: string | null
+  full_name: string
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  phone: string | null
+  meeting_url: string | null
+  activity_type: string | null
+  status: 'Scheduled' | 'Rescheduled' | 'Showed Up' | 'Cancelled' | 'No show'
+  call_type: 'Qualified' | 'Disqualified' | 'Onboarding' | 'Interview' | null
+  calendar: string | null
+  setter_name: string | null
+  closer_name: string | null
+  notes: string | null
+  objections: string | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  created_at: string
+}
+
 export interface CloserDailyReport {
   id: string
   date: string
