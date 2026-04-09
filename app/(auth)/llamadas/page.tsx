@@ -298,15 +298,19 @@ export default function LlamadasPage() {
   const weeklyData = useMemo(() => {
     const thirtyAgo = new Date(); thirtyAgo.setDate(thirtyAgo.getDate() - 30)
     const recent = calls.filter(c => new Date(c.start_date) >= thirtyAgo)
-    const weeks: Record<string, Record<string, number>> = {}
+    interface WeekData {
+      wk: string
+      [key: string]: string | number
+    }
+    const weeks: Record<string, WeekData> = {}
     for (const c of recent) {
       const wk = weekStart(c.start_date)
       if (!weeks[wk]) weeks[wk] = { wk }
-      weeks[wk][c.status] = (weeks[wk][c.status] ?? 0) + 1
+      weeks[wk][c.status] = ((weeks[wk][c.status] as number) ?? 0) + 1
     }
     return Object.values(weeks)
-      .sort((a, b) => (a.wk as string).localeCompare(b.wk as string))
-      .map(w => ({ ...w, label: weekLabel(w.wk as string) }))
+      .sort((a, b) => a.wk.localeCompare(b.wk))
+      .map(w => ({ ...w, label: weekLabel(w.wk) }))
   }, [calls])
 
   const totalCalls = tableData.length
