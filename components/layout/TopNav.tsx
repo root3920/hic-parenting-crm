@@ -10,13 +10,13 @@ import {
   LayoutDashboard,
   DollarSign,
 
-  Handshake,
   Target,
   Users,
   UsersRound,
   Plus,
   FileText,
   BarChart2,
+  TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -29,7 +29,6 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/sales', label: 'Sales', icon: DollarSign },
 
-  { href: '/closing', label: 'Closers', icon: Handshake },
   { href: '/spc', label: 'SPC Members', icon: Users },
   { href: '/equipo/csm', label: 'Equipo', icon: UsersRound },
   { href: '/goals', label: 'Metas', icon: Target },
@@ -153,6 +152,17 @@ export function TopNav() {
                         <p className="text-xs text-zinc-400 dark:text-zinc-500">Setting Team</p>
                       </div>
                     </Link>
+                    <Link
+                      href="/equipo/closer/nuevo"
+                      onClick={() => setQuickMenuOpen(false)}
+                      className="flex items-start gap-3 px-3.5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                      <TrendingUp className="h-4 w-4 mt-0.5 text-zinc-400 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Reporte Closer diario</p>
+                        <p className="text-xs text-zinc-400 dark:text-zinc-500">Closing Team</p>
+                      </div>
+                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -259,6 +269,14 @@ export function TopNav() {
                 >
                   <BarChart2 className="h-4 w-4 shrink-0" />
                   Reporte Setter diario
+                </Link>
+                <Link
+                  href="/equipo/closer/nuevo"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-3 px-4 h-12 rounded-xl text-sm font-medium transition-colors text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  <TrendingUp className="h-4 w-4 shrink-0" />
+                  Reporte Closer diario
                 </Link>
               </nav>
               <div className="px-3 pb-6 space-y-1 border-t border-zinc-200 dark:border-zinc-800 pt-4">

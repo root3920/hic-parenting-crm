@@ -15,7 +15,9 @@
       "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/)",
       "Bash(cat /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/csm/layout.tsx)",
       "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(ls -la \"/Users/federicoalarconu/hic-dashboard/app/\\(auth\\)/\")",
+      "Bash(find:*)"
     ]
   }
 }

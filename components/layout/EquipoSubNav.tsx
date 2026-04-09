@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users, BarChart2 } from 'lucide-react'
+import { Users, BarChart2, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const tabs = [
   { href: '/equipo/csm', label: 'Client Success HT', icon: Users },
   { href: '/equipo/setter', label: 'Setting Team', icon: BarChart2 },
+  { href: '/equipo/closer', label: 'Closing Team', icon: TrendingUp },
 ]
 
 export function EquipoSubNav() {

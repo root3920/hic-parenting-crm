@@ -75,6 +75,27 @@ export interface DateRange {
   to: Date | undefined
 }
 
+export interface CloserDailyReport {
+  id: string
+  date: string
+  closer_name: string
+  total_meetings: number
+  showed_meetings: number
+  cancelled_meetings: number
+  no_show_meetings: number
+  rescheduled_meetings: number
+  followup_meetings: number
+  total_offers: number
+  offers_proposed: number
+  won_deals: number
+  lost_deals: number
+  cash_collected: number
+  recurrent_cash: number
+  feedback: string | null
+  source: string
+  created_at: string
+}
+
 export interface SetterDailyReport {
   id: string
   date: string
