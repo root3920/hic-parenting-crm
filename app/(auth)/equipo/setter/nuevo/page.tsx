@@ -37,10 +37,8 @@ interface FormState {
   // Pipeline
   calls_proposed: string
   calls_booked: string
-  calls_done: string
-  calls_cancelled: string
-  calls_noshow: string
-  calls_rescheduled: string
+  calls_no_reply: string
+  calls_followup: string
   // Calificación
   qual_apps: string
   disqual_apps: string
@@ -63,7 +61,7 @@ const initialState: FormState = {
   setter_name: DEFAULT_SETTERS[0],
   hours_worked: '8',
   total_convos: '', followups: '', inbound: '', outbound: '', no_reply: '', new_leads: '',
-  calls_proposed: '', calls_booked: '', calls_done: '', calls_cancelled: '', calls_noshow: '', calls_rescheduled: '',
+  calls_proposed: '', calls_booked: '', calls_no_reply: '', calls_followup: '',
   qual_apps: '', disqual_apps: '', waiting: '', requalified: 'N/A', disqual_reasons: [],
   spc_invites: '', spc_new: '', spc_interested: '',
   performance_score: 7, highs: [], lows: [], notas: '',
@@ -161,11 +159,11 @@ export default function NuevoReporteSetterPage() {
   // Live KPIs
   const liveKPIs = useMemo(() => ({
     convRate: pct(n(form.calls_booked), n(form.total_convos)),
-    showRate: pct(n(form.calls_done), n(form.calls_booked)),
+    bookingRate: pct(n(form.calls_booked), n(form.calls_proposed)),
     qualRate: pct(n(form.qual_apps), n(form.qual_apps) + n(form.disqual_apps)),
     convosPerHora: dec(n(form.total_convos), n(form.hours_worked)),
     spcConvRate: pct(n(form.spc_new), n(form.spc_invites)),
-  }), [form.calls_booked, form.total_convos, form.calls_done, form.qual_apps, form.disqual_apps, form.hours_worked, form.spc_new, form.spc_invites])
+  }), [form.calls_booked, form.total_convos, form.calls_proposed, form.qual_apps, form.disqual_apps, form.hours_worked, form.spc_new, form.spc_invites])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -186,10 +184,8 @@ export default function NuevoReporteSetterPage() {
       new_leads: n(form.new_leads),
       calls_proposed: n(form.calls_proposed),
       calls_booked: n(form.calls_booked),
-      calls_done: n(form.calls_done),
-      calls_cancelled: n(form.calls_cancelled),
-      calls_noshow: n(form.calls_noshow),
-      calls_rescheduled: n(form.calls_rescheduled),
+      calls_no_reply: n(form.calls_no_reply),
+      calls_followup: n(form.calls_followup),
       qual_apps: n(form.qual_apps),
       disqual_apps: n(form.disqual_apps),
       waiting: n(form.waiting),
@@ -234,7 +230,7 @@ export default function NuevoReporteSetterPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
           {[
             { label: 'Conv Rate', value: liveKPIs.convRate },
-            { label: 'Show Rate', value: liveKPIs.showRate },
+            { label: 'Tasa agendamiento', value: liveKPIs.bookingRate },
             { label: '% Calificados', value: liveKPIs.qualRate },
             { label: 'Convos/hora', value: liveKPIs.convosPerHora },
             { label: 'Conv SPC', value: liveKPIs.spcConvRate },
@@ -302,15 +298,11 @@ export default function NuevoReporteSetterPage() {
               label="Llamadas"
               sub="Pipeline de llamadas"
             />
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FieldLabel>Propuestas</FieldLabel><NumberInput value={form.calls_proposed} onChange={(v) => set('calls_proposed', v)} /></div>
-              <div><FieldLabel>Agendadas</FieldLabel><NumberInput value={form.calls_booked} onChange={(v) => set('calls_booked', v)} /></div>
-              <div><FieldLabel>Realizadas</FieldLabel><NumberInput value={form.calls_done} onChange={(v) => set('calls_done', v)} /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><FieldLabel>Canceladas</FieldLabel><NumberInput value={form.calls_cancelled} onChange={(v) => set('calls_cancelled', v)} /></div>
-              <div><FieldLabel>No-show</FieldLabel><NumberInput value={form.calls_noshow} onChange={(v) => set('calls_noshow', v)} /></div>
-              <div><FieldLabel>Reagendadas</FieldLabel><NumberInput value={form.calls_rescheduled} onChange={(v) => set('calls_rescheduled', v)} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><FieldLabel>Llamadas propuestas</FieldLabel><NumberInput value={form.calls_proposed} onChange={(v) => set('calls_proposed', v)} /></div>
+              <div><FieldLabel>Llamadas agendadas</FieldLabel><NumberInput value={form.calls_booked} onChange={(v) => set('calls_booked', v)} /></div>
+              <div><FieldLabel>Propuestas sin respuesta</FieldLabel><NumberInput value={form.calls_no_reply} onChange={(v) => set('calls_no_reply', v)} /></div>
+              <div><FieldLabel>En seguimiento</FieldLabel><NumberInput value={form.calls_followup} onChange={(v) => set('calls_followup', v)} /></div>
             </div>
           </SectionCard>
 
