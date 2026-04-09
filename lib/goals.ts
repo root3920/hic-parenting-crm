@@ -31,6 +31,43 @@ export const GOALS = {
       description: 'Calls calificadas / Total convos',
     } as GoalConfig,
   },
+  setter_daily: {
+    convRate: {
+      target: 5.5,
+      alert: 4.0,
+      unit: '%',
+      label: 'Conv Rate',
+      description: 'Calls agendadas / Total convos',
+    } as GoalConfig,
+    showRate: {
+      target: 30.0,
+      alert: 20.0,
+      unit: '%',
+      label: 'Show Rate',
+      description: 'Calls realizadas / Calls agendadas',
+    } as GoalConfig,
+    qualRate: {
+      target: 60.0,
+      alert: 40.0,
+      unit: '%',
+      label: '% Calificados',
+      description: 'Calificados / (Cal + Descal)',
+    } as GoalConfig,
+    convosPerHour: {
+      target: 10.0,
+      alert: 7.0,
+      unit: '',
+      label: 'Convos/hora',
+      description: 'Total convos / Horas trabajadas',
+    } as GoalConfig,
+    spcConvRate: {
+      target: 20.0,
+      alert: 10.0,
+      unit: '%',
+      label: 'Conv SPC',
+      description: 'Nuevos SPC / Invitaciones SPC',
+    } as GoalConfig,
+  },
   closing: {
     showRate: {
       target: 65.0,

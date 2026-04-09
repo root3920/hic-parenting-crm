@@ -16,6 +16,7 @@ import {
   UsersRound,
   Plus,
   FileText,
+  BarChart2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -141,6 +142,17 @@ export function TopNav() {
                         <p className="text-xs text-zinc-400 dark:text-zinc-500">Client Success HT</p>
                       </div>
                     </Link>
+                    <Link
+                      href="/equipo/setter/nuevo"
+                      onClick={() => setQuickMenuOpen(false)}
+                      className="flex items-start gap-3 px-3.5 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                      <BarChart2 className="h-4 w-4 mt-0.5 text-zinc-400 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Reporte Setter diario</p>
+                        <p className="text-xs text-zinc-400 dark:text-zinc-500">Setting Team</p>
+                      </div>
+                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -231,7 +243,7 @@ export function TopNav() {
                     </Link>
                   )
                 })}
-                {/* Quick action in mobile drawer */}
+                {/* Quick actions in mobile drawer */}
                 <Link
                   href="/equipo/csm/nuevo"
                   onClick={() => setIsOpen(false)}
@@ -239,6 +251,14 @@ export function TopNav() {
                 >
                   <FileText className="h-4 w-4 shrink-0" />
                   Reporte CSM diario
+                </Link>
+                <Link
+                  href="/equipo/setter/nuevo"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-3 px-4 h-12 rounded-xl text-sm font-medium transition-colors text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  <BarChart2 className="h-4 w-4 shrink-0" />
+                  Reporte Setter diario
                 </Link>
               </nav>
               <div className="px-3 pb-6 space-y-1 border-t border-zinc-200 dark:border-zinc-800 pt-4">

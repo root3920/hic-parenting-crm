@@ -75,6 +75,43 @@ export interface DateRange {
   to: Date | undefined
 }
 
+export interface SetterDailyReport {
+  id: string
+  date: string
+  setter_name: string
+  hours_worked: number
+  // Conversaciones
+  total_convos: number
+  followups: number
+  inbound: number
+  outbound: number
+  no_reply: number
+  new_leads: number
+  // Pipeline de llamadas
+  calls_proposed: number
+  calls_booked: number
+  calls_done: number
+  calls_cancelled: number
+  calls_noshow: number
+  calls_rescheduled: number
+  // Leads calificados
+  qual_apps: number
+  disqual_apps: number
+  waiting: number
+  requalified: string
+  disqual_reasons: string[] | null
+  // SPC
+  spc_invites: number
+  spc_new: number
+  spc_interested: number
+  // Autoevaluación
+  performance_score: number
+  highs: string[] | null
+  lows: string[] | null
+  notas: string | null
+  created_at: string
+}
+
 export interface CsmReport {
   id: string
   date: string
