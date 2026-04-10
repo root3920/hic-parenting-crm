@@ -49,7 +49,7 @@ function s(arr: CloserDailyReport[], key: keyof CloserDailyReport) {
 
 function safeDiv(num: number, den: number) { return den > 0 ? num / den : NaN }
 
-function fmtPct(v: number, dec = 1) { return isNaN(v) ? '—' : `${v.toFixed(dec)}%` }
+function fmtPct(v: number, dec = 1) { return isNaN(v) ? '0%' : `${v.toFixed(dec)}%` }
 
 function fmtCash(v: number) {
   return isNaN(v) || v === 0 ? '$0' : `$${Math.round(v).toLocaleString()}`
