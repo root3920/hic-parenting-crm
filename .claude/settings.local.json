@@ -17,7 +17,11 @@
       "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/)",
       "Bash(cat:*)",
       "Bash(ls -la \"/Users/federicoalarconu/hic-dashboard/app/\\(auth\\)/\")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(head -20 grep -n \"new Date\\(\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/csm/page.tsx)",
+      "Bash(head -20 grep -n \"new Date\\(\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/llamadas/page.tsx)",
+      "Bash(head -20 grep -n \"new Date\\(\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/setter/page.tsx)",
+      "Bash(head -15 grep -n \"new Date\\(r\\\\.\\\\|toLocaleDateString\\\\|formatDate\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/csm/page.tsx)"
     ]
   }
 }

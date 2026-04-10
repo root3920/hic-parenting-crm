@@ -14,8 +14,14 @@ export function formatCurrency(value: number, currency = 'USD'): string {
   }).format(value)
 }
 
+// Parse YYYY-MM-DD date strings in local time to avoid UTC midnight → day-before shift
+function localDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return localDate(dateStr).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -23,7 +29,7 @@ export function formatDate(dateStr: string): string {
 }
 
 export function formatShortDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return localDate(dateStr).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   })

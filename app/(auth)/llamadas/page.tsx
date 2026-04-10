@@ -86,9 +86,11 @@ function weekStart(dateStr: string): string {
 }
 
 function weekLabel(wk: string): string {
-  const d = new Date(wk)
+  // wk is YYYY-MM-DD — parse in local time to avoid UTC midnight day shift
+  const [y, m, d] = wk.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-  return `${d.getDate()} ${months[d.getMonth()]}`
+  return `${date.getDate()} ${months[date.getMonth()]}`
 }
 
 function initials(name: string) {
