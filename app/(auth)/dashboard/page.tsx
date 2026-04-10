@@ -74,7 +74,8 @@ export default function DashboardPage() {
           supabase.from('closer_reports').select('won_deals, cash_collected').gte('date', from).lte('date', to),
           supabase
             .from('spc_cancellations')
-            .select('cancelled_at')
+            .select('id')
+            .eq('cancel_type', 'paid_cancel')
             .gte('cancelled_at', thirtyDaysAgo),
         ])
 
@@ -82,7 +83,7 @@ export default function DashboardPage() {
       const members: { status: string; plan: string; amount: number; created_at: string }[] = spcResult.data ?? []
       const setterReports: { qualified_calls: number }[] = setterResult.data ?? []
       const closerReports: { won_deals: number; cash_collected: number }[] = closerResult.data ?? []
-      const recentCancels: { cancelled_at: string }[] = cancelsResult.data ?? []
+      const recentCancels: { id: string }[] = cancelsResult.data ?? []
 
       const totalRevenue = transactions.reduce((s, t) => s + t.cost, 0)
       const activeMembers = members.filter((m) => m.status === 'active').length
