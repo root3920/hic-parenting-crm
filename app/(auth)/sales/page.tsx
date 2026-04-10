@@ -228,25 +228,26 @@ export default function SalesPage() {
     setConfirm(null)
   }
 
+  const q = search.toLowerCase()
   const filtered = transactions.filter(
     (t) =>
-      t.buyer_name.toLowerCase().includes(search.toLowerCase()) ||
-      (t.buyer_email ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      t.offer_title.toLowerCase().includes(search.toLowerCase())
+      (t.buyer_name ?? '').toLowerCase().includes(q) ||
+      (t.buyer_email ?? '').toLowerCase().includes(q) ||
+      (t.offer_title ?? '').toLowerCase().includes(q)
   )
 
   // Active = non-refunded; used for all revenue calculations
   const active = transactions.filter((t) => t.status !== 'refunded')
   const refunded = transactions.filter((t) => t.status === 'refunded')
 
-  const grossRevenue = transactions.reduce((s, t) => s + t.cost, 0)
-  const refundedAmount = refunded.reduce((s, t) => s + t.cost, 0)
+  const grossRevenue = transactions.reduce((s, t) => s + (Number(t.cost) || 0), 0)
+  const refundedAmount = refunded.reduce((s, t) => s + (Number(t.cost) || 0), 0)
   const totalRevenue = grossRevenue - refundedAmount
   const avgTicket = active.length > 0 ? totalRevenue / active.length : 0
 
   const dailyMap: Record<string, number> = {}
   active.forEach((t) => {
-    dailyMap[t.date] = (dailyMap[t.date] ?? 0) + t.cost
+    dailyMap[t.date] = (dailyMap[t.date] ?? 0) + (Number(t.cost) || 0)
   })
   const dailyRevenue = Object.entries(dailyMap)
     .map(([date, revenue]) => ({ date: formatShortDate(date), revenue }))
@@ -254,8 +255,8 @@ export default function SalesPage() {
 
   const bestDay = Object.entries(dailyMap).sort((a, b) => b[1] - a[1])[0]
 
-  const kajabi = active.filter((t) => t.source === 'Kajabi').reduce((s, t) => s + t.cost, 0)
-  const ghl = active.filter((t) => t.source === 'GoHighLevel').reduce((s, t) => s + t.cost, 0)
+  const kajabi = active.filter((t) => t.source === 'Kajabi').reduce((s, t) => s + (Number(t.cost) || 0), 0)
+  const ghl = active.filter((t) => t.source === 'GoHighLevel').reduce((s, t) => s + (Number(t.cost) || 0), 0)
   const sourceData = [
     { name: 'Kajabi', value: kajabi, color: '#185FA5' },
     { name: 'GoHighLevel', value: ghl, color: '#3B6D11' },
@@ -263,11 +264,12 @@ export default function SalesPage() {
 
   const productMap: Record<string, ProductStat> = {}
   active.forEach((t) => {
-    if (!productMap[t.offer_title]) {
-      productMap[t.offer_title] = { name: t.offer_title, revenue: 0, count: 0 }
+    const key = t.offer_title ?? '(sin título)'
+    if (!productMap[key]) {
+      productMap[key] = { name: key, revenue: 0, count: 0 }
     }
-    productMap[t.offer_title].revenue += t.cost
-    productMap[t.offer_title].count++
+    productMap[key].revenue += Number(t.cost) || 0
+    productMap[key].count++
   })
   const products = Object.values(productMap).sort((a, b) => b.revenue - a.revenue)
   const maxRevenue = products[0]?.revenue ?? 1
