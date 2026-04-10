@@ -54,7 +54,7 @@ interface UnifiedSetterDay {
 function mapSetterReport(r: any): UnifiedSetterDay {
   return {
     id: `sr_${r.id}`,
-    date: r.date,
+    date: normalizeDate(r.date),
     setter_name: normalizeName(r.setter_name),
     total_convos: r.total_convos ?? 0,
     follow_ups: r.follow_ups ?? 0,
@@ -83,7 +83,7 @@ function mapSetterReport(r: any): UnifiedSetterDay {
 function mapDailyReport(r: any): UnifiedSetterDay {
   return {
     id: `sdr_${r.id}`,
-    date: r.date,
+    date: normalizeDate(r.date),
     setter_name: normalizeName(r.setter_name),
     total_convos: r.total_convos ?? 0,
     follow_ups: r.followups ?? 0,
@@ -110,25 +110,34 @@ function mapDailyReport(r: any): UnifiedSetterDay {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function normalizeName(name: string): string {
-  return name.replace('@', '').trim()
+function normalizeName(name: string | null | undefined): string {
+  return (name ?? '').replace('@', '').trim()
+}
+
+// Normalize DB date values to YYYY-MM-DD regardless of whether the column
+// returns a plain date string or a full ISO timestamp
+function normalizeDate(date: string): string {
+  return (date ?? '').slice(0, 10)
 }
 
 type Preset = '7d' | '30d' | '90d' | 'todo'
 
+// Use local year/month/day to avoid UTC-offset drift on date strings
+function localDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function getDateRange(preset: Preset) {
-  const fmtDate = (d: Date) => d.toISOString().split('T')[0]
-  const endOfToday = () => {
-    const d = new Date()
-    d.setHours(23, 59, 59, 999)
-    return fmtDate(d)
-  }
+  const today = new Date()
+  const to = localDateStr(today)
   const daysAgo = (n: number) => {
     const d = new Date()
     d.setDate(d.getDate() - n)
-    return fmtDate(d)
+    return localDateStr(d)
   }
-  const to = endOfToday()
   if (preset === '7d')  return { from: daysAgo(6),  to }
   if (preset === '30d') return { from: daysAgo(29), to }
   if (preset === '90d') return { from: daysAgo(89), to }
@@ -303,13 +312,15 @@ export default function SetterDashboardPage() {
     ])
 
     // Merge: key = date_settername, prefer daily
+    // Use normalizeDate on r.date (raw DB value) so timestamptz vs date columns
+    // produce the same key regardless of format
     const merged = new Map<string, UnifiedSetterDay>()
     for (const r of (legacy ?? [])) {
-      const key = `${r.date}_${normalizeName(r.setter_name)}`
+      const key = `${normalizeDate(r.date)}_${normalizeName(r.setter_name)}`
       merged.set(key, mapSetterReport(r))
     }
     for (const r of (daily ?? [])) {
-      const key = `${r.date}_${normalizeName(r.setter_name)}`
+      const key = `${normalizeDate(r.date)}_${normalizeName(r.setter_name)}`
       const existing = merged.get(key)
       if (existing) {
         merged.set(key, { ...mapDailyReport(r), id: `both_${r.id}`, source: 'both' })
