@@ -25,11 +25,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  const { pathname } = request.nextUrl
+
+  if (pathname.startsWith('/api/webhooks')) {
+    return NextResponse.next()
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
 
   if (!user && pathname !== '/login') {
     const url = request.nextUrl.clone()
