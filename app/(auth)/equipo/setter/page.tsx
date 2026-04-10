@@ -116,23 +116,23 @@ function normalizeName(name: string): string {
 
 type Preset = '7d' | '30d' | '90d' | 'todo'
 
-function getDateRange(preset: Preset, customFrom?: string, customTo?: string) {
-  const today = new Date()
-  const fmt = (d: Date) => d.toISOString().split('T')[0]
-  if (preset === '7d') {
-    const from = new Date(today); from.setDate(today.getDate() - 6)
-    return { from: fmt(from), to: fmt(today) }
+function getDateRange(preset: Preset) {
+  const fmtDate = (d: Date) => d.toISOString().split('T')[0]
+  const endOfToday = () => {
+    const d = new Date()
+    d.setHours(23, 59, 59, 999)
+    return fmtDate(d)
   }
-  if (preset === '30d') {
-    const from = new Date(today); from.setDate(today.getDate() - 29)
-    return { from: fmt(from), to: fmt(today) }
+  const daysAgo = (n: number) => {
+    const d = new Date()
+    d.setDate(d.getDate() - n)
+    return fmtDate(d)
   }
-  if (preset === '90d') {
-    const from = new Date(today); from.setDate(today.getDate() - 89)
-    return { from: fmt(from), to: fmt(today) }
-  }
-  // 'todo'
-  return { from: '2020-01-01', to: fmt(today) }
+  const to = endOfToday()
+  if (preset === '7d')  return { from: daysAgo(6),  to }
+  if (preset === '30d') return { from: daysAgo(29), to }
+  if (preset === '90d') return { from: daysAgo(89), to }
+  return { from: '2020-01-01', to }
 }
 
 function s(arr: UnifiedSetterDay[], key: keyof UnifiedSetterDay) {
@@ -298,8 +298,8 @@ export default function SetterDashboardPage() {
     setLoading(true)
     setData([])
     const [{ data: legacy }, { data: daily }] = await Promise.all([
-      supabase.from('setter_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).limit(500),
-      supabase.from('setter_daily_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).limit(500),
+      supabase.from('setter_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).limit(2000),
+      supabase.from('setter_daily_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).limit(2000),
     ])
 
     // Merge: key = date_settername, prefer daily
