@@ -55,7 +55,7 @@ function mapSetterReport(r: any): UnifiedSetterDay {
   return {
     id: `sr_${r.id}`,
     date: r.date,
-    setter_name: r.setter_name,
+    setter_name: normalizeName(r.setter_name),
     total_convos: r.total_convos ?? 0,
     follow_ups: r.follow_ups ?? 0,
     outbound: r.outbound ?? 0,
@@ -84,7 +84,7 @@ function mapDailyReport(r: any): UnifiedSetterDay {
   return {
     id: `sdr_${r.id}`,
     date: r.date,
-    setter_name: r.setter_name,
+    setter_name: normalizeName(r.setter_name),
     total_convos: r.total_convos ?? 0,
     follow_ups: r.followups ?? 0,
     outbound: r.outbound ?? 0,
@@ -109,6 +109,10 @@ function mapDailyReport(r: any): UnifiedSetterDay {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function normalizeName(name: string): string {
+  return name.replace('@', '').trim()
+}
 
 type Preset = '7d' | '30d' | '90d' | 'todo'
 
@@ -301,11 +305,11 @@ export default function SetterDashboardPage() {
     // Merge: key = date_settername, prefer daily
     const merged = new Map<string, UnifiedSetterDay>()
     for (const r of (legacy ?? [])) {
-      const key = `${r.date}_${r.setter_name}`
+      const key = `${r.date}_${normalizeName(r.setter_name)}`
       merged.set(key, mapSetterReport(r))
     }
     for (const r of (daily ?? [])) {
-      const key = `${r.date}_${r.setter_name}`
+      const key = `${r.date}_${normalizeName(r.setter_name)}`
       const existing = merged.get(key)
       if (existing) {
         merged.set(key, { ...mapDailyReport(r), id: `both_${r.id}`, source: 'both' })
