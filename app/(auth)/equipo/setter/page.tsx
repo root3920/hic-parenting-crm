@@ -9,7 +9,8 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { KpiGoalCard } from '@/components/shared/KpiGoalCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { GOALS } from '@/lib/goals'
 import {
@@ -153,6 +154,24 @@ export default function SetterDashboardPage() {
   const [selectedSetter, setSelectedSetter] = useState('Todos')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<Row | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    const supabase = createClient()
+    const table = deleteTarget.source === 'CSV' ? 'setter_reports' : 'setter_daily_reports'
+    const { error } = await supabase.from(table).delete().eq('id', deleteTarget.id)
+    setDeleting(false)
+    if (error) {
+      toast.error(`Error al eliminar: ${error.message}`)
+    } else {
+      setAllRows((prev) => prev.filter((r) => !(r.id === deleteTarget.id && r.source === deleteTarget.source)))
+      toast.success('Registro eliminado')
+      setDeleteTarget(null)
+    }
+  }
 
   // Fetch once — no date filter in the query, filter client-side
   useEffect(() => {
@@ -167,6 +186,7 @@ export default function SetterDashboardPage() {
 
       const combined: Row[] = [
         ...(legacy ?? []).map((r: Row) => ({
+          id:                r.id,
           date:              r.date?.slice(0, 10) ?? '',
           setter_name:       (r.setter_name ?? '').replace('@', '').trim(),
           total_convos:      r.total_convos ?? 0,
@@ -179,6 +199,7 @@ export default function SetterDashboardPage() {
           source:            'CSV' as const,
         })),
         ...(daily ?? []).map((r: Row) => ({
+          id:                r.id,
           date:              r.date?.slice(0, 10) ?? '',
           setter_name:       (r.setter_name ?? '').replace('@', '').trim(),
           total_convos:      r.total_convos ?? 0,
@@ -448,7 +469,7 @@ export default function SetterDashboardPage() {
                       {pageRows.map((r: Row, i: number) => {
                         const convPct = safeDiv(r.qualified_calls, r.total_convos) * 100
                         return (
-                          <tr key={`${r.date}_${r.setter_name}_${r.source}_${i}`} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                          <tr key={`${r.date}_${r.setter_name}_${r.source}_${i}`} className="group border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                             <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{formatDate(r.date)}</td>
                             <td className="py-2.5 px-3 font-medium text-zinc-800 dark:text-zinc-200">{r.setter_name}</td>
                             <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{r.total_convos}</td>
@@ -462,12 +483,21 @@ export default function SetterDashboardPage() {
                             </td>
                             <td className="py-2.5 px-3"><SourceBadge source={r.source} /></td>
                             <td className="py-2.5 px-3">
-                              <button
-                                onClick={() => setDetailReport(r)}
-                                className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                              >
-                                Ver
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setDetailReport(r)}
+                                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                >
+                                  Ver
+                                </button>
+                                <button
+                                  onClick={() => setDeleteTarget(r)}
+                                  className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                  title="Eliminar registro"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         )
@@ -507,6 +537,37 @@ export default function SetterDashboardPage() {
 
       <Dialog open={!!detailReport} onOpenChange={(open) => { if (!open) setDetailReport(null) }}>
         {detailReport && <ReportDetail report={detailReport} onClose={() => setDetailReport(null)} />}
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">¿Eliminar este registro?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            Esta acción no se puede deshacer.
+            {deleteTarget && (
+              <span className="block mt-1 font-medium text-zinc-700 dark:text-zinc-300">
+                {formatDate(deleteTarget.date)} · {deleteTarget.setter_name} · {deleteTarget.source}
+              </span>
+            )}
+          </p>
+          <div className="flex items-center justify-end gap-2 mt-4">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors disabled:opacity-60"
+            >
+              {deleting ? 'Eliminando...' : 'Eliminar'}
+            </button>
+          </div>
+        </DialogContent>
       </Dialog>
     </PageTransition>
   )
