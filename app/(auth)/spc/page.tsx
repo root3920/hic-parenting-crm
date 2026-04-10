@@ -59,7 +59,7 @@ interface SpcCancellation {
   subscribed_at: string
   amount: number
   plan: 'monthly' | 'annual'
-  cancel_type: 'paid_subscription' | 'trial'
+  cancel_type: 'paid_cancel' | 'pending_cancel' | 'trial_cancel'
   created_at: string
 }
 
@@ -166,15 +166,18 @@ export default function SpcPage() {
   })
 
   // ── Cancellation metrics ─────────────────────────────────────────────────
-  const paidCancels = cancellations.filter((c) => c.cancel_type === 'paid_subscription')
-  const thisMonthCancels = cancellations.filter(
+  const paidCancels = cancellations.filter((c) => c.cancel_type === 'paid_cancel')
+  const pendingCancels = cancellations.filter((c) => c.cancel_type === 'pending_cancel')
+  const trialCancels = cancellations.filter((c) => c.cancel_type === 'trial_cancel')
+  const thisMonthCancels = paidCancels.filter(
     (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= firstOfMonth
   )
+
   const mrrLost = paidCancels
     .filter((c) => (c.cancelled_at?.slice(0, 10) ?? '') >= sixtyDaysAgo)
-    .reduce((s, c) => s + c.amount, 0)
+    .reduce((s, c) => s + (c.plan === 'annual' ? c.amount / 12 : c.amount), 0)
 
-  const cancels30d = cancellations.filter(
+  const cancels30d = paidCancels.filter(
     (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= thirtyDaysAgo
   ).length
   const churnRate =
@@ -259,7 +262,7 @@ export default function SpcPage() {
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
-    { key: 'cancellations', label: `Cancelaciones${!loading ? ` (${paidCancels.length})` : ''}` },
+    { key: 'cancellations', label: `Cancelaciones${!loading ? ` (${paidCancels.length + pendingCancels.length})` : ''}` },
   ]
 
   return (
@@ -818,16 +821,16 @@ export default function SpcPage() {
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                    Total cancelaciones
+                    Cancelaciones pagadas
                   </p>
                   {loading ? (
                     <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ) : (
                     <>
-                      <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                      <p className="text-2xl font-semibold text-red-600 dark:text-red-400">
                         {paidCancels.length}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">suscripciones pagadas</p>
+                      <p className="text-xs text-zinc-500 mt-1">suscripciones pagadas perdidas</p>
                     </>
                   )}
                 </CardContent>
@@ -836,16 +839,16 @@ export default function SpcPage() {
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                    Este mes
+                    Pendientes de cancelar
                   </p>
                   {loading ? (
                     <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ) : (
                     <>
-                      <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-                        {thisMonthCancels.length}
+                      <p className="text-2xl font-semibold text-amber-600 dark:text-amber-400">
+                        {pendingCancels.length}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">cancelaciones</p>
+                      <p className="text-xs text-zinc-500 mt-1">aún tienen acceso activo</p>
                     </>
                   )}
                 </CardContent>
@@ -881,7 +884,7 @@ export default function SpcPage() {
                       <p className={`text-2xl font-semibold ${churnColor}`}>
                         {churnRate}%
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">últimos 30 días</p>
+                      <p className="text-xs text-zinc-500 mt-1">solo cancelaciones pagadas</p>
                     </>
                   )}
                 </CardContent>
@@ -924,20 +927,24 @@ export default function SpcPage() {
               </CardContent>
             </Card>
 
-            {/* Historial de cancelaciones table */}
-            <Card>
+            {/* SECTION A: Cancelaciones pagadas */}
+            <Card className="border-red-200 dark:border-red-900/40">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Historial de cancelaciones</CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 shrink-0" />
+                  <CardTitle className="text-sm font-semibold">Cancelaciones pagadas</CardTitle>
+                  <span className="ml-auto text-xs text-red-600 dark:text-red-400 font-medium">{paidCancels.length} registros</span>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {loading ? (
                   <div className="p-6 space-y-2">
-                    {[...Array(5)].map((_, i) => (
+                    {[...Array(3)].map((_, i) => (
                       <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                     ))}
                   </div>
-                ) : cancellations.length === 0 ? (
-                  <EmptyState title="Sin cancelaciones" description="Las cancelaciones aparecerán aquí." />
+                ) : paidCancels.length === 0 ? (
+                  <EmptyState title="Sin cancelaciones pagadas" description="No hay suscripciones pagadas canceladas." />
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
@@ -954,7 +961,7 @@ export default function SpcPage() {
                         </AnimatedTableRow>
                       </TableHeader>
                       <TableBody>
-                        {cancellations.map((c, i) => (
+                        {paidCancels.map((c, i) => (
                           <AnimatedTableRow
                             key={c.id}
                             variants={rowVariants}
@@ -963,47 +970,142 @@ export default function SpcPage() {
                             custom={i}
                             className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
                           >
+                            <TableCell className="font-medium text-sm">{c.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.email}</TableCell>
                             <TableCell>
-                              <div className="font-medium text-sm">{c.name}</div>
-                              <div className="text-xs text-zinc-400 mt-0.5">
-                                <span
-                                  className={cn(
-                                    'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium',
-                                    c.cancel_type === 'paid_subscription'
-                                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                                      : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                                  )}
-                                >
-                                  {c.cancel_type === 'paid_subscription' ? 'Pagado' : 'Trial'}
-                                </span>
-                              </div>
+                              <StatusPill label={c.plan === 'annual' ? 'Annual' : 'Monthly'} variant={c.plan === 'annual' ? 'success' : 'info'} />
                             </TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">
-                              {c.email}
+                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(c.amount)}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.source}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">{c.subscribed_at ? formatDate(c.subscribed_at) : '—'}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">{c.cancelled_at ? formatDate(c.cancelled_at) : '—'}</TableCell>
+                            <TableCell className="text-right text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
+                              {c.subscribed_at && c.cancelled_at ? `${daysActive(c.subscribed_at, c.cancelled_at)}d` : '—'}
                             </TableCell>
+                          </AnimatedTableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* SECTION B: Cancelaciones pendientes */}
+            <Card className="border-amber-200 dark:border-amber-900/40">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
+                  <CardTitle className="text-sm font-semibold">Cancelaciones pendientes</CardTitle>
+                  <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                    ⚠️ Oportunidad de retención
+                  </span>
+                  <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">{pendingCancels.length} registros</span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="p-6 space-y-2">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ))}
+                  </div>
+                ) : pendingCancels.length === 0 ? (
+                  <EmptyState title="Sin cancelaciones pendientes" description="No hay miembros con cancelación solicitada." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead className="hidden md:table-cell">Email</TableHead>
+                          <TableHead>Plan</TableHead>
+                          <TableHead className="text-right">Monto</TableHead>
+                          <TableHead className="hidden md:table-cell">Plataforma</TableHead>
+                          <TableHead className="hidden lg:table-cell">Suscrito desde</TableHead>
+                          <TableHead className="hidden sm:table-cell">Acceso hasta</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">Días activo</TableHead>
+                        </AnimatedTableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pendingCancels.map((c, i) => (
+                          <AnimatedTableRow
+                            key={c.id}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="visible"
+                            custom={i}
+                            className={cn(i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50')}
+                          >
+                            <TableCell className="font-medium text-sm">{c.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.email}</TableCell>
                             <TableCell>
-                              <StatusPill
-                                label={c.plan === 'annual' ? 'Annual' : 'Monthly'}
-                                variant={c.plan === 'annual' ? 'success' : 'info'}
-                              />
+                              <StatusPill label={c.plan === 'annual' ? 'Annual' : 'Monthly'} variant={c.plan === 'annual' ? 'success' : 'info'} />
                             </TableCell>
-                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
-                              {formatCurrency(c.amount)}
-                            </TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">
-                              {c.source}
-                            </TableCell>
-                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">
-                              {c.subscribed_at ? formatDate(c.subscribed_at) : '—'}
-                            </TableCell>
-                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
+                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(c.amount)}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.source}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">{c.subscribed_at ? formatDate(c.subscribed_at) : '—'}</TableCell>
+                            <TableCell className="text-xs text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap hidden sm:table-cell">
                               {c.cancelled_at ? formatDate(c.cancelled_at) : '—'}
                             </TableCell>
                             <TableCell className="text-right text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
-                              {c.subscribed_at && c.cancelled_at
-                                ? `${daysActive(c.subscribed_at, c.cancelled_at)}d`
-                                : '—'}
+                              {c.subscribed_at && c.cancelled_at ? `${daysActive(c.subscribed_at, c.cancelled_at)}d` : '—'}
                             </TableCell>
+                          </AnimatedTableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* SECTION C: Trials cancelados */}
+            <Card className="border-zinc-200 dark:border-zinc-700">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-zinc-400 shrink-0" />
+                  <CardTitle className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">Trials cancelados</CardTitle>
+                  <span className="ml-1 text-xs text-zinc-400 italic">Nunca realizaron un pago · no afectan el churn</span>
+                  <span className="ml-auto text-xs text-zinc-400 font-medium">{trialCancels.length} registros</span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="p-6 space-y-2">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ))}
+                  </div>
+                ) : trialCancels.length === 0 ? (
+                  <EmptyState title="Sin trials cancelados" description="Los trials cancelados aparecerán aquí." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead className="hidden md:table-cell">Email</TableHead>
+                          <TableHead className="hidden md:table-cell">Plataforma</TableHead>
+                          <TableHead className="hidden sm:table-cell">Inicio trial</TableHead>
+                          <TableHead className="hidden sm:table-cell">Canceló</TableHead>
+                        </AnimatedTableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {trialCancels.map((c, i) => (
+                          <AnimatedTableRow
+                            key={c.id}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="visible"
+                            custom={i}
+                            className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                          >
+                            <TableCell className="font-medium text-sm text-zinc-500 dark:text-zinc-400">{c.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-400 hidden md:table-cell">{c.email}</TableCell>
+                            <TableCell className="text-xs text-zinc-400 hidden md:table-cell">{c.source}</TableCell>
+                            <TableCell className="text-xs text-zinc-400 whitespace-nowrap hidden sm:table-cell">{c.subscribed_at ? formatDate(c.subscribed_at) : '—'}</TableCell>
+                            <TableCell className="text-xs text-zinc-400 whitespace-nowrap hidden sm:table-cell">{c.cancelled_at ? formatDate(c.cancelled_at) : '—'}</TableCell>
                           </AnimatedTableRow>
                         ))}
                       </TableBody>
