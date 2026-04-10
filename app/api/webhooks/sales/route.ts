@@ -14,6 +14,43 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     console.log('Received body:', JSON.stringify(body))
 
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Handle refund events
+    if (body.event_type === 'refund' || body.status === 'refunded') {
+      const { transaction_id, buyer_email } = body
+
+      if (!transaction_id && !buyer_email) {
+        return NextResponse.json(
+          { error: 'Refund requires transaction_id or buyer_email' },
+          { status: 400 }
+        )
+      }
+
+      let query = supabase
+        .from('transactions')
+        .update({ status: 'refunded' })
+
+      if (transaction_id) {
+        query = query.eq('transaction_id', transaction_id)
+      } else {
+        query = query.eq('buyer_email', buyer_email)
+      }
+
+      const { error } = await query
+
+      if (error) {
+        console.error('Supabase refund error:', JSON.stringify(error))
+        return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+      }
+
+      return NextResponse.json({ success: true, action: 'refunded' }, { status: 200 })
+    }
+
+    // Handle new sale
     const {
       date, offer_tittle, cost, buyer_fullname,
       buyer_email, buyer_phone, currency,
@@ -27,11 +64,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
     const { data, error } = await supabase
       .from('transactions')
       .insert({
@@ -43,7 +75,8 @@ export async function POST(req: NextRequest) {
         buyer_phone,
         currency: currency || 'USD',
         transaction_id,
-        source
+        source,
+        status: 'completed',
       })
       .select()
       .single()
