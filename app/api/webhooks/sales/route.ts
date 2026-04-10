@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     const {
       date, offer_tittle, cost, buyer_fullname,
       buyer_email, buyer_phone, currency,
-      transaction_id, source
+      transaction_id, source, payment_source
     } = body
 
     if (!date || !offer_tittle || cost === undefined) {
@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
         currency: currency || 'USD',
         transaction_id,
         source,
+        payment_source,
         status: 'completed',
       })
       .select()

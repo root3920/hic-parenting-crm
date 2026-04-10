@@ -9,6 +9,7 @@ export interface Transaction {
   currency: string
   transaction_id?: string
   source: 'Kajabi' | 'GoHighLevel' | 'Manual' | 'Stripe' | 'PayPal' | 'Otro'
+  payment_source?: string
   status?: 'completed' | 'refunded'
   created_at: string
 }

@@ -54,6 +54,7 @@ const emptyForm = {
   currency: 'USD',
   transaction_id: '',
   source: 'Manual',
+  payment_source: '',
 }
 
 type FormData = typeof emptyForm
@@ -126,6 +127,7 @@ export default function SalesPage() {
         currency: form.currency,
         transaction_id: form.transaction_id || null,
         source: form.source,
+        payment_source: form.payment_source || null,
         status: 'completed',
       })
       .select()
@@ -388,6 +390,7 @@ export default function SalesPage() {
                       <TableHead>Buyer</TableHead>
                       <TableHead className="hidden md:table-cell">Offer</TableHead>
                       <TableHead className="hidden md:table-cell">Source</TableHead>
+                      <TableHead className="hidden lg:table-cell">Método de pago</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                       <TableHead className="w-20" />
                     </AnimatedTableRow>
@@ -413,6 +416,9 @@ export default function SalesPage() {
                             label={tx.source}
                             variant={tx.source === 'Kajabi' ? 'info' : 'purple'}
                           />
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs text-zinc-500 dark:text-zinc-400">
+                          {tx.payment_source ?? '—'}
                         </TableCell>
                         <TableCell className="text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
@@ -617,6 +623,24 @@ export default function SalesPage() {
                   placeholder="txn_xxx o referencia interna"
                   className={inputClass}
                 />
+              </div>
+
+              <div>
+                <label className={labelClass}>Método de pago</label>
+                <select
+                  value={form.payment_source}
+                  onChange={(e) => setField('payment_source', e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">— Seleccionar —</option>
+                  <option>Stripe</option>
+                  <option>PayPal</option>
+                  <option>Kajabi Payments</option>
+                  <option>Credit Card</option>
+                  <option>Bank Transfer</option>
+                  <option>Cash</option>
+                  <option>Otro</option>
+                </select>
               </div>
 
               <div className="mt-auto pt-4 border-t border-zinc-200 dark:border-zinc-800">
