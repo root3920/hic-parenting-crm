@@ -292,9 +292,10 @@ export default function SetterDashboardPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
+    setData([])
     const [{ data: legacy }, { data: daily }] = await Promise.all([
-      supabase.from('setter_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }),
-      supabase.from('setter_daily_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }),
+      supabase.from('setter_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).limit(500),
+      supabase.from('setter_daily_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).limit(500),
     ])
 
     // Merge: key = date_settername, prefer daily
