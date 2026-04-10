@@ -9,7 +9,7 @@ import { RevenueBarChart } from '@/components/charts/RevenueBarChart'
 import { DonutChart } from '@/components/charts/DonutChart'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { StatusPill } from '@/components/shared/StatusPill'
-import { formatCurrency, formatDate, formatShortDate, getMonthRange } from '@/lib/utils'
+import { formatCurrency, formatDate, formatShortDate } from '@/lib/utils'
 import { Transaction } from '@/types'
 import {
   Table,
@@ -26,6 +26,7 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
 import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTableRow'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,9 +41,39 @@ const chartVariants = {
   visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
 }
 
-function todayStr() {
-  return new Date().toISOString().split('T')[0]
+type DateMode = '7d' | '30d' | '1y' | 'all' | 'custom'
+
+function localDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
+
+function getDateRange(mode: DateMode): { from: string; to: string } {
+  const today = new Date()
+  const from = new Date()
+  switch (mode) {
+    case '7d':  from.setDate(today.getDate() - 7); break
+    case '30d': from.setDate(today.getDate() - 30); break
+    case '1y':  from.setFullYear(today.getFullYear() - 1); break
+    case 'all': from.setFullYear(2021, 0, 1); break
+    default:    from.setDate(today.getDate() - 30)
+  }
+  return { from: localDateStr(from), to: localDateStr(today) }
+}
+
+function todayStr() {
+  return localDateStr(new Date())
+}
+
+const DATE_MODES: { label: string; value: DateMode }[] = [
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
+  { label: '1 año', value: '1y' },
+  { label: 'Todo', value: 'all' },
+  { label: 'Custom', value: 'custom' },
+]
 
 const emptyForm = {
   date: todayStr(),
@@ -77,8 +108,10 @@ export default function SalesPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [fromDate, setFromDate] = useState(getMonthRange().from)
-  const [toDate, setToDate] = useState(getMonthRange().to)
+
+  const [dateMode, setDateMode] = useState<DateMode>('30d')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<FormData>(emptyForm)
@@ -86,6 +119,16 @@ export default function SalesPage() {
 
   const [confirm, setConfirm] = useState<ConfirmAction>(null)
   const [actionLoading, setActionLoading] = useState(false)
+
+  const { from: fromDate, to: toDate } = useMemo(() => {
+    if (dateMode === 'custom') {
+      return {
+        from: customFrom || localDateStr(new Date()),
+        to: customTo || localDateStr(new Date()),
+      }
+    }
+    return getDateRange(dateMode)
+  }, [dateMode, customFrom, customTo])
 
   useEffect(() => {
     async function fetchTransactions() {
@@ -192,10 +235,13 @@ export default function SalesPage() {
       t.offer_title.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Exclude refunded from all revenue calculations
+  // Active = non-refunded; used for all revenue calculations
   const active = transactions.filter((t) => t.status !== 'refunded')
+  const refunded = transactions.filter((t) => t.status === 'refunded')
 
-  const totalRevenue = active.reduce((s, t) => s + t.cost, 0)
+  const grossRevenue = transactions.reduce((s, t) => s + t.cost, 0)
+  const refundedAmount = refunded.reduce((s, t) => s + t.cost, 0)
+  const totalRevenue = grossRevenue - refundedAmount
   const avgTicket = active.length > 0 ? totalRevenue / active.length : 0
 
   const dailyMap: Record<string, number> = {}
@@ -253,20 +299,44 @@ export default function SalesPage() {
     <PageTransition>
       <div className="max-w-7xl mx-auto">
         <PageHeader title="Sales Report" description="Revenue and transaction analytics">
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-            />
-            <span className="text-xs text-zinc-400">to</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Date mode buttons */}
+            <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+              {DATE_MODES.map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => setDateMode(m.value)}
+                  className={cn(
+                    'px-2.5 py-1.5 text-xs font-medium transition-colors border-r border-zinc-200 dark:border-zinc-700 last:border-r-0',
+                    dateMode === m.value
+                      ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
+                      : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                  )}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom date inputs — only shown in custom mode */}
+            {dateMode === 'custom' && (
+              <>
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+                <span className="text-xs text-zinc-400">→</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+              </>
+            )}
+
             <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
               Agregar venta
@@ -274,9 +344,34 @@ export default function SalesPage() {
           </div>
         </PageHeader>
 
-        <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
-          <KPICard title="Total Revenue" value={formatCurrency(totalRevenue)} subtitle="selected period" loading={loading} />
-          <KPICard title="Transactions" value={active.length} subtitle="total" loading={loading} />
+        <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-6">
+          {/* Total Revenue — custom card to fit gross/refund sub-line */}
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } } }}>
+            <Card className="h-full">
+              <CardContent className="pt-4 md:pt-6 px-4 md:px-6">
+                {loading ? (
+                  <div className="space-y-2">
+                    <div className="h-3 w-24 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    <div className="h-7 w-32 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    <div className="h-3 w-40 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Total Revenue</p>
+                    <p className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-2">{formatCurrency(totalRevenue)}</p>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+                      Bruto: {formatCurrency(grossRevenue)}
+                      {refundedAmount > 0 && (
+                        <span className="text-red-500 dark:text-red-400"> · -{formatCurrency(refundedAmount)}</span>
+                      )}
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <KPICard title="Transactions" value={active.length} subtitle="completadas" loading={loading} />
           <KPICard title="Avg Ticket" value={formatCurrency(avgTicket)} subtitle="per transaction" loading={loading} />
           <KPICard
             title="Best Day"
@@ -284,6 +379,31 @@ export default function SalesPage() {
             subtitle={bestDay ? formatDate(bestDay[0]) : 'no data'}
             loading={loading}
           />
+
+          {/* Refunds card */}
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } } }}>
+            <Card className="h-full">
+              <CardContent className="pt-4 md:pt-6 px-4 md:px-6">
+                {loading ? (
+                  <div className="space-y-2">
+                    <div className="h-3 w-24 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    <div className="h-7 w-28 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    <div className="h-3 w-32 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Reembolsos</p>
+                    <p className="text-xl md:text-2xl font-bold text-red-600 dark:text-red-400 mt-2">
+                      {refundedAmount > 0 ? `-${formatCurrency(refundedAmount)}` : '—'}
+                    </p>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+                      {refunded.length} transacc. reembolsadas
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         </KPICardGrid>
 
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-3 mb-6">

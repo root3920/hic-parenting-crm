@@ -22,7 +22,15 @@
       "Bash(head -20 grep -n \"new Date\\(\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/llamadas/page.tsx)",
       "Bash(head -20 grep -n \"new Date\\(\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/setter/page.tsx)",
       "Bash(head -15 grep -n \"new Date\\(r\\\\.\\\\|toLocaleDateString\\\\|formatDate\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/csm/page.tsx)",
-      "Bash(grep -r \"toast\\\\|sonner\\\\|useToast\" package.json components/ui/ --include=*.tsx --include=*.json -l)"
+      "Bash(grep -r \"toast\\\\|sonner\\\\|useToast\" package.json components/ui/ --include=*.tsx --include=*.json -l)",
+      "Bash(psql --version)",
+      "Bash(supabase --version)",
+      "Bash(brew install:*)",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/psql --version)",
+      "Bash(ping -c 2 db.nlrxlikkhkdxrncqvxht.supabase.co)",
+      "Bash(curl -s --max-time 5 https://nlrxlikkhkdxrncqvxht.supabase.co/rest/v1/ -o /dev/null -w \"%{http_code}\")",
+      "Bash(nslookup db.nlrxlikkhkdxrncqvxht.supabase.co)",
+      "Bash(nslookup nlrxlikkhkdxrncqvxht.supabase.co)"
     ]
   }
 }
