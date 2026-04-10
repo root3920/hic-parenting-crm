@@ -25,7 +25,7 @@ const PAGE_SIZE = 10
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Preset = '7d' | '30d' | '90d' | 'todo'
+type Preset = '7d' | '30d' | '90d' | 'todo' | 'custom'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any
@@ -151,6 +151,8 @@ export default function SetterDashboardPage() {
   const [allRows, setAllRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('30d')
+  const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return localDateStr(d) })
+  const [customTo, setCustomTo] = useState(() => localDateStr(new Date()))
   const [selectedSetter, setSelectedSetter] = useState('Todos')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<Row | null>(null)
@@ -219,7 +221,10 @@ export default function SetterDashboardPage() {
     fetchAll()
   }, [])
 
-  const { from: fromDate, to: toDate } = useMemo(() => getDateRange(preset), [preset])
+  const { from: fromDate, to: toDate } = useMemo(() => {
+    if (preset === 'custom') return { from: customFrom, to: customTo }
+    return getDateRange(preset)
+  }, [preset, customFrom, customTo])
 
   // Client-side filter: date range + setter
   const filtered = useMemo(() => {
@@ -238,7 +243,7 @@ export default function SetterDashboardPage() {
   }, [allRows])
 
   // Reset page when filters change
-  useEffect(() => { setPage(0) }, [preset, selectedSetter])
+  useEffect(() => { setPage(0) }, [preset, selectedSetter, customFrom, customTo])
 
   // ── KPI aggregates ──
   const kpis = useMemo(() => {
@@ -308,7 +313,7 @@ export default function SetterDashboardPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset buttons */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', '90d', 'todo'] as Preset[]).map((p) => (
+              {(['7d', '30d', '90d', 'todo', 'custom'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => { setPreset(p); setPage(0) }}
@@ -319,10 +324,27 @@ export default function SetterDashboardPage() {
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'todo' ? 'Todo' : p}
+                  {p === 'todo' ? 'Todo' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>
+            {preset === 'custom' && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+                <span className="text-xs text-zinc-400">→</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+            )}
             <select
               value={selectedSetter}
               onChange={(e) => { setSelectedSetter(e.target.value); setPage(0) }}

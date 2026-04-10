@@ -23,9 +23,9 @@ export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 10
 
-type Preset = '7d' | '30d' | '90d' | 'todo'
+type Preset = '7d' | '30d' | '90d' | 'todo' | 'custom'
 
-function getDateRange(preset: Preset) {
+function getDateRange(preset: Exclude<Preset, 'custom'>) {
   const today = new Date()
   const fmt = (d: Date) => d.toISOString().split('T')[0]
   if (preset === '7d') {
@@ -168,11 +168,20 @@ export default function CloserDashboardPage() {
   const [reports, setReports] = useState<CloserDailyReport[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('30d')
+  const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
   const [selectedCloser, setSelectedCloser] = useState('Todos')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<CloserDailyReport | null>(null)
 
-  const { from: fromDate, to: toDate, days: rangeDays } = useMemo(() => getDateRange(preset), [preset])
+  const { from: fromDate, to: toDate, days: rangeDays } = useMemo(() => {
+    if (preset === 'custom') {
+      const diffMs = new Date(customTo).getTime() - new Date(customFrom).getTime()
+      const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1)
+      return { from: customFrom, to: customTo, days }
+    }
+    return getDateRange(preset)
+  }, [preset, customFrom, customTo])
 
   const fetchReports = useCallback(async () => {
     setLoading(true)
@@ -294,7 +303,7 @@ export default function CloserDashboardPage() {
         <PageHeader title="Closing Team" description="Rendimiento del equipo de cierre">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', '90d', 'todo'] as Preset[]).map((p) => (
+              {(['7d', '30d', '90d', 'todo', 'custom'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => { setPreset(p); setPage(0) }}
@@ -303,10 +312,27 @@ export default function CloserDashboardPage() {
                     preset === p ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'todo' ? 'Todo' : p}
+                  {p === 'todo' ? 'Todo' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>
+            {preset === 'custom' && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+                <span className="text-xs text-zinc-400">→</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+            )}
             <select
               value={selectedCloser}
               onChange={(e) => { setSelectedCloser(e.target.value); setPage(0) }}
