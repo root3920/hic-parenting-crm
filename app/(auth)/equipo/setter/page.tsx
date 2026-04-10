@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -22,107 +22,15 @@ export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 10
 
-// ─── Unified interface ───────────────────────────────────────────────────────
-
-interface UnifiedSetterDay {
-  id: string
-  date: string
-  setter_name: string
-  total_convos: number
-  follow_ups: number
-  outbound: number
-  inbound: number
-  call_proposed: number
-  calls_booked: number
-  calls_no_reply: number
-  calls_followup: number
-  qual_apps: number
-  disqual_apps: number
-  waiting: number
-  disqual_reasons: string[] | null
-  spc_invites: number
-  spc_new: number
-  spc_interested: number
-  performance_score: number
-  highs: string[]
-  lows: string[]
-  hours_worked: number
-  source: 'setter_reports' | 'setter_daily_reports' | 'both'
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapSetterReport(r: any): UnifiedSetterDay {
-  return {
-    id: `sr_${r.id}`,
-    date: normalizeDate(r.date),
-    setter_name: normalizeName(r.setter_name),
-    total_convos: r.total_convos ?? 0,
-    follow_ups: r.follow_ups ?? 0,
-    outbound: r.outbound ?? 0,
-    inbound: r.inbound ?? 0,
-    call_proposed: r.call_proposed ?? 0,
-    calls_booked: r.qualified_calls ?? 0,
-    calls_no_reply: 0,
-    calls_followup: 0,
-    qual_apps: r.qualified_calls ?? 0,
-    disqual_apps: r.disqualified ?? 0,
-    waiting: 0,
-    disqual_reasons: null,
-    spc_invites: 0,
-    spc_new: 0,
-    spc_interested: 0,
-    performance_score: r.performance_score ?? 0,
-    highs: r.highs ? [r.highs] : [],
-    lows: r.lows ? [r.lows] : [],
-    hours_worked: r.hours_worked ?? 0,
-    source: 'setter_reports',
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapDailyReport(r: any): UnifiedSetterDay {
-  return {
-    id: `sdr_${r.id}`,
-    date: normalizeDate(r.date),
-    setter_name: normalizeName(r.setter_name),
-    total_convos: r.total_convos ?? 0,
-    follow_ups: r.followups ?? 0,
-    outbound: r.outbound ?? 0,
-    inbound: r.inbound ?? 0,
-    call_proposed: r.calls_proposed ?? 0,
-    calls_booked: r.calls_booked ?? 0,
-    calls_no_reply: r.calls_no_reply ?? 0,
-    calls_followup: r.calls_followup ?? 0,
-    qual_apps: r.qual_apps ?? 0,
-    disqual_apps: r.disqual_apps ?? 0,
-    waiting: r.waiting ?? 0,
-    disqual_reasons: r.disqual_reasons ?? null,
-    spc_invites: r.spc_invites ?? 0,
-    spc_new: r.spc_new ?? 0,
-    spc_interested: r.spc_interested ?? 0,
-    performance_score: r.performance_score ?? 0,
-    highs: r.highs ?? [],
-    lows: r.lows ?? [],
-    hours_worked: r.hours_worked ?? 0,
-    source: 'setter_daily_reports',
-  }
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function normalizeName(name: string | null | undefined): string {
-  return (name ?? '').replace('@', '').trim()
-}
-
-// Normalize DB date values to YYYY-MM-DD regardless of whether the column
-// returns a plain date string or a full ISO timestamp
-function normalizeDate(date: string): string {
-  return (date ?? '').slice(0, 10)
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type Preset = '7d' | '30d' | '90d' | 'todo'
 
-// Use local year/month/day to avoid UTC-offset drift on date strings
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Row = any
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function localDateStr(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -144,10 +52,6 @@ function getDateRange(preset: Preset) {
   return { from: '2020-01-01', to }
 }
 
-function s(arr: UnifiedSetterDay[], key: keyof UnifiedSetterDay) {
-  return arr.reduce((acc, r) => acc + ((r[key] as number) ?? 0), 0)
-}
-
 function safeDiv(num: number, den: number) {
   return den > 0 ? num / den : NaN
 }
@@ -156,15 +60,8 @@ function fmtPct(v: number, dec = 1) {
   return isNaN(v) ? '—' : `${v.toFixed(dec)}%`
 }
 
-function countFreq(arrays: (string[] | null)[]): [string, number][] {
-  const freq: Record<string, number> = {}
-  for (const arr of arrays) {
-    if (!arr) continue
-    for (const item of arr) {
-      freq[item] = (freq[item] ?? 0) + 1
-    }
-  }
-  return Object.entries(freq).sort((a, b) => b[1] - a[1])
+function sumField(rows: Row[], key: string): number {
+  return rows.reduce((acc: number, r: Row) => acc + (r[key] ?? 0), 0)
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -179,27 +76,18 @@ function VolumeCard({ label, value, sub }: { label: string; value: string | numb
   )
 }
 
-function SourceBadge({ source }: { source: UnifiedSetterDay['source'] }) {
-  if (source === 'setter_daily_reports') {
+function SourceBadge({ source }: { source: string }) {
+  if (source === 'Formulario') {
     return <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Formulario</span>
-  }
-  if (source === 'both') {
-    return <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Ambos</span>
   }
   return <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">CSV</span>
 }
 
-function ReportDetail({ report, onClose }: { report: UnifiedSetterDay; onClose: () => void }) {
-  function chips(arr: string[] | null) {
-    if (!arr?.length) return <span className="text-xs text-zinc-400">—</span>
-    return (
-      <div className="flex flex-wrap gap-1.5 mt-1">
-        {arr.map((v) => (
-          <span key={v} className="inline-flex px-2 py-0.5 rounded-full text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">{v}</span>
-        ))}
-      </div>
-    )
-  }
+function ReportDetail({ report, onClose }: { report: Row; onClose: () => void }) {
+  void onClose
+  const convRate = safeDiv(report.qualified_calls, report.total_convos) * 100
+  const pitchRate = safeDiv(report.call_proposed, report.total_convos) * 100
+
   function Row({ label, value }: { label: string; value: string | number | null | undefined }) {
     if (value === null || value === undefined || value === '') return null
     return (
@@ -210,9 +98,6 @@ function ReportDetail({ report, onClose }: { report: UnifiedSetterDay; onClose: 
     )
   }
 
-  const convRate = safeDiv(report.calls_booked, report.total_convos) * 100
-  const pitchRate = safeDiv(report.call_proposed, report.total_convos) * 100
-
   return (
     <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
       <DialogHeader>
@@ -222,11 +107,10 @@ function ReportDetail({ report, onClose }: { report: UnifiedSetterDay; onClose: 
         </div>
       </DialogHeader>
       <div className="space-y-5 mt-2">
-        {/* KPI summary */}
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
             { label: 'Pitch Rate', value: fmtPct(pitchRate) },
-            { label: 'Booking Rate', value: fmtPct(safeDiv(report.calls_booked, report.call_proposed) * 100) },
+            { label: 'Booking Rate', value: fmtPct(safeDiv(report.qualified_calls, report.call_proposed) * 100) },
             { label: 'Conv General', value: fmtPct(convRate) },
           ].map(({ label, value }) => (
             <div key={label} className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-2">
@@ -235,53 +119,26 @@ function ReportDetail({ report, onClose }: { report: UnifiedSetterDay; onClose: 
             </div>
           ))}
         </div>
-        {/* Conversaciones */}
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Conversaciones</p>
           <Row label="Total convos" value={report.total_convos} />
-          <Row label="Follow-ups" value={report.follow_ups} />
-          <Row label="Inbound" value={report.inbound} />
-          <Row label="Outbound" value={report.outbound} />
-          <Row label="Horas trabajadas" value={report.hours_worked} />
+          <Row label="Calls propuestas" value={report.call_proposed} />
+          <Row label="Calls agendadas" value={report.qualified_calls} />
         </div>
-        {/* Pipeline */}
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-teal-600 mb-2">Pipeline de llamadas</p>
-          <Row label="Propuestas" value={report.call_proposed} />
-          <Row label="Agendadas" value={report.calls_booked} />
-          {report.calls_no_reply > 0 && <Row label="Sin respuesta" value={report.calls_no_reply} />}
-          {report.calls_followup > 0 && <Row label="En seguimiento" value={report.calls_followup} />}
-        </div>
-        {/* Calificación */}
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-purple-600 mb-2">Calificación</p>
-          <Row label="Calificados" value={report.qual_apps} />
-          <Row label="Descalificados" value={report.disqual_apps} />
-          {report.waiting > 0 && <Row label="En espera" value={report.waiting} />}
-          {report.disqual_reasons?.length ? (
-            <div className="py-1"><span className="text-xs text-zinc-400">Razones:</span>{chips(report.disqual_reasons)}</div>
-          ) : null}
-        </div>
-        {/* SPC (if applicable) */}
-        {(report.spc_invites > 0 || report.spc_new > 0) && (
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-purple-600 mb-2">SPC</p>
-            <Row label="Invitaciones" value={report.spc_invites} />
-            <Row label="Nuevos miembros" value={report.spc_new} />
-            <Row label="Interesados" value={report.spc_interested} />
-          </div>
-        )}
-        {/* Autoevaluación */}
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Autoevaluación</p>
           <Row label="Performance" value={`${report.performance_score}/10`} />
-          {report.highs.length > 0 && (
-            <div className="py-1"><span className="text-xs text-zinc-400">Fortalezas:</span>{chips(report.highs)}</div>
-          )}
-          {report.lows.length > 0 && (
-            <div className="py-1"><span className="text-xs text-zinc-400">A mejorar:</span>{chips(report.lows)}</div>
-          )}
+          {report.highs && <Row label="Fortalezas" value={report.highs} />}
+          {report.lows && <Row label="A mejorar" value={report.lows} />}
         </div>
+        {report.notes && (
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Notas</p>
+            <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg px-3 py-2.5">
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">{report.notes}</p>
+            </div>
+          </div>
+        )}
       </div>
     </DialogContent>
   )
@@ -290,151 +147,131 @@ function ReportDetail({ report, onClose }: { report: UnifiedSetterDay; onClose: 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SetterDashboardPage() {
-  const supabase = useMemo(() => createClient(), [])
-  const [data, setData] = useState<UnifiedSetterDay[]>([])
+  const [allRows, setAllRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('30d')
   const [selectedSetter, setSelectedSetter] = useState('Todos')
   const [page, setPage] = useState(0)
-  const [detailReport, setDetailReport] = useState<UnifiedSetterDay | null>(null)
+  const [detailReport, setDetailReport] = useState<Row | null>(null)
 
-  const { from: fromDate, to: toDate } = useMemo(
-    () => getDateRange(preset),
-    [preset]
-  )
+  // Fetch once — no date filter in the query, filter client-side
+  useEffect(() => {
+    async function fetchAll() {
+      setLoading(true)
+      const supabase = createClient()
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setData([])
-    const [{ data: legacy }, { data: daily }] = await Promise.all([
-      supabase.from('setter_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).limit(2000),
-      supabase.from('setter_daily_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).limit(2000),
-    ])
+      const [{ data: legacy }, { data: daily }] = await Promise.all([
+        supabase.from('setter_reports').select('*').order('date', { ascending: false }),
+        supabase.from('setter_daily_reports').select('*').order('date', { ascending: false }),
+      ])
 
-    // Merge: key = date_settername, prefer daily
-    // Use normalizeDate on r.date (raw DB value) so timestamptz vs date columns
-    // produce the same key regardless of format
-    const merged = new Map<string, UnifiedSetterDay>()
-    for (const r of (legacy ?? [])) {
-      const key = `${normalizeDate(r.date)}_${normalizeName(r.setter_name)}`
-      merged.set(key, mapSetterReport(r))
+      const combined: Row[] = [
+        ...(legacy ?? []).map((r: Row) => ({
+          date:              r.date?.slice(0, 10) ?? '',
+          setter_name:       (r.setter_name ?? '').replace('@', '').trim(),
+          total_convos:      r.total_convos ?? 0,
+          call_proposed:     r.call_proposed ?? 0,
+          qualified_calls:   r.qualified_calls ?? 0,
+          performance_score: r.performance_score ?? 0,
+          notes:             r.notes ?? '',
+          highs:             r.highs ?? '',
+          lows:              r.lows ?? '',
+          source:            'CSV' as const,
+        })),
+        ...(daily ?? []).map((r: Row) => ({
+          date:              r.date?.slice(0, 10) ?? '',
+          setter_name:       (r.setter_name ?? '').replace('@', '').trim(),
+          total_convos:      r.total_convos ?? 0,
+          call_proposed:     r.calls_proposed ?? 0,
+          qualified_calls:   r.calls_booked ?? 0,
+          performance_score: r.performance_score ?? 0,
+          notes:             r.notas ?? '',
+          highs:             Array.isArray(r.highs) ? r.highs.join(', ') : (r.highs ?? ''),
+          lows:              Array.isArray(r.lows)  ? r.lows.join(', ')  : (r.lows  ?? ''),
+          source:            'Formulario' as const,
+        })),
+      ].sort((a, b) => b.date.localeCompare(a.date))
+
+      setAllRows(combined)
+      setLoading(false)
     }
-    for (const r of (daily ?? [])) {
-      const key = `${normalizeDate(r.date)}_${normalizeName(r.setter_name)}`
-      const existing = merged.get(key)
-      if (existing) {
-        merged.set(key, { ...mapDailyReport(r), id: `both_${r.id}`, source: 'both' })
-      } else {
-        merged.set(key, mapDailyReport(r))
-      }
-    }
+    fetchAll()
+  }, [])
 
-    const sorted = Array.from(merged.values()).sort((a, b) => b.date.localeCompare(a.date))
-    setData(sorted)
-    setLoading(false)
-  }, [supabase, fromDate, toDate])
+  const { from: fromDate, to: toDate } = useMemo(() => getDateRange(preset), [preset])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  // Client-side filter: date range + setter
+  const filtered = useMemo(() => {
+    const setterQuery = selectedSetter === 'Todos' ? '' : selectedSetter.toLowerCase().replace('@', '').trim()
+    return allRows.filter((r: Row) => {
+      const matchesSetter = !setterQuery || r.setter_name.toLowerCase().includes(setterQuery)
+      const matchesDate   = r.date >= fromDate && r.date <= toDate
+      return matchesSetter && matchesDate
+    })
+  }, [allRows, selectedSetter, fromDate, toDate])
 
-  // Setter filter applied client-side (names come from merged data)
+  // Setter names for dropdown
   const setterNames = useMemo(() => {
-    const names = Array.from(new Set(data.map((r) => r.setter_name)))
+    const names = Array.from(new Set(allRows.map((r: Row) => r.setter_name as string))).sort()
     return ['Todos', ...names]
-  }, [data])
+  }, [allRows])
 
-  const filtered = useMemo(
-    () => selectedSetter === 'Todos' ? data : data.filter((r) => r.setter_name === selectedSetter),
-    [data, selectedSetter]
-  )
+  // Reset page when filters change
+  useEffect(() => { setPage(0) }, [preset, selectedSetter])
 
   // ── KPI aggregates ──
   const kpis = useMemo(() => {
-    const totalConvos = s(filtered, 'total_convos')
-    const totalProposed = s(filtered, 'call_proposed')
-    const totalBooked = s(filtered, 'calls_booked')
+    const totalConvos   = sumField(filtered, 'total_convos')
+    const totalProposed = sumField(filtered, 'call_proposed')
+    const totalBooked   = sumField(filtered, 'qualified_calls')
     return {
-      pitchRate: safeDiv(totalProposed, totalConvos) * 100,
-      bookingRate: safeDiv(totalBooked, totalProposed) * 100,
-      convGeneral: safeDiv(totalBooked, totalConvos) * 100,
+      pitchRate:   safeDiv(totalProposed, totalConvos)  * 100,
+      bookingRate: safeDiv(totalBooked,   totalProposed) * 100,
+      convGeneral: safeDiv(totalBooked,   totalConvos)  * 100,
     }
   }, [filtered])
 
   // ── Volume stats ──
   const volume = useMemo(() => {
-    const totalConvos = s(filtered, 'total_convos')
-    const totalProposed = s(filtered, 'call_proposed')
-    const totalBooked = s(filtered, 'calls_booked')
-    const totalFollowUps = s(filtered, 'follow_ups')
-    const totalOutbound = s(filtered, 'outbound')
+    const totalConvos   = sumField(filtered, 'total_convos')
+    const totalProposed = sumField(filtered, 'call_proposed')
+    const totalBooked   = sumField(filtered, 'qualified_calls')
     const avgPerf = filtered.length > 0
-      ? filtered.reduce((acc, r) => acc + r.performance_score, 0) / filtered.length
+      ? filtered.reduce((acc: number, r: Row) => acc + r.performance_score, 0) / filtered.length
       : NaN
     return {
-      totalConvos, totalProposed, totalBooked, totalFollowUps, totalOutbound, avgPerf,
-      followUpPct: fmtPct(safeDiv(totalFollowUps, totalConvos) * 100),
-      inboundPct: fmtPct(safeDiv(s(filtered, 'inbound'), totalConvos) * 100),
-      outboundPct: fmtPct(safeDiv(totalOutbound, totalConvos) * 100),
+      totalConvos,
+      totalProposed,
+      totalBooked,
+      avgPerf,
       bookingPct: fmtPct(safeDiv(totalBooked, totalProposed) * 100),
     }
   }, [filtered])
 
-  // ── Chart data (ascending by date) ──
+  // ── Chart data ──
   const chartData = useMemo(() => {
-    const byDate: Record<string, {
-      date: string
-      follow_ups: number
-      inbound: number
-      outbound: number
-      call_proposed: number
-      calls_booked: number
-      calls_no_reply: number
-    }> = {}
+    const byDate: Record<string, { date: string; call_proposed: number; qualified_calls: number }> = {}
     for (const r of [...filtered].reverse()) {
       if (!byDate[r.date]) {
-        byDate[r.date] = { date: formatDate(r.date), follow_ups: 0, inbound: 0, outbound: 0, call_proposed: 0, calls_booked: 0, calls_no_reply: 0 }
+        byDate[r.date] = { date: formatDate(r.date), call_proposed: 0, qualified_calls: 0 }
       }
-      byDate[r.date].follow_ups += r.follow_ups
-      byDate[r.date].inbound += r.inbound
-      byDate[r.date].outbound += r.outbound
-      byDate[r.date].call_proposed += r.call_proposed
-      byDate[r.date].calls_booked += r.calls_booked
-      byDate[r.date].calls_no_reply += r.calls_no_reply
+      byDate[r.date].call_proposed   += r.call_proposed
+      byDate[r.date].qualified_calls += r.qualified_calls
     }
     return Object.values(byDate)
   }, [filtered])
 
-  const hasNoReplyData = useMemo(() => filtered.some((r) => r.calls_no_reply > 0), [filtered])
-
-  // ── Calificación ──
-  const calData = useMemo(() => ({
-    qual: s(filtered, 'qual_apps'),
-    disqual: s(filtered, 'disqual_apps'),
-    waiting: s(filtered, 'waiting'),
-    disqualReasons: countFreq(filtered.map((r) => r.disqual_reasons)).slice(0, 3),
-  }), [filtered])
-
-  // ── Performance ──
+  // ── Performance sparkline ──
   const perfData = useMemo(() => {
-    if (filtered.length === 0) return { avg: NaN, sparkline: [], topHighs: [] as [string,number][], topLows: [] as [string,number][], trend: NaN }
-    const avg = filtered.reduce((acc, r) => acc + r.performance_score, 0) / filtered.length
-    const sparkline = [...filtered].reverse().map((r) => ({ date: formatDate(r.date), score: r.performance_score }))
-    const topHighs = countFreq(filtered.map((r) => r.highs)).slice(0, 3)
-    const topLows = countFreq(filtered.map((r) => r.lows)).slice(0, 3)
-    return { avg, sparkline, topHighs, topLows, trend: NaN }
+    if (filtered.length === 0) return { avg: NaN, sparkline: [] }
+    const avg = filtered.reduce((acc: number, r: Row) => acc + r.performance_score, 0) / filtered.length
+    const sparkline = [...filtered].reverse().map((r: Row) => ({ date: formatDate(r.date), score: r.performance_score }))
+    return { avg, sparkline }
   }, [filtered])
-
-  // ── SPC ──
-  const spcData = useMemo(() => ({
-    invites: s(filtered, 'spc_invites'),
-    newMembers: s(filtered, 'spc_new'),
-    interested: s(filtered, 'spc_interested'),
-    rate: safeDiv(s(filtered, 'spc_new'), s(filtered, 'spc_invites')) * 100,
-  }), [filtered])
-  const hasSpcData = spcData.invites > 0
 
   // ── Pagination ──
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const pageRows = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const pageRows   = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   function perfColor(v: number) {
     if (isNaN(v) || v === 0) return 'text-zinc-400'
@@ -494,7 +331,7 @@ export default function SetterDashboardPage() {
               {[...Array(3)].map((_, i) => <div key={i} className="h-28 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />)}
             </div>
             <div className="grid grid-cols-3 gap-3">
-              {[...Array(6)].map((_, i) => <div key={i} className="h-20 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />)}
+              {[...Array(4)].map((_, i) => <div key={i} className="h-20 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />)}
             </div>
           </div>
         ) : filtered.length === 0 ? (
@@ -531,23 +368,13 @@ export default function SetterDashboardPage() {
             </div>
 
             {/* ── Section 2: Volume Stats ── */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-              <VolumeCard
-                label="Total Convos"
-                value={volume.totalConvos}
-                sub={`${volume.followUpPct} follow-ups · ${volume.inboundPct} inbound · ${volume.outboundPct} outbound`}
-              />
-              <VolumeCard label="Calls Propuestas" value={volume.totalProposed} />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <VolumeCard label="Total Convos"      value={volume.totalConvos} />
+              <VolumeCard label="Calls Propuestas"  value={volume.totalProposed} />
               <VolumeCard
                 label="Calls Agendadas"
                 value={volume.totalBooked}
                 sub={`${volume.bookingPct} booking rate`}
-              />
-              <VolumeCard label="Follow-ups" value={volume.totalFollowUps} />
-              <VolumeCard
-                label="Outbound"
-                value={volume.totalOutbound}
-                sub={`${volume.outboundPct} del volumen total`}
               />
               <VolumeCard
                 label="Avg Performance"
@@ -560,7 +387,7 @@ export default function SetterDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Volumen diario de conversaciones</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Pipeline de llamadas (diario)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
@@ -569,10 +396,9 @@ export default function SetterDashboardPage() {
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ fontSize: 11 }} />
-                      <Legend formatter={(v) => <span className="text-xs">{v === 'follow_ups' ? 'Follow-ups' : v === 'inbound' ? 'Inbound' : 'Outbound'}</span>} />
-                      <Bar dataKey="follow_ups" stackId="a" fill="#185FA5" maxBarSize={32} />
-                      <Bar dataKey="inbound" stackId="a" fill="#1D9E75" maxBarSize={32} />
-                      <Bar dataKey="outbound" stackId="a" fill="#EF9F27" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                      <Legend formatter={(v) => <span className="text-xs">{v === 'call_proposed' ? 'Propuestas' : 'Agendadas'}</span>} />
+                      <Bar dataKey="call_proposed"   fill="#71717a" maxBarSize={32} />
+                      <Bar dataKey="qualified_calls" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={32} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -580,177 +406,29 @@ export default function SetterDashboardPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Pipeline de llamadas</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Tendencia de performance</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <LineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ fontSize: 11 }} />
-                      <Legend formatter={(v) => <span className="text-xs">{v === 'call_proposed' ? 'Propuestas' : v === 'calls_booked' ? 'Agendadas' : 'Sin respuesta'}</span>} />
-                      <Line type="monotone" dataKey="call_proposed" stroke="#71717a" strokeWidth={2} strokeDasharray="4 2" dot={false} />
-                      <Line type="monotone" dataKey="calls_booked" stroke="#185FA5" strokeWidth={2} dot={false} />
-                      {hasNoReplyData && (
-                        <Line type="monotone" dataKey="calls_no_reply" stroke="#EF4444" strokeWidth={1.5} strokeDasharray="3 2" dot={false} />
-                      )}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* ── Section 4: Calificación + Performance ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {/* Leads & Calificación */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Leads & Calificación</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 mb-4">
-                    {[
-                      { label: 'Calificados', value: calData.qual, dot: 'bg-green-500', color: 'text-green-600 dark:text-green-400' },
-                      { label: 'Descalificados', value: calData.disqual, dot: 'bg-red-500', color: 'text-red-600 dark:text-red-400' },
-                      { label: 'En espera', value: calData.waiting, dot: 'bg-zinc-400', color: 'text-zinc-700 dark:text-zinc-300' },
-                    ].map(({ label, value, dot, color }) => (
-                      <div key={label} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className={cn('w-2 h-2 rounded-full', dot)} />
-                          <span className="text-sm text-zinc-500 dark:text-zinc-400">{label}</span>
-                        </div>
-                        <span className={cn('text-sm font-semibold', color)}>{value}</span>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800">
-                      <span className="text-sm text-zinc-500 dark:text-zinc-400">Tasa cal.</span>
-                      <span className={cn(
-                        'inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold',
-                        safeDiv(calData.qual, calData.qual + calData.disqual) >= 0.6
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                          : safeDiv(calData.qual, calData.qual + calData.disqual) >= 0.4
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                          : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                      )}>
-                        {fmtPct(safeDiv(calData.qual, calData.qual + calData.disqual) * 100)}
-                      </span>
-                    </div>
-                  </div>
-                  {calData.disqualReasons.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">Razones de descalificación</p>
-                      <div className="flex flex-wrap gap-2">
-                        {calData.disqualReasons.map(([reason, count]) => (
-                          <span key={reason} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800">
-                            {reason} <span className="font-bold">({count})</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Autoevaluación & Tendencia */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Autoevaluación & Tendencia</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center mb-4">
-                    <p className={cn('text-5xl font-bold', perfColor(perfData.avg))}>
-                      {isNaN(perfData.avg) ? '—' : perfData.avg.toFixed(1)}
-                    </p>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">/ 10 promedio</p>
-                  </div>
-                  {perfData.sparkline.length > 1 && (
-                    <div className="mb-4">
-                      <ResponsiveContainer width="100%" height={60}>
-                        <LineChart data={perfData.sparkline} margin={{ top: 2, right: 4, left: -30, bottom: 0 }}>
-                          <Line type="monotone" dataKey="score" stroke="#EF9F27" strokeWidth={2} dot={false} />
-                          <YAxis domain={[0, 10]} hide />
-                          <XAxis dataKey="date" hide />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                  {(perfData.topHighs.length > 0 || perfData.topLows.length > 0) && (
-                    <div className="space-y-3">
-                      {perfData.topHighs.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium text-zinc-400 mb-1.5">Top fortalezas</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {perfData.topHighs.map(([label, count]) => (
-                              <span key={label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
-                                {label} <span className="font-bold opacity-70">({count})</span>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {perfData.topLows.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium text-zinc-400 mb-1.5">Top áreas de mejora</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {perfData.topLows.map(([label, count]) => (
-                              <span key={label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                                {label} <span className="font-bold opacity-70">({count})</span>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                  {perfData.sparkline.length > 1 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart data={perfData.sparkline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 10]} tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ fontSize: 11 }} />
+                        <Line type="monotone" dataKey="score" stroke="#EF9F27" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[220px] flex items-center justify-center">
+                      <p className="text-xs text-zinc-400">Sin suficientes datos</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* ── Section 5: SPC (conditional) ── */}
-            {hasSpcData && (
-              <Card className="mb-6">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Secure Parent Collective</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Invitaciones</p>
-                      <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{spcData.invites}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Nuevos members</p>
-                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{spcData.newMembers}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Interesados</p>
-                      <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{spcData.interested}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Conv SPC rate</p>
-                      <p className={cn('text-2xl font-bold', isNaN(spcData.rate) ? 'text-zinc-400' : 'text-purple-600 dark:text-purple-400')}>
-                        {fmtPct(spcData.rate)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-1">
-                    <div className="flex justify-between text-xs text-zinc-400">
-                      <span>Nuevos / Invitaciones</span>
-                      <span>{spcData.newMembers} / {spcData.invites}</span>
-                    </div>
-                    <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-purple-500 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(isNaN(spcData.rate) ? 0 : spcData.rate, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* ── Section 6: Historial ── */}
+            {/* ── Section 4: Historial ── */}
             <Card className="mb-8">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-semibold">Historial completo</CardTitle>
@@ -767,15 +445,15 @@ export default function SetterDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pageRows.map((r) => {
-                        const convPct = safeDiv(r.calls_booked, r.total_convos) * 100
+                      {pageRows.map((r: Row, i: number) => {
+                        const convPct = safeDiv(r.qualified_calls, r.total_convos) * 100
                         return (
-                          <tr key={r.id} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                          <tr key={`${r.date}_${r.setter_name}_${r.source}_${i}`} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                             <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{formatDate(r.date)}</td>
                             <td className="py-2.5 px-3 font-medium text-zinc-800 dark:text-zinc-200">{r.setter_name}</td>
                             <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{r.total_convos}</td>
                             <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{r.call_proposed}</td>
-                            <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{r.calls_booked}</td>
+                            <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{r.qualified_calls}</td>
                             <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{fmtPct(convPct, 0)}</td>
                             <td className="py-2.5 px-3">
                               <span className={cn('font-semibold', perfColor(r.performance_score))}>
