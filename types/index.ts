@@ -97,6 +97,11 @@ export interface Call {
   utm_medium: string | null
   utm_campaign: string | null
   created_at: string
+  call_status: 'No Show' | 'Showed Up' | null
+  next_step: 'Follow Up' | 'Cancelled' | 'Rescheduled' | null
+  call_summary: string | null
+  reported_at: string | null
+  reported_by: string | null
 }
 
 export interface CloserDailyReport {

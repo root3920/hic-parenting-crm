@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { PageTransition } from '@/components/motion/PageTransition'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,8 @@ const DEFAULT_CLOSERS = ['Cali Luna', 'Marcela HIC Parenting']
 function today() {
   return new Date().toISOString().split('T')[0]
 }
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FormState {
   date: string
@@ -35,6 +38,37 @@ interface FormState {
   feedback: string
 }
 
+interface DayCall {
+  id: string
+  start_date: string
+  full_name: string
+  email: string | null
+  phone: string | null
+  meeting_url: string | null
+  status: string
+  call_type: string | null
+  notes: string | null
+  call_status: string | null
+  next_step: string | null
+  call_summary: string | null
+}
+
+interface CallReport {
+  call_id: string
+  call_status: 'No Show' | 'Showed Up' | ''
+  next_step: 'Follow Up' | 'Cancelled' | 'Rescheduled' | ''
+  call_summary: string
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CALL_TYPE_STYLES: Record<string, string> = {
+  'Qualified':    'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  'Disqualified': 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  'Onboarding':   'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  'Interview':    'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+}
+
 const initialState: FormState = {
   date: today(),
   closer_name: DEFAULT_CLOSERS[0],
@@ -45,12 +79,20 @@ const initialState: FormState = {
   feedback: '',
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function n(v: string) { return parseInt(v) || 0 }
 function nf(v: string) { return parseFloat(v) || 0 }
 
 function pct(num: number, den: number) {
   return den > 0 ? `${((num / den) * 100).toFixed(1)}%` : '—'
 }
+
+function formatTime(dateStr: string) {
+  return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SectionHeader({ color, label, sub }: { color: string; label: string; sub: string }) {
   return (
@@ -100,6 +142,101 @@ function SectionCard({ children, className }: { children: React.ReactNode; class
   )
 }
 
+function CallReportCard({ call, report, onUpdate, index }: {
+  call: DayCall
+  report: CallReport | undefined
+  onUpdate: (field: keyof Omit<CallReport, 'call_id'>, value: string) => void
+  index: number
+}) {
+  const callStatus = report?.call_status ?? ''
+  const borderColor =
+    callStatus === 'Showed Up' ? 'border-l-[#3B6D11]' :
+    callStatus === 'No Show'   ? 'border-l-[#A32D2D]' :
+    'border-l-zinc-300 dark:border-l-zinc-600'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.07 }}
+      className={cn(
+        'bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 border-l-4 p-4 hover:shadow-md transition-shadow',
+        borderColor
+      )}
+    >
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">{formatTime(call.start_date)}</span>
+            {call.call_type && (
+              <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', CALL_TYPE_STYLES[call.call_type] ?? 'bg-zinc-100 text-zinc-600')}>
+                {call.call_type}
+              </span>
+            )}
+          </div>
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{call.full_name}</p>
+          {call.email && <p className="text-xs text-zinc-400 dark:text-zinc-500">{call.email}</p>}
+        </div>
+        {call.meeting_url && (
+          <a
+            href={call.meeting_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Unirse a llamada"
+            className="p-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors shrink-0"
+          >
+            <Video className="h-4 w-4" />
+          </a>
+        )}
+      </div>
+
+      {/* Form fields */}
+      <div className="space-y-2.5">
+        <div>
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+            Estado de la llamada <span className="text-red-400">*</span>
+          </label>
+          <select
+            value={report?.call_status ?? ''}
+            onChange={(e) => onUpdate('call_status', e.target.value)}
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+          >
+            <option value="">── Seleccionar ──</option>
+            <option value="No Show">No Show</option>
+            <option value="Showed Up">Showed Up</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Siguiente paso</label>
+          <select
+            value={report?.next_step ?? ''}
+            onChange={(e) => onUpdate('next_step', e.target.value)}
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+          >
+            <option value="">── Seleccionar ──</option>
+            <option value="Follow Up">Follow Up</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="Rescheduled">Rescheduled</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Resumen de la llamada</label>
+          <textarea
+            value={report?.call_summary ?? ''}
+            onChange={(e) => onUpdate('call_summary', e.target.value)}
+            placeholder="Escribe qué pasó en esta llamada..."
+            rows={2}
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y"
+          />
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function NuevoReporteCloserPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
@@ -107,6 +244,12 @@ export default function NuevoReporteCloserPage() {
   const [submitting, setSubmitting] = useState(false)
   const [closerOptions, setCloserOptions] = useState<string[]>(DEFAULT_CLOSERS)
 
+  // Llamadas del día
+  const [dayCalls, setDayCalls] = useState<DayCall[]>([])
+  const [callsLoading, setCallsLoading] = useState(false)
+  const [callReports, setCallReports] = useState<Record<string, CallReport>>({})
+
+  // Load closer options from DB
   useEffect(() => {
     supabase
       .from('closer_daily_reports')
@@ -120,8 +263,33 @@ export default function NuevoReporteCloserPage() {
       })
   }, [supabase])
 
+  // Fetch calls for selected date + closer
+  useEffect(() => {
+    if (!form.date || !form.closer_name) return
+    setCallsLoading(true)
+    setCallReports({})
+    supabase
+      .from('calls')
+      .select('id, start_date, full_name, email, phone, meeting_url, status, call_type, notes, call_status, next_step, call_summary')
+      .eq('closer_name', form.closer_name)
+      .gte('start_date', `${form.date}T00:00:00`)
+      .lte('start_date', `${form.date}T23:59:59`)
+      .order('start_date', { ascending: true })
+      .then(({ data }) => {
+        setDayCalls(data ?? [])
+        setCallsLoading(false)
+      })
+  }, [supabase, form.date, form.closer_name])
+
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function updateCallReport(callId: string, field: keyof Omit<CallReport, 'call_id'>, value: string) {
+    setCallReports(prev => ({
+      ...prev,
+      [callId]: { ...prev[callId], call_id: callId, [field]: value }
+    }))
   }
 
   const liveKPIs = useMemo(() => ({
@@ -131,6 +299,8 @@ export default function NuevoReporteCloserPage() {
     closeRate: pct(n(form.won_deals), n(form.offers_proposed)),
   }), [form.showed_meetings, form.total_meetings, form.no_show_meetings, form.offers_proposed, form.won_deals])
 
+  const allReported = dayCalls.length > 0 && dayCalls.every(c => callReports[c.id]?.call_status)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.date || !form.closer_name) {
@@ -138,6 +308,7 @@ export default function NuevoReporteCloserPage() {
       return
     }
     setSubmitting(true)
+
     const { error } = await supabase.from('closer_daily_reports').insert({
       date: form.date,
       closer_name: form.closer_name,
@@ -156,13 +327,34 @@ export default function NuevoReporteCloserPage() {
       feedback: form.feedback || null,
       source: 'form',
     })
-    setSubmitting(false)
+
     if (error) {
+      setSubmitting(false)
       toast.error(`Error al guardar: ${error.message}`)
-    } else {
-      toast.success('Reporte guardado correctamente')
-      router.push('/equipo/closer')
+      return
     }
+
+    // Update calls in parallel
+    const reportsToUpdate = Object.values(callReports).filter(r => r.call_status)
+    if (reportsToUpdate.length > 0) {
+      const now = new Date().toISOString()
+      await Promise.all(
+        reportsToUpdate.map(r =>
+          supabase.from('calls').update({
+            call_status:  r.call_status,
+            next_step:    r.next_step || null,
+            call_summary: r.call_summary || null,
+            reported_at:  now,
+            reported_by:  form.closer_name,
+            status: r.call_status === 'No Show' ? 'No show' : 'Showed Up',
+          }).eq('id', r.call_id)
+        )
+      )
+    }
+
+    setSubmitting(false)
+    toast.success('Reporte guardado correctamente')
+    router.push('/equipo/closer')
   }
 
   return (
@@ -240,6 +432,48 @@ export default function NuevoReporteCloserPage() {
               <div><FieldLabel>No-show</FieldLabel><NumberInput value={form.no_show_meetings} onChange={(v) => set('no_show_meetings', v)} /></div>
               <div><FieldLabel>Reagendadas</FieldLabel><NumberInput value={form.rescheduled_meetings} onChange={(v) => set('rescheduled_meetings', v)} /></div>
             </div>
+          </SectionCard>
+
+          {/* Section — Llamadas del día */}
+          <SectionCard>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                Llamadas
+              </span>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                Llamadas del día
+                {!callsLoading && dayCalls.length > 0 && (
+                  <span className="ml-1">
+                    ({dayCalls.length})
+                    {allReported && <span className="ml-1 text-green-500">✓</span>}
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {callsLoading ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="h-36 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
+                ))}
+              </div>
+            ) : dayCalls.length === 0 ? (
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center py-4">
+                No se encontraron llamadas para este día
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {dayCalls.map((call, i) => (
+                  <CallReportCard
+                    key={call.id}
+                    call={call}
+                    report={callReports[call.id]}
+                    onUpdate={(field, value) => updateCallReport(call.id, field, value)}
+                    index={i}
+                  />
+                ))}
+              </div>
+            )}
           </SectionCard>
 
           {/* Section 2 — Ofertas & Cierres */}

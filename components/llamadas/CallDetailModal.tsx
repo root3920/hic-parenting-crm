@@ -2,8 +2,24 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Call } from '@/types'
-import { Video, Mail, Phone, Calendar, User, Tag, ExternalLink } from 'lucide-react'
+import { Video, Mail, Phone, Calendar, User, Tag, ExternalLink, ClipboardCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+const CALL_STATUS_STYLES: Record<string, string> = {
+  'Showed Up': 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  'No Show':   'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+}
+
+const NEXT_STEP_STYLES: Record<string, string> = {
+  'Follow Up':   'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  'Cancelled':   'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  'Rescheduled': 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+}
+
+function formatReportedAt(dateStr: string) {
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 const STATUS_STYLES: Record<string, string> = {
   'Scheduled':  'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
@@ -150,6 +166,36 @@ export function CallDetailModal({ call, onClose }: Props) {
               <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2.5">
                 <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed whitespace-pre-wrap">{call.objections}</p>
               </div>
+            </div>
+          )}
+
+          {/* Closer report */}
+          {call.call_summary && (
+            <div className="border-l-4 border-l-teal-400 pl-3">
+              <div className="flex items-center gap-2 mb-2">
+                <ClipboardCheck className="h-4 w-4 text-teal-500" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-400">Reporte del closer</p>
+              </div>
+              <div className="bg-teal-50 dark:bg-teal-900/20 rounded-lg px-3 py-2.5 mb-2.5">
+                <p className="text-xs text-teal-800 dark:text-teal-300 leading-relaxed whitespace-pre-wrap">{call.call_summary}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {call.call_status && (
+                  <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', CALL_STATUS_STYLES[call.call_status] ?? 'bg-zinc-100 text-zinc-600')}>
+                    Estado reportado: {call.call_status}
+                  </span>
+                )}
+                {call.next_step && (
+                  <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', NEXT_STEP_STYLES[call.next_step] ?? 'bg-zinc-100 text-zinc-600')}>
+                    Siguiente paso: {call.next_step}
+                  </span>
+                )}
+              </div>
+              {call.reported_by && call.reported_at && (
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1.5">
+                  Reportado por <span className="font-medium text-zinc-600 dark:text-zinc-300">{call.reported_by}</span> · {formatReportedAt(call.reported_at)}
+                </p>
+              )}
             </div>
           )}
 

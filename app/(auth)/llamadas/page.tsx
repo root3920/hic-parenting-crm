@@ -475,6 +475,7 @@ export default function LlamadasPage() {
                             <SortHeader label="Estado" sortKey="status" current={sortKey} dir={sortDir} onSort={handleSort} />
                             <SortHeader label="Closer" sortKey="closer_name" current={sortKey} dir={sortDir} onSort={handleSort} />
                             <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Setter</th>
+                            <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Reporte</th>
                             <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Acciones</th>
                           </tr>
                         </thead>
@@ -517,6 +518,19 @@ export default function LlamadasPage() {
                                 {/* Setter */}
                                 <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap max-w-[120px] truncate">
                                   {call.setter_name ?? '—'}
+                                </td>
+                                {/* Reporte */}
+                                <td className="py-2.5 px-3">
+                                  {call.call_status ? (
+                                    <span
+                                      title={`Reportado por ${call.reported_by ?? ''}${call.reported_at ? ' el ' + new Date(call.reported_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : ''}`}
+                                      className="inline-flex items-center gap-1 text-xs"
+                                    >
+                                      <span className={cn('h-2 w-2 rounded-full', call.call_status === 'Showed Up' ? 'bg-green-500' : 'bg-red-500')} />
+                                    </span>
+                                  ) : (
+                                    <span className="h-2 w-2 rounded-full bg-zinc-300 dark:bg-zinc-600 inline-block" title="Sin reporte" />
+                                  )}
                                 </td>
                                 {/* Acciones */}
                                 <td className="py-2.5 px-3">
