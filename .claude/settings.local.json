@@ -21,7 +21,8 @@
       "Bash(head -20 grep -n \"new Date\\(\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/csm/page.tsx)",
       "Bash(head -20 grep -n \"new Date\\(\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/llamadas/page.tsx)",
       "Bash(head -20 grep -n \"new Date\\(\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/setter/page.tsx)",
-      "Bash(head -15 grep -n \"new Date\\(r\\\\.\\\\|toLocaleDateString\\\\|formatDate\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/csm/page.tsx)"
+      "Bash(head -15 grep -n \"new Date\\(r\\\\.\\\\|toLocaleDateString\\\\|formatDate\" /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/csm/page.tsx)",
+      "Bash(grep -r \"toast\\\\|sonner\\\\|useToast\" package.json components/ui/ --include=*.tsx --include=*.json -l)"
     ]
   }
 }

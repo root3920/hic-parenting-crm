@@ -19,11 +19,13 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import { Search } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Search, Plus, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
 import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTableRow'
+import { toast } from 'sonner'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +40,32 @@ const chartVariants = {
   visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
 }
 
+function todayStr() {
+  return new Date().toISOString().split('T')[0]
+}
+
+const emptyForm = {
+  date: todayStr(),
+  offer_title: '',
+  cost: '',
+  buyer_name: '',
+  buyer_email: '',
+  buyer_phone: '',
+  currency: 'USD',
+  transaction_id: '',
+  source: 'Manual',
+}
+
+type FormData = typeof emptyForm
+
+const inputClass =
+  'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+
+const selectClass =
+  'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+
+const labelClass = 'block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1'
+
 export default function SalesPage() {
   const supabase = useMemo(() => createClient(), [])
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -45,6 +73,10 @@ export default function SalesPage() {
   const [search, setSearch] = useState('')
   const [fromDate, setFromDate] = useState(getMonthRange().from)
   const [toDate, setToDate] = useState(getMonthRange().to)
+
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState<FormData>(emptyForm)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     async function fetchTransactions() {
@@ -62,10 +94,52 @@ export default function SalesPage() {
     fetchTransactions()
   }, [fromDate, toDate])
 
+  function set(field: keyof FormData, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.date || !form.offer_title || !form.cost || !form.buyer_name) {
+      toast.error('Completa los campos obligatorios')
+      return
+    }
+
+    setSubmitting(true)
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert({
+        date: form.date,
+        offer_title: form.offer_title,
+        cost: parseFloat(form.cost) || 0,
+        buyer_name: form.buyer_name,
+        buyer_email: form.buyer_email || null,
+        buyer_phone: form.buyer_phone || null,
+        currency: form.currency,
+        transaction_id: form.transaction_id || null,
+        source: form.source,
+      })
+      .select()
+      .single()
+
+    setSubmitting(false)
+
+    if (error) {
+      toast.error(`Error: ${error.message}`)
+      return
+    }
+
+    // Optimistic update
+    setTransactions((prev) => [data as Transaction, ...prev])
+    setShowForm(false)
+    setForm({ ...emptyForm, date: todayStr() })
+    toast.success('Transacción guardada')
+  }
+
   const filtered = transactions.filter(
     (t) =>
       t.buyer_name.toLowerCase().includes(search.toLowerCase()) ||
-      t.buyer_email.toLowerCase().includes(search.toLowerCase()) ||
+      (t.buyer_email ?? '').toLowerCase().includes(search.toLowerCase()) ||
       t.offer_title.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -118,6 +192,10 @@ export default function SalesPage() {
               onChange={(e) => setToDate(e.target.value)}
               className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
             />
+            <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Agregar venta
+            </Button>
           </div>
         </PageHeader>
 
@@ -267,6 +345,163 @@ export default function SalesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Slide-over panel */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div
+            className="flex-1 bg-black/30 backdrop-blur-sm"
+            onClick={() => setShowForm(false)}
+          />
+          {/* Panel */}
+          <div className="w-full max-w-md bg-white dark:bg-zinc-900 h-full shadow-xl flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Agregar transacción manual</h2>
+              <button
+                onClick={() => setShowForm(false)}
+                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col p-5 gap-4">
+              {/* Date + Source */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Fecha *</label>
+                  <input
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => set('date', e.target.value)}
+                    required
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Fuente</label>
+                  <select
+                    value={form.source}
+                    onChange={(e) => set('source', e.target.value)}
+                    className={selectClass}
+                  >
+                    <option>Kajabi</option>
+                    <option>GoHighLevel</option>
+                    <option>Manual</option>
+                    <option>Stripe</option>
+                    <option>PayPal</option>
+                    <option>Otro</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Product / Offer */}
+              <div>
+                <label className={labelClass}>Producto / Oferta *</label>
+                <input
+                  type="text"
+                  value={form.offer_title}
+                  onChange={(e) => set('offer_title', e.target.value)}
+                  placeholder="Ej: Parenting With Understanding GROUP Coaching"
+                  required
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className={labelClass}>Monto *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-base font-semibold select-none">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.cost}
+                    onChange={(e) => set('cost', e.target.value)}
+                    placeholder="0.00"
+                    required
+                    className={`${inputClass} pl-7 text-lg font-semibold`}
+                  />
+                </div>
+              </div>
+
+              {/* Buyer name */}
+              <div>
+                <label className={labelClass}>Nombre del comprador *</label>
+                <input
+                  type="text"
+                  value={form.buyer_name}
+                  onChange={(e) => set('buyer_name', e.target.value)}
+                  required
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className={labelClass}>Email</label>
+                <input
+                  type="email"
+                  value={form.buyer_email}
+                  onChange={(e) => set('buyer_email', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Phone + Currency */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Teléfono</label>
+                  <input
+                    type="text"
+                    value={form.buyer_phone}
+                    onChange={(e) => set('buyer_phone', e.target.value)}
+                    placeholder="+1 (555) 000-0000"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Moneda</label>
+                  <select
+                    value={form.currency}
+                    onChange={(e) => set('currency', e.target.value)}
+                    className={selectClass}
+                  >
+                    <option>USD</option>
+                    <option>EUR</option>
+                    <option>MXN</option>
+                    <option>CAD</option>
+                    <option>GBP</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Transaction ID */}
+              <div>
+                <label className={labelClass}>Transaction ID</label>
+                <input
+                  type="text"
+                  value={form.transaction_id}
+                  onChange={(e) => set('transaction_id', e.target.value)}
+                  placeholder="txn_xxx o referencia interna"
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Spacer + Submit */}
+              <div className="mt-auto pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                <Button type="submit" disabled={submitting} className="w-full">
+                  {submitting ? 'Guardando...' : 'Guardar transacción'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </PageTransition>
   )
 }

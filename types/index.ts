@@ -5,8 +5,10 @@ export interface Transaction {
   cost: number
   buyer_name: string
   buyer_email: string
+  buyer_phone?: string
   currency: string
-  source: 'Kajabi' | 'GoHighLevel'
+  transaction_id?: string
+  source: 'Kajabi' | 'GoHighLevel' | 'Manual' | 'Stripe' | 'PayPal' | 'Otro'
   created_at: string
 }
 
