@@ -3,12 +3,16 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log('SERVICE_ROLE_KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+
     const secret = req.headers.get('x-webhook-secret')
     if (process.env.WEBHOOK_SECRET && secret !== process.env.WEBHOOK_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await req.json()
+    console.log('Received body:', JSON.stringify(body))
 
     const {
       date, offer_tittle, cost, buyer_fullname,
@@ -45,8 +49,8 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Supabase error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Supabase insert error:', JSON.stringify(error))
+      return NextResponse.json({ error: error.message, details: error }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -55,8 +59,11 @@ export async function POST(req: NextRequest) {
       id: data.id
     }, { status: 200 })
 
-  } catch (err) {
-    console.error('Webhook error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err: any) {
+    console.error('Webhook catch error:', err?.message, err?.stack)
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: err?.message
+    }, { status: 500 })
   }
 }
