@@ -370,6 +370,41 @@ export default function SalesPage() {
   const products = Object.values(productMap).sort((a, b) => b.revenue - a.revenue)
   const maxRevenue = products[0]?.revenue ?? 1
 
+  // ── Recuperación de compras ──────────────────────────────────────────────
+  const failedEmails = useMemo(() => new Set(
+    transactions.filter(t => t.status === 'failed').map(t => t.buyer_email?.toLowerCase()).filter(Boolean) as string[]
+  ), [transactions])
+
+  const completedEmails = useMemo(() => new Set(
+    transactions.filter(t => t.status === 'completed').map(t => t.buyer_email?.toLowerCase()).filter(Boolean) as string[]
+  ), [transactions])
+
+  const recoveredEmails = useMemo(() =>
+    Array.from(failedEmails).filter(email => completedEmails.has(email)),
+    [failedEmails, completedEmails]
+  )
+
+  const totalFailed = failedEmails.size
+  const totalRecovered = recoveredEmails.length
+  const recoveryRate = totalFailed > 0 ? (totalRecovered / totalFailed * 100).toFixed(1) : '0'
+  const recoveredRevenue = useMemo(() =>
+    transactions
+      .filter(t => t.status === 'completed' && recoveredEmails.includes(t.buyer_email?.toLowerCase() ?? ''))
+      .reduce((sum, t) => sum + (Number(t.cost) || 0), 0),
+    [transactions, recoveredEmails]
+  )
+
+  const failedByProduct = useMemo(() => {
+    const map: Record<string, number> = {}
+    transactions.filter(t => t.status === 'failed').forEach(t => {
+      const key = t.offer_title ?? '(sin título)'
+      map[key] = (map[key] ?? 0) + 1
+    })
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  }, [transactions])
+
+  const maxFailed = failedByProduct[0]?.[1] ?? 1
+
   const confirmMeta = confirm
     ? confirm.type === 'delete'
       ? {
@@ -505,6 +540,77 @@ export default function SalesPage() {
             </Card>
           </motion.div>
         </KPICardGrid>
+
+        {/* ── Recuperación de compras ──────────────────────────────────── */}
+        {!loading && totalFailed > 0 && (
+          <motion.div variants={chartVariants} initial="hidden" animate="visible" className="mb-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Recuperación de compras</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* 4 metric cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="rounded-lg bg-red-50 dark:bg-red-900/20 px-3 py-2.5">
+                    <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">Compras fallidas</p>
+                    <p className="text-2xl font-bold text-red-700 dark:text-red-300 mt-1">{totalFailed}</p>
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">emails únicos</p>
+                  </div>
+                  <div className="rounded-lg bg-green-50 dark:bg-green-900/20 px-3 py-2.5">
+                    <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">Recuperadas</p>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">{totalRecovered}</p>
+                    <p className="text-xs text-green-500 dark:text-green-400 mt-0.5">compraron después</p>
+                  </div>
+                  <div className={cn('rounded-lg px-3 py-2.5', Number(recoveryRate) >= 50 ? 'bg-green-50 dark:bg-green-900/20' : Number(recoveryRate) >= 20 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-red-50 dark:bg-red-900/20')}>
+                    <p className={cn('text-xs font-medium uppercase tracking-wide', Number(recoveryRate) >= 50 ? 'text-green-600 dark:text-green-400' : Number(recoveryRate) >= 20 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>Tasa de recuperación</p>
+                    <p className={cn('text-2xl font-bold mt-1', Number(recoveryRate) >= 50 ? 'text-green-700 dark:text-green-300' : Number(recoveryRate) >= 20 ? 'text-amber-700 dark:text-amber-300' : 'text-red-700 dark:text-red-300')}>{recoveryRate}%</p>
+                    <p className={cn('text-xs mt-0.5', Number(recoveryRate) >= 50 ? 'text-green-500 dark:text-green-400' : Number(recoveryRate) >= 20 ? 'text-amber-500 dark:text-amber-400' : 'text-red-500 dark:text-red-400')}>de fallidos recuperados</p>
+                  </div>
+                  <div className="rounded-lg bg-green-50 dark:bg-green-900/20 px-3 py-2.5">
+                    <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">Revenue recuperado</p>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">{formatCurrency(recoveredRevenue)}</p>
+                    <p className="text-xs text-green-500 dark:text-green-400 mt-0.5">de clientes recuperados</p>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Progreso de recuperación</span>
+                    <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{totalRecovered} / {totalFailed}</span>
+                  </div>
+                  <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full transition-all', Number(recoveryRate) >= 50 ? 'bg-green-500' : Number(recoveryRate) >= 20 ? 'bg-amber-500' : 'bg-red-500')}
+                      style={{ width: `${Math.min(Number(recoveryRate), 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Top 5 products with most failures */}
+                {failedByProduct.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-2">Top productos con más fallos</p>
+                    <div className="space-y-2">
+                      {failedByProduct.map(([name, count]) => (
+                        <div key={name} className="flex items-center gap-3">
+                          <span className="text-xs text-zinc-600 dark:text-zinc-400 w-40 truncate shrink-0">{name}</span>
+                          <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-red-400 dark:bg-red-500 rounded-full"
+                              style={{ width: `${(count / maxFailed) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 w-6 text-right shrink-0">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-3 mb-6">
           <motion.div className="lg:col-span-2" variants={chartVariants} initial="hidden" animate="visible">
