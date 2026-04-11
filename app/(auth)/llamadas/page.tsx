@@ -297,7 +297,9 @@ export default function LlamadasPage() {
     setStatusFilter(prev => prev === key ? 'all' : key)
   }
 
-  async function updateCallStatus(callId: string, newStatus: string) {
+  type CallStatus = 'Showed Up' | 'Cancelled' | 'Rescheduled' | 'No show' | 'Scheduled'
+
+  async function updateCallStatus(callId: string, newStatus: CallStatus) {
     setUpdatingId(callId)
     const { error } = await supabase.from('calls').update({ status: newStatus }).eq('id', callId)
     setUpdatingId(null)
@@ -560,7 +562,7 @@ export default function LlamadasPage() {
                                               key={s}
                                               onClick={async () => {
                                                 setOpenPopoverId(null)
-                                                await updateCallStatus(call.id, s)
+                                                await updateCallStatus(call.id, s as CallStatus)
                                               }}
                                               className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                                             >
@@ -742,7 +744,7 @@ export default function LlamadasPage() {
         call={detailCall}
         onClose={() => setDetailCall(null)}
         onStatusChange={(callId, newStatus) => {
-          setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus } : c))
+          setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus as CallStatus } : c))
         }}
       />
     </PageTransition>
