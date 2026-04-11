@@ -11,9 +11,10 @@ import { UpcomingCallCard } from '@/components/llamadas/UpcomingCallCard'
 import {
   Calendar, CheckCircle, XCircle, UserX, RefreshCw,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
-  Eye, ExternalLink, Search,
+  Eye, ExternalLink, Search, Loader2, Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -53,6 +54,16 @@ const PIE_COLORS: Record<string, string> = {
   'No show':     '#BA7517',
   'Rescheduled': '#534AB7',
   'Scheduled':   '#185FA5',
+}
+
+const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show'] as const
+
+const STATUS_DOT: Record<string, string> = {
+  'Scheduled':   'bg-blue-500',
+  'Showed Up':   'bg-green-500',
+  'Rescheduled': 'bg-purple-500',
+  'Cancelled':   'bg-red-500',
+  'No show':     'bg-amber-500',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -169,6 +180,8 @@ export default function LlamadasPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
   const [detailCall, setDetailCall] = useState<Call | null>(null)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
 
   // Debounce search
   useEffect(() => {
@@ -282,6 +295,19 @@ export default function LlamadasPage() {
 
   function handleStatusCardClick(key: StatusFilter) {
     setStatusFilter(prev => prev === key ? 'all' : key)
+  }
+
+  async function updateCallStatus(callId: string, newStatus: string) {
+    setUpdatingId(callId)
+    const { error } = await supabase.from('calls').update({ status: newStatus }).eq('id', callId)
+    setUpdatingId(null)
+    if (error) {
+      toast.error('Error al actualizar el estado')
+      return
+    }
+    setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus } : c))
+    setDetailCall(prev => prev?.id === callId ? { ...prev, status: newStatus } : prev)
+    toast.success(`Estado actualizado a ${newStatus}`)
   }
 
   // ── Analytics: donut data ──
@@ -511,7 +537,42 @@ export default function LlamadasPage() {
                                 </td>
                                 {/* Estado */}
                                 <td className="py-2.5 px-3">
-                                  <StatusPill status={call.status} />
+                                  <div className="relative inline-block">
+                                    <button
+                                      disabled={updatingId === call.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setOpenPopoverId(prev => prev === call.id ? null : call.id)
+                                      }}
+                                      className="flex items-center gap-1 hover:opacity-70 transition-opacity disabled:opacity-40"
+                                    >
+                                      {updatingId === call.id
+                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
+                                        : <StatusPill status={call.status} />
+                                      }
+                                    </button>
+                                    {openPopoverId === call.id && (
+                                      <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setOpenPopoverId(null)} />
+                                        <div className="absolute top-full left-0 mt-1 z-20 w-40 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
+                                          {STATUS_OPTIONS.map((s) => (
+                                            <button
+                                              key={s}
+                                              onClick={async () => {
+                                                setOpenPopoverId(null)
+                                                await updateCallStatus(call.id, s)
+                                              }}
+                                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                                            >
+                                              <span className={cn('h-2 w-2 rounded-full flex-shrink-0', STATUS_DOT[s])} />
+                                              {s}
+                                              {s === call.status && <Check className="h-3 w-3 ml-auto text-zinc-400" />}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
                                 </td>
                                 {/* Closer */}
                                 <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap max-w-[120px] truncate">
@@ -677,7 +738,13 @@ export default function LlamadasPage() {
       </div>
 
       {/* Detail modal */}
-      <CallDetailModal call={detailCall} onClose={() => setDetailCall(null)} />
+      <CallDetailModal
+        call={detailCall}
+        onClose={() => setDetailCall(null)}
+        onStatusChange={(callId, newStatus) => {
+          setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus } : c))
+        }}
+      />
     </PageTransition>
   )
 }
