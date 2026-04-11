@@ -7,6 +7,8 @@ import { Call } from '@/types'
 import { Video, Mail, Phone, Calendar, User, Tag, ExternalLink, ClipboardCheck, ChevronDown, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { formatFullDateInTimezone } from '@/lib/timezones'
+import { useUserTimezone } from '@/hooks/useUserTimezone'
 
 const CALL_STATUS_STYLES: Record<string, string> = {
   'Showed Up': 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300',
@@ -49,16 +51,6 @@ function formatReportedAt(dateStr: string) {
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function formatFullDate(dateStr: string) {
-  const d = new Date(dateStr)
-  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-  const h = d.getHours() % 12 || 12
-  const m = d.getMinutes().toString().padStart(2, '0')
-  const ampm = d.getHours() >= 12 ? 'pm' : 'am'
-  return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]} · ${h}:${m}${ampm}`
-}
-
 function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]?.toUpperCase() ?? '').join('')
 }
@@ -84,6 +76,7 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
 
 export function CallDetailModal({ call, onClose, onStatusChange }: Props) {
   const supabase = useMemo(() => createClient(), [])
+  const { timezone } = useUserTimezone()
 
   const [localStatus, setLocalStatus] = useState(call?.status ?? '')
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
@@ -208,7 +201,7 @@ export function CallDetailModal({ call, onClose, onStatusChange }: Props) {
 
           {/* Date/Time */}
           <div className={cn('px-3 py-2 rounded-lg text-sm font-medium', isFuture ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400')}>
-            📅 {formatFullDate(call.start_date)}
+            📅 {formatFullDateInTimezone(call.start_date, timezone)}
           </div>
 
           {/* Meeting link — prominent */}

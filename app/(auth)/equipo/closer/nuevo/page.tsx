@@ -9,6 +9,8 @@ import { ArrowLeft, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
+import { formatTimeInTimezone } from '@/lib/timezones'
+import { useUserTimezone } from '@/hooks/useUserTimezone'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,8 +90,8 @@ function pct(num: number, den: number) {
   return den > 0 ? `${((num / den) * 100).toFixed(1)}%` : '—'
 }
 
-function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+function formatTime(dateStr: string, timezone: string) {
+  return formatTimeInTimezone(dateStr, timezone)
 }
 
 function mapStatusToCallStatus(status: string): CallReport['call_status'] {
@@ -158,11 +160,12 @@ function SectionCard({ children, className }: { children: React.ReactNode; class
   )
 }
 
-function CallReportCard({ call, report, onUpdate, index }: {
+function CallReportCard({ call, report, onUpdate, index, timezone }: {
   call: DayCall
   report: CallReport | undefined
   onUpdate: (field: keyof Omit<CallReport, 'call_id'>, value: string) => void
   index: number
+  timezone: string
 }) {
   const callStatus = report?.call_status ?? ''
   const borderColor =
@@ -188,7 +191,7 @@ function CallReportCard({ call, report, onUpdate, index }: {
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">{formatTime(call.start_date)}</span>
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">{formatTime(call.start_date, timezone)}</span>
             {call.call_type && (
               <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', CALL_TYPE_STYLES[call.call_type] ?? 'bg-zinc-100 text-zinc-600')}>
                 {call.call_type}
@@ -267,6 +270,7 @@ function CallReportCard({ call, report, onUpdate, index }: {
 export default function NuevoReporteCloserPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const { timezone } = useUserTimezone()
   const [form, setForm] = useState<FormState>(initialState)
   const [submitting, setSubmitting] = useState(false)
   const [closerOptions, setCloserOptions] = useState<string[]>(DEFAULT_CLOSERS)
@@ -510,6 +514,7 @@ export default function NuevoReporteCloserPage() {
                     report={callReports[call.id]}
                     onUpdate={(field, value) => updateCallReport(call.id, field, value)}
                     index={i}
+                    timezone={timezone}
                   />
                 ))}
               </div>

@@ -37,9 +37,10 @@ export async function POST(req: NextRequest) {
     const closerName    = body?.customData?.closer_name ||
                           `${body?.user?.firstName ?? ''} ${body?.user?.lastName ?? ''}`.trim() ||
                           null
-    const utmSource     = body?.customData?.utm_source   ?? null
-    const utmMedium     = body?.customData?.utm_medium   ?? null
-    const utmCampaign   = body?.customData?.utm_campaign ?? null
+    const utmSource      = body?.customData?.utm_source       ?? null
+    const utmMedium      = body?.customData?.utm_medium       ?? null
+    const utmCampaign    = body?.customData?.utm_campaign     ?? null
+    const sourceTimezone = body?.calendar?.selectedTimezone   ?? 'America/Los_Angeles'
 
     if (!appointmentId) {
       return NextResponse.json({ error: 'Missing appointmentId' }, { status: 400 })
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
           utm_campaign:       utmCampaign,
           external_id:        appointmentId,
           appointment_status: appStatus,
+          source_timezone:    sourceTimezone,
         })
         .select()
         .single()

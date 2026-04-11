@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { US_TIMEZONES, formatDateTimeInTimezone } from '@/lib/timezones'
+import { useUserTimezone } from '@/hooks/useUserTimezone'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -78,13 +80,8 @@ function getDateRange(preset: Preset) {
   return { from: '2020-01-01', to: fmt(add(400)) }
 }
 
-function formatDateShort(dateStr: string) {
-  const d = new Date(dateStr)
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-  const h = d.getHours() % 12 || 12
-  const m = d.getMinutes().toString().padStart(2, '0')
-  const ampm = d.getHours() >= 12 ? 'pm' : 'am'
-  return `${d.getDate()} ${months[d.getMonth()]} · ${h}:${m}${ampm}`
+function formatDateShort(dateStr: string, timezone: string) {
+  return formatDateTimeInTimezone(dateStr, timezone)
 }
 
 function weekStart(dateStr: string): string {
@@ -165,6 +162,8 @@ function SortHeader({ label, sortKey: sk, current, dir, onSort }: {
 
 export default function LlamadasPage() {
   const supabase = useMemo(() => createClient(), [])
+  const { timezone } = useUserTimezone()
+  const tzAbbr = US_TIMEZONES.find(t => t.value === timezone)?.abbr ?? 'EST'
 
   // State
   const [calls, setCalls] = useState<Call[]>([])
@@ -423,6 +422,13 @@ export default function LlamadasPage() {
           </div>
         </PageHeader>
 
+        {/* Timezone indicator */}
+        <div className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 mb-4">
+          <span>Mostrando horarios en <strong className="text-zinc-600 dark:text-zinc-400">{tzAbbr}</strong></span>
+          <span>·</span>
+          <Link href="/settings" className="text-blue-500 hover:underline">Cambiar</Link>
+        </div>
+
         {loading ? (
           <div className="space-y-4">
             <div className="grid grid-cols-5 gap-3">
@@ -520,7 +526,7 @@ export default function LlamadasPage() {
                                 {/* Fecha */}
                                 <td className="py-2.5 px-3 whitespace-nowrap">
                                   <span className={cn('font-medium', isFuture ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400')}>
-                                    {formatDateShort(call.start_date)}
+                                    {formatDateShort(call.start_date, timezone)} {tzAbbr}
                                   </span>
                                 </td>
                                 {/* Nombre */}
