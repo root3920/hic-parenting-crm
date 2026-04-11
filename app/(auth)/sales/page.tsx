@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Plus, X, Trash2, RotateCcw } from 'lucide-react'
+import { Search, Plus, X, Trash2, RotateCcw, ChevronRight, Copy, CheckCircle2, Download } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
@@ -192,6 +192,12 @@ export default function SalesPage() {
 
   const [confirm, setConfirm] = useState<ConfirmAction>(null)
   const [actionLoading, setActionLoading] = useState(false)
+
+  const [showRecoveryPanel, setShowRecoveryPanel] = useState(false)
+  const [recoverySearch, setRecoverySearch] = useState('')
+  const [recoveryTab, setRecoveryTab] = useState<'all' | 'week' | 'month'>('all')
+  const [confirmRecover, setConfirmRecover] = useState<Transaction | null>(null)
+  const [recoverLoading, setRecoverLoading] = useState(false)
 
   const { from: fromDate, to: toDate } = useMemo(() => {
     if (dateMode === 'custom') {
@@ -375,8 +381,11 @@ export default function SalesPage() {
     transactions.filter(t => t.status === 'failed').map(t => t.buyer_email?.toLowerCase()).filter(Boolean) as string[]
   ), [transactions])
 
+  // 'completed' OR 'recovered' both count as "bought"
   const completedEmails = useMemo(() => new Set(
-    transactions.filter(t => t.status === 'completed').map(t => t.buyer_email?.toLowerCase()).filter(Boolean) as string[]
+    transactions
+      .filter(t => t.status === 'completed' || t.status === 'recovered')
+      .map(t => t.buyer_email?.toLowerCase()).filter(Boolean) as string[]
   ), [transactions])
 
   const recoveredEmails = useMemo(() =>
@@ -389,7 +398,7 @@ export default function SalesPage() {
   const recoveryRate = totalFailed > 0 ? (totalRecovered / totalFailed * 100).toFixed(1) : '0'
   const recoveredRevenue = useMemo(() =>
     transactions
-      .filter(t => t.status === 'completed' && recoveredEmails.includes(t.buyer_email?.toLowerCase() ?? ''))
+      .filter(t => (t.status === 'completed' || t.status === 'recovered') && recoveredEmails.includes(t.buyer_email?.toLowerCase() ?? ''))
       .reduce((sum, t) => sum + (Number(t.cost) || 0), 0),
     [transactions, recoveredEmails]
   )
@@ -404,6 +413,80 @@ export default function SalesPage() {
   }, [transactions])
 
   const maxFailed = failedByProduct[0]?.[1] ?? 1
+
+  // Leads: failed and NOT yet bought (deduped by email, most recent per person)
+  const toRecover = useMemo(() => {
+    const raw = transactions.filter(t =>
+      t.status === 'failed' && !completedEmails.has(t.buyer_email?.toLowerCase() ?? '')
+    )
+    const map = new Map<string, Transaction>()
+    raw.forEach(t => {
+      const email = t.buyer_email?.toLowerCase()
+      if (!email) return
+      if (!map.has(email) || new Date(t.date) > new Date(map.get(email)!.date)) {
+        map.set(email, t)
+      }
+    })
+    return Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [transactions, completedEmails])
+
+  const pendingRecovery = toRecover.length
+
+  function daysAgo(dateStr: string): string {
+    const diff = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86_400_000)
+    if (diff === 0) return 'hoy'
+    if (diff === 1) return 'ayer'
+    return `hace ${diff}d`
+  }
+
+  function filterRecoveryByTab(list: Transaction[]) {
+    const now = new Date()
+    if (recoveryTab === 'week') {
+      const cutoff = new Date(now); cutoff.setDate(now.getDate() - 7)
+      return list.filter(t => new Date(t.date + 'T12:00:00') >= cutoff)
+    }
+    if (recoveryTab === 'month') {
+      const cutoff = new Date(now); cutoff.setDate(now.getDate() - 30)
+      return list.filter(t => new Date(t.date + 'T12:00:00') >= cutoff)
+    }
+    return list
+  }
+
+  const filteredToRecover = useMemo(() => {
+    const q = recoverySearch.toLowerCase()
+    return filterRecoveryByTab(toRecover).filter(t =>
+      (t.buyer_name ?? '').toLowerCase().includes(q) ||
+      (t.buyer_email ?? '').toLowerCase().includes(q)
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toRecover, recoverySearch, recoveryTab])
+
+  function exportRecoveryCSV() {
+    const rows = [
+      ['nombre', 'email', 'producto', 'monto', 'fecha_intento'],
+      ...filteredToRecover.map(t => [
+        t.buyer_name ?? '',
+        t.buyer_email ?? '',
+        t.offer_title ?? '',
+        String(t.cost),
+        t.date,
+      ])
+    ]
+    const csv = rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    const a = document.createElement('a'); a.href = url; a.download = 'leads_recuperacion.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleMarkRecovered(tx: Transaction) {
+    setRecoverLoading(true)
+    const { error } = await supabase.from('transactions').update({ status: 'recovered' }).eq('id', tx.id)
+    setRecoverLoading(false)
+    if (error) { toast.error('Error al actualizar'); return }
+    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, status: 'recovered' } : t))
+    setConfirmRecover(null)
+    toast.success(`${tx.buyer_name} marcado como recuperado`)
+  }
 
   const confirmMeta = confirm
     ? confirm.type === 'delete'
@@ -544,9 +627,19 @@ export default function SalesPage() {
         {/* ── Recuperación de compras ──────────────────────────────────── */}
         {!loading && totalFailed > 0 && (
           <motion.div variants={chartVariants} initial="hidden" animate="visible" className="mb-6">
-            <Card>
+            <Card
+              className="cursor-pointer transition-shadow hover:shadow-lg"
+              onClick={() => setShowRecoveryPanel(true)}
+            >
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Recuperación de compras</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold">Recuperación de compras</CardTitle>
+                  {pendingRecovery > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                      {pendingRecovery} pendientes
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* 4 metric cards */}
@@ -607,6 +700,13 @@ export default function SalesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Footer link */}
+                <div className="flex justify-end pt-1">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline">
+                    Ver leads <ChevronRight className="h-3.5 w-3.5" />
+                  </span>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -753,7 +853,17 @@ export default function SalesPage() {
                                 Reembolsado
                               </span>
                             )}
-                            <span className={`font-semibold text-sm ${tx.status === 'refunded' ? 'line-through text-zinc-400' : ''}`}>
+                            {tx.status === 'recovered' && (
+                              <span className="text-xs font-medium text-teal-700 bg-teal-50 dark:bg-teal-900/20 dark:text-teal-300 px-2 py-0.5 rounded-full">
+                                Recuperado ✓
+                              </span>
+                            )}
+                            {tx.status === 'failed' && (
+                              <span className="text-xs font-medium text-orange-600 bg-orange-50 dark:bg-orange-900/20 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                                Fallida
+                              </span>
+                            )}
+                            <span className={`font-semibold text-sm ${tx.status === 'refunded' ? 'line-through text-zinc-400' : tx.status === 'failed' ? 'text-zinc-400' : ''}`}>
                               {formatCurrency(tx.cost, tx.currency)}
                             </span>
                           </div>
@@ -810,6 +920,161 @@ export default function SalesPage() {
                 className={`px-3 py-1.5 text-xs rounded-md font-medium transition-colors disabled:opacity-60 ${confirmMeta.confirmClass}`}
               >
                 {actionLoading ? 'Procesando...' : confirmMeta.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Recovery leads panel ──────────────────────────────────────── */}
+      {showRecoveryPanel && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={() => setShowRecoveryPanel(false)} />
+          <div className="w-full max-w-2xl bg-white dark:bg-zinc-900 h-full shadow-xl flex flex-col animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="flex items-start justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Leads para recuperación</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  {pendingRecovery} {pendingRecovery === 1 ? 'persona que intentó comprar pero no completó' : 'personas que intentaron comprar pero no completaron'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={exportRecoveryCSV}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Exportar CSV
+                </button>
+                <button
+                  onClick={() => setShowRecoveryPanel(false)}
+                  className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter tabs + search */}
+            <div className="px-5 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 shrink-0 space-y-2.5">
+              <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden w-fit">
+                {([['all', 'Todos'], ['week', 'Esta semana'], ['month', 'Este mes']] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setRecoveryTab(val)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium transition-colors border-r border-zinc-200 dark:border-zinc-700 last:border-r-0',
+                      recoveryTab === val
+                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
+                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input
+                  placeholder="Buscar por nombre o email..."
+                  value={recoverySearch}
+                  onChange={e => setRecoverySearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-y-auto">
+              {filteredToRecover.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-zinc-400 dark:text-zinc-500">
+                  <CheckCircle2 className="h-8 w-8 mb-2 text-green-400" />
+                  <p className="text-sm font-medium">Sin leads pendientes</p>
+                  <p className="text-xs mt-1">Todos los fallidos ya fueron recuperados</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800/80 backdrop-blur z-10">
+                    <tr>
+                      <th className="text-left px-5 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Nombre</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hidden md:table-cell">Producto</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Monto</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hidden sm:table-cell">Último intento</th>
+                      <th className="px-4 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {filteredToRecover.map(t => (
+                      <tr key={t.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                        <td className="px-5 py-3">
+                          <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 leading-tight">{t.buyer_name}</div>
+                          <div className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{t.buyer_email}</div>
+                        </td>
+                        <td className="px-3 py-3 hidden md:table-cell">
+                          <span className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 max-w-[180px]">
+                            {(t.offer_title ?? '').slice(0, 35)}{(t.offer_title?.length ?? 0) > 35 ? '…' : ''}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">${Number(t.cost).toLocaleString()}</span>
+                        </td>
+                        <td className="px-3 py-3 text-right hidden sm:table-cell">
+                          <span className="text-xs text-zinc-400 dark:text-zinc-500">{daysAgo(t.date)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <button
+                              title="Copiar email"
+                              onClick={() => {
+                                navigator.clipboard.writeText(t.buyer_email ?? '')
+                                toast.success('Email copiado')
+                              }}
+                              className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              title="Marcar como recuperado"
+                              onClick={() => setConfirmRecover(t)}
+                              className="p-1.5 rounded-md text-zinc-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm recover dialog */}
+      {confirmRecover && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmRecover(null)} />
+          <div className="relative bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-sm animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">¿Marcar como recuperado?</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-5">
+              ¿Marcar a <strong className="text-zinc-700 dark:text-zinc-300">{confirmRecover.buyer_name}</strong> como recuperado manualmente?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setConfirmRecover(null)}
+                className="px-3 py-1.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleMarkRecovered(confirmRecover)}
+                disabled={recoverLoading}
+                className="px-3 py-1.5 text-xs rounded-md font-medium bg-teal-600 hover:bg-teal-700 text-white transition-colors disabled:opacity-60"
+              >
+                {recoverLoading ? 'Guardando...' : 'Marcar recuperado'}
               </button>
             </div>
           </div>

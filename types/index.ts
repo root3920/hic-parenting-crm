@@ -10,7 +10,7 @@ export interface Transaction {
   transaction_id?: string
   source: 'Kajabi' | 'GoHighLevel' | 'Manual' | 'Stripe' | 'PayPal' | 'Otro'
   payment_source?: string
-  status?: 'completed' | 'refunded' | 'failed'
+  status?: 'completed' | 'refunded' | 'failed' | 'recovered'
   created_at: string
 }
 
