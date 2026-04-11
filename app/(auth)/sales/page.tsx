@@ -107,6 +107,7 @@ export default function SalesPage() {
   const supabase = useMemo(() => createClient(), [])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadedCount, setLoadedCount] = useState(0)
   const [search, setSearch] = useState('')
 
   const [dateMode, setDateMode] = useState<DateMode>('30d')
@@ -131,19 +132,43 @@ export default function SalesPage() {
   }, [dateMode, customFrom, customTo])
 
   useEffect(() => {
+    let cancelled = false
+
     async function fetchTransactions() {
       setLoading(true)
-      const { data } = await supabase
-        .from('transactions')
-        .select('*')
-        .gte('date', fromDate)
-        .lte('date', toDate)
-        .order('date', { ascending: false })
+      setLoadedCount(0)
 
-      setTransactions(data ?? [])
-      setLoading(false)
+      const pageSize = 1000
+      let allData: Transaction[] = []
+      let page = 0
+
+      while (true) {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .gte('date', fromDate)
+          .lte('date', toDate)
+          .order('date', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (cancelled) return
+        if (error || !data || data.length === 0) break
+
+        allData = [...allData, ...(data as Transaction[])]
+        setLoadedCount(allData.length)
+
+        if (data.length < pageSize) break
+        page++
+      }
+
+      if (!cancelled) {
+        setTransactions(allData)
+        setLoading(false)
+      }
     }
+
     fetchTransactions()
+    return () => { cancelled = true }
   }, [fromDate, toDate])
 
   function setField(field: keyof FormData, value: string) {
@@ -355,7 +380,9 @@ export default function SalesPage() {
                   <div className="space-y-2">
                     <div className="h-3 w-24 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                     <div className="h-7 w-32 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
-                    <div className="h-3 w-40 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    {loadedCount > 0 && (
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500">{loadedCount.toLocaleString()} cargadas…</p>
+                    )}
                   </div>
                 ) : (
                   <>
