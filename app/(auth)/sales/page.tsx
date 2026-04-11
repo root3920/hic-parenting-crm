@@ -9,7 +9,7 @@ import { RevenueBarChart } from '@/components/charts/RevenueBarChart'
 import { DonutChart } from '@/components/charts/DonutChart'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { StatusPill } from '@/components/shared/StatusPill'
-import { formatCurrency, formatDate, formatShortDate } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { Transaction } from '@/types'
 import {
   Table,
@@ -42,6 +42,78 @@ const chartVariants = {
 }
 
 type DateMode = '7d' | '30d' | '1y' | 'all' | 'custom'
+
+type GroupBy = 'year' | 'month' | 'week' | 'day'
+
+function getGroupBy(mode: DateMode, customFrom: string, customTo: string): GroupBy {
+  if (mode === 'all') return 'year'
+  if (mode === '1y') return 'month'
+  if (mode === '7d' || mode === '30d') return 'day'
+  // custom
+  const days = customFrom && customTo
+    ? (new Date(customTo).getTime() - new Date(customFrom).getTime()) / 86_400_000
+    : 0
+  if (days > 365) return 'month'
+  if (days > 60) return 'week'
+  return 'day'
+}
+
+function groupTransactions(
+  active: Transaction[],
+  mode: DateMode,
+  customFrom: string,
+  customTo: string
+): { label: string; revenue: number }[] {
+  const groupBy = getGroupBy(mode, customFrom, customTo)
+  const groups: Record<string, { label: string; revenue: number }> = {}
+
+  for (const t of active) {
+    if (!t.date) continue
+    const d = new Date(t.date + 'T12:00:00')
+    let sortKey = ''
+    let label = ''
+
+    if (groupBy === 'year') {
+      sortKey = String(d.getFullYear())
+      label = sortKey
+    } else if (groupBy === 'month') {
+      sortKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      label = d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+    } else if (groupBy === 'week') {
+      // Anchor to Monday of the week
+      const dayOfWeek = d.getDay()
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+      const monday = new Date(d)
+      monday.setDate(d.getDate() + diffToMonday)
+      const y = monday.getFullYear()
+      const mo = String(monday.getMonth() + 1).padStart(2, '0')
+      const dy = String(monday.getDate()).padStart(2, '0')
+      sortKey = `${y}-${mo}-${dy}`
+      label = monday.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+    } else {
+      // day
+      sortKey = t.date
+      label = mode === '7d'
+        ? d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+        : d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+    }
+
+    if (!groups[sortKey]) groups[sortKey] = { label, revenue: 0 }
+    groups[sortKey].revenue += Number(t.cost) || 0
+  }
+
+  return Object.entries(groups)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => ({ label: v.label, revenue: v.revenue }))
+}
+
+const CHART_TITLE: Record<DateMode, string> = {
+  all:    'Revenue por año',
+  '1y':   'Revenue mensual — último año',
+  '30d':  'Revenue diario — últimos 30 días',
+  '7d':   'Revenue diario — últimos 7 días',
+  custom: 'Revenue — rango personalizado',
+}
 
 function localDateStr(d: Date): string {
   const y = d.getFullYear()
@@ -270,15 +342,14 @@ export default function SalesPage() {
   const totalRevenue = grossRevenue - refundedAmount
   const avgTicket = active.length > 0 ? totalRevenue / active.length : 0
 
-  const dailyMap: Record<string, number> = {}
-  active.forEach((t) => {
-    dailyMap[t.date] = (dailyMap[t.date] ?? 0) + (Number(t.cost) || 0)
-  })
-  const dailyRevenue = Object.entries(dailyMap)
-    .map(([date, revenue]) => ({ date: formatShortDate(date), revenue }))
-    .sort((a, b) => a.date.localeCompare(b.date))
+  const groupedRevenue = groupTransactions(active, dateMode, customFrom, customTo)
 
-  const bestDay = Object.entries(dailyMap).sort((a, b) => b[1] - a[1])[0]
+  const bestDayMap: Record<string, number> = {}
+  active.forEach((t) => {
+    if (!t.date) return
+    bestDayMap[t.date] = (bestDayMap[t.date] ?? 0) + (Number(t.cost) || 0)
+  })
+  const bestDay = Object.entries(bestDayMap).sort((a, b) => b[1] - a[1])[0]
 
   const kajabi = active.filter((t) => t.source === 'Kajabi').reduce((s, t) => s + (Number(t.cost) || 0), 0)
   const ghl = active.filter((t) => t.source === 'GoHighLevel').reduce((s, t) => s + (Number(t.cost) || 0), 0)
@@ -439,15 +510,15 @@ export default function SalesPage() {
           <motion.div className="lg:col-span-2" variants={chartVariants} initial="hidden" animate="visible">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Daily Revenue</CardTitle>
+                <CardTitle className="text-sm font-semibold">{CHART_TITLE[dateMode]}</CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
                   <div className="h-64 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-lg" />
-                ) : dailyRevenue.length === 0 ? (
+                ) : groupedRevenue.length === 0 ? (
                   <EmptyState title="No revenue data" description="No transactions in selected period." />
                 ) : (
-                  <RevenueBarChart data={dailyRevenue} />
+                  <RevenueBarChart data={groupedRevenue} rotateLabels={dateMode !== 'all'} />
                 )}
               </CardContent>
             </Card>

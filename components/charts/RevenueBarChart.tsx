@@ -12,7 +12,7 @@ import {
 import { formatCurrency } from '@/lib/utils'
 
 interface DataPoint {
-  date: string
+  label: string
   revenue: number
   [key: string]: string | number
 }
@@ -21,6 +21,7 @@ interface RevenueBarChartProps {
   data: DataPoint[]
   dataKey?: string
   color?: string
+  rotateLabels?: boolean
 }
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
@@ -41,14 +42,23 @@ export function RevenueBarChart({
   data,
   dataKey = 'revenue',
   color = '#185FA5',
+  rotateLabels = false,
 }: RevenueBarChartProps) {
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+      <BarChart
+        data={data}
+        margin={{ top: 4, right: 4, left: 0, bottom: rotateLabels ? 40 : 0 }}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
         <XAxis
-          dataKey="date"
-          tick={{ fontSize: 11, fill: '#71717a' }}
+          dataKey="label"
+          tick={rotateLabels
+            ? { fontSize: 10, fill: '#71717a', textAnchor: 'end' }
+            : { fontSize: 11, fill: '#71717a' }
+          }
+          angle={rotateLabels ? -40 : 0}
+          interval={rotateLabels ? 'preserveStartEnd' : 0}
           axisLine={false}
           tickLine={false}
         />
