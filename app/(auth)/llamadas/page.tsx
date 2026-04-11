@@ -517,7 +517,9 @@ export default function LlamadasPage() {
                         </thead>
                         <tbody>
                           {pageRows.map((call) => {
-                            const isFuture = new Date(call.start_date) > new Date()
+                            const isUpcoming = new Date(call.start_date) > new Date()
+                            const isActive = call.status === 'Scheduled' || call.status === 'Rescheduled'
+                            const showBlue = isUpcoming && isActive
                             return (
                               <tr
                                 key={call.id}
@@ -525,7 +527,7 @@ export default function LlamadasPage() {
                               >
                                 {/* Fecha */}
                                 <td className="py-2.5 px-3 whitespace-nowrap">
-                                  <span className={cn('font-medium', isFuture ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400')}>
+                                  <span className={cn('font-medium', showBlue ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400')}>
                                     {formatDateShort(call.start_date, timezone)} {tzAbbr}
                                   </span>
                                 </td>
