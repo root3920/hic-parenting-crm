@@ -10,12 +10,40 @@ const supabase = createClient(
 // Note: GHL typo — field is "appoinmentStatus" (one 'i')
 function mapStatus(appoinmentStatus: string): string {
   const s = (appoinmentStatus || '').toLowerCase().trim()
-  if (s === 'confirmed')                              return 'Scheduled'
-  if (s === 'cancelled' || s === 'canceled')          return 'Cancelled'
-  if (s === 'rescheduled')                            return 'Rescheduled'
+  if (s === 'confirmed')                                       return 'Scheduled'
+  if (s === 'cancelled' || s === 'canceled')                   return 'Cancelled'
+  if (s === 'rescheduled')                                     return 'Rescheduled'
   if (s === 'showed' || s === 'showed_up' || s === 'attended') return 'Showed Up'
-  if (s === 'noshow' || s === 'no_show' || s === 'no-show')    return 'No show'
+  if (s === 'noshow'  || s === 'no_show'  || s === 'no-show')  return 'No show'
   return 'Scheduled'
+}
+
+// GHL sends startTime as "2026-04-13T11:00:00" — local time in the calendar's
+// selectedTimezone, but JS would parse it as UTC. This converts it to true UTC.
+function ghlTimeToUTC(localTimeStr: string, sourceTz: string): string {
+  const [datePart, timePart = '00:00:00'] = localTimeStr.split('T')
+  const [year, month, day]                = datePart.split('-').map(Number)
+  const [hour, minute, second = 0]        = timePart.split(':').map(Number)
+
+  // Treat the components as UTC first (a neutral "test" instant)
+  const testDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
+
+  // Ask Intl what clock shows in sourceTz at that instant
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: sourceTz,
+    year:     'numeric', month:  '2-digit', day:    '2-digit',
+    hour:     '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(testDate)
+
+  const get = (type: string) => Number(parts.find(p => p.type === type)?.value ?? 0)
+  const tzAsUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+
+  // Offset = how far testDate is from what sourceTz displays for it
+  const offsetMs = testDate.getTime() - tzAsUTC
+
+  // True UTC = local components + offset
+  return new Date(testDate.getTime() + offsetMs).toISOString()
 }
 
 export async function POST(req: NextRequest) {
@@ -23,28 +51,32 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
 
     // Extract key fields
-    const appointmentId = body?.calendar?.appointmentId
-    const appStatus     = body?.calendar?.appoinmentStatus  // GHL typo — one 'i'
-    const startTime     = body?.calendar?.startTime
-    const endTime       = body?.calendar?.endTime
-    const meetingUrl    = body?.calendar?.address || body?.customData?.meeting_url
-    const calendarName  = body?.calendar?.calendarName || body?.customData?.calendar_name
-    const fullName      = body?.full_name || `${body?.first_name ?? ''} ${body?.last_name ?? ''}`.trim()
-    const firstName     = body?.first_name
-    const lastName      = body?.last_name
-    const email         = body?.email
-    const phone         = body?.phone
-    const closerName    = body?.customData?.closer_name ||
-                          `${body?.user?.firstName ?? ''} ${body?.user?.lastName ?? ''}`.trim() ||
-                          null
+    const appointmentId  = body?.calendar?.appointmentId
+    const appStatus      = body?.calendar?.appoinmentStatus  // GHL typo — one 'i'
+    const startTime      = body?.calendar?.startTime
+    const endTime        = body?.calendar?.endTime
+    const meetingUrl     = body?.calendar?.address || body?.customData?.meeting_url
+    const calendarName   = body?.calendar?.calendarName || body?.customData?.calendar_name
+    const fullName       = body?.full_name || `${body?.first_name ?? ''} ${body?.last_name ?? ''}`.trim()
+    const firstName      = body?.first_name
+    const lastName       = body?.last_name
+    const email          = body?.email
+    const phone          = body?.phone
+    const closerName     = body?.customData?.closer_name ||
+                           `${body?.user?.firstName ?? ''} ${body?.user?.lastName ?? ''}`.trim() ||
+                           null
     const utmSource      = body?.customData?.utm_source       ?? null
     const utmMedium      = body?.customData?.utm_medium       ?? null
     const utmCampaign    = body?.customData?.utm_campaign     ?? null
-    const sourceTimezone = body?.calendar?.selectedTimezone   ?? 'America/Los_Angeles'
+    const sourceTimezone = body?.calendar?.selectedTimezone   ?? 'America/Denver'
 
     if (!appointmentId) {
       return NextResponse.json({ error: 'Missing appointmentId' }, { status: 400 })
     }
+
+    // Convert GHL local times to UTC
+    const startUTC = startTime ? ghlTimeToUTC(startTime, sourceTimezone) : null
+    const endUTC   = endTime   ? ghlTimeToUTC(endTime,   sourceTimezone) : null
 
     const status       = mapStatus(appStatus)
     const activityType = status === 'Rescheduled' ? 'Rescheduled Meeting' : 'Appointment Booked'
@@ -55,7 +87,8 @@ export async function POST(req: NextRequest) {
     console.log(`appoinmentStatus: ${appStatus} → mapped to: ${status}`)
     console.log(`Contact: ${fullName} | ${email}`)
     console.log(`Closer: ${closerName}`)
-    console.log(`Time: ${startTime}`)
+    console.log(`Time (local): ${startTime} (${sourceTimezone})`)
+    console.log(`Time (UTC):   ${startUTC}`)
     console.log('====================')
 
     // Check if this appointment already exists
@@ -72,10 +105,10 @@ export async function POST(req: NextRequest) {
         .update({
           status,
           appointment_status: appStatus,
-          start_date:    startTime,
-          end_date:      endTime,
-          meeting_url:   meetingUrl,
-          activity_type: activityType,
+          start_date:         startUTC,
+          end_date:           endUTC,
+          meeting_url:        meetingUrl,
+          activity_type:      activityType,
         })
         .eq('external_id', appointmentId)
         .select()
@@ -96,14 +129,15 @@ export async function POST(req: NextRequest) {
         call_id:         data?.id,
         appointment_id:  appointmentId,
         name:            fullName,
+        start_utc:       startUTC,
       })
     } else {
       // INSERT — new appointment
       const { data, error } = await supabase
         .from('calls')
         .insert({
-          start_date:         startTime,
-          end_date:           endTime,
+          start_date:         startUTC,
+          end_date:           endUTC,
           full_name:          fullName,
           first_name:         firstName,
           last_name:          lastName,
@@ -139,6 +173,7 @@ export async function POST(req: NextRequest) {
         call_id:        data?.id,
         appointment_id: appointmentId,
         name:           fullName,
+        start_utc:      startUTC,
       })
     }
   } catch (err: unknown) {
@@ -162,6 +197,7 @@ export async function GET() {
       'showed → Showed Up',
       'noshow → No show',
     ],
-    key_field: 'calendar.appoinmentStatus (note: GHL typo, one i)',
+    key_field:   'calendar.appoinmentStatus (note: GHL typo, one i)',
+    time_note:   'startTime converted from selectedTimezone local time to UTC before storage',
   })
 }
