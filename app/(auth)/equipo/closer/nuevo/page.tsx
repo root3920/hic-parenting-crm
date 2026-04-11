@@ -55,7 +55,7 @@ interface DayCall {
 
 interface CallReport {
   call_id: string
-  call_status: 'No Show' | 'Showed Up' | ''
+  call_status: 'No Show' | 'Showed Up' | 'Cancelled' | 'Rescheduled' | ''
   next_step: 'Follow Up' | 'Cancelled' | 'Rescheduled' | ''
   call_summary: string
 }
@@ -90,6 +90,22 @@ function pct(num: number, den: number) {
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+}
+
+function mapStatusToCallStatus(status: string): CallReport['call_status'] {
+  if (status === 'Showed Up')   return 'Showed Up'
+  if (status === 'No show')     return 'No Show'
+  if (status === 'Cancelled')   return 'Cancelled'
+  if (status === 'Rescheduled') return 'Rescheduled'
+  return ''
+}
+
+function mapCallStatusToStatus(callStatus: string): string {
+  if (callStatus === 'Showed Up')   return 'Showed Up'
+  if (callStatus === 'No Show')     return 'No show'
+  if (callStatus === 'Cancelled')   return 'Cancelled'
+  if (callStatus === 'Rescheduled') return 'Rescheduled'
+  return 'Scheduled'
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -150,9 +166,13 @@ function CallReportCard({ call, report, onUpdate, index }: {
 }) {
   const callStatus = report?.call_status ?? ''
   const borderColor =
-    callStatus === 'Showed Up' ? 'border-l-[#3B6D11]' :
-    callStatus === 'No Show'   ? 'border-l-[#A32D2D]' :
+    callStatus === 'Showed Up'   ? 'border-l-[#3B6D11]' :
+    callStatus === 'No Show'     ? 'border-l-[#A32D2D]' :
+    callStatus === 'Cancelled'   ? 'border-l-[#A32D2D]' :
+    callStatus === 'Rescheduled' ? 'border-l-[#534AB7]' :
     'border-l-zinc-300 dark:border-l-zinc-600'
+
+  const hasExistingStatus = call.status !== 'Scheduled'
 
   return (
     <motion.div
@@ -172,6 +192,11 @@ function CallReportCard({ call, report, onUpdate, index }: {
             {call.call_type && (
               <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', CALL_TYPE_STYLES[call.call_type] ?? 'bg-zinc-100 text-zinc-600')}>
                 {call.call_type}
+              </span>
+            )}
+            {hasExistingStatus && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                Estado actual: {call.status}
               </span>
             )}
           </div>
@@ -203,8 +228,10 @@ function CallReportCard({ call, report, onUpdate, index }: {
             className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           >
             <option value="">── Seleccionar ──</option>
-            <option value="No Show">No Show</option>
             <option value="Showed Up">Showed Up</option>
+            <option value="No Show">No Show</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="Rescheduled">Rescheduled</option>
           </select>
         </div>
         <div>
@@ -276,7 +303,20 @@ export default function NuevoReporteCloserPage() {
       .lte('start_date', `${form.date}T23:59:59`)
       .order('start_date', { ascending: true })
       .then(({ data }) => {
-        setDayCalls(data ?? [])
+        const calls = data ?? []
+        setDayCalls(calls)
+        const initialReports: Record<string, CallReport> = {}
+        for (const call of calls) {
+          const validNextSteps: Array<CallReport['next_step']> = ['Follow Up', 'Cancelled', 'Rescheduled', '']
+          const rawNext = call.next_step ?? ''
+          initialReports[call.id] = {
+            call_id: call.id,
+            call_status: mapStatusToCallStatus(call.status),
+            next_step: validNextSteps.includes(rawNext as CallReport['next_step']) ? (rawNext as CallReport['next_step']) : '',
+            call_summary: call.call_summary ?? '',
+          }
+        }
+        setCallReports(initialReports)
         setCallsLoading(false)
       })
   }, [supabase, form.date, form.closer_name])
@@ -346,7 +386,7 @@ export default function NuevoReporteCloserPage() {
             call_summary: r.call_summary || null,
             reported_at:  now,
             reported_by:  form.closer_name,
-            status: r.call_status === 'No Show' ? 'No show' : 'Showed Up',
+            status: mapCallStatusToStatus(r.call_status),
           }).eq('id', r.call_id)
         )
       )

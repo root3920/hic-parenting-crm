@@ -25,6 +25,13 @@ const PAGE_SIZE = 10
 
 type Preset = '7d' | '30d' | '90d' | 'todo' | 'custom'
 
+interface CallSummary {
+  id: string
+  status: string
+  start_date: string
+  closer_name: string
+}
+
 function getDateRange(preset: Exclude<Preset, 'custom'>) {
   const today = new Date()
   const fmt = (d: Date) => d.toISOString().split('T')[0]
@@ -173,6 +180,7 @@ export default function CloserDashboardPage() {
   const [selectedCloser, setSelectedCloser] = useState('Todos')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<CloserDailyReport | null>(null)
+  const [callsData, setCallsData] = useState<CallSummary[]>([])
 
   const { from: fromDate, to: toDate, days: rangeDays } = useMemo(() => {
     if (preset === 'custom') {
@@ -183,19 +191,27 @@ export default function CloserDashboardPage() {
     return getDateRange(preset)
   }, [preset, customFrom, customTo])
 
-  const fetchReports = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('closer_daily_reports')
-      .select('*')
-      .gte('date', fromDate)
-      .lte('date', toDate)
-      .order('date', { ascending: false })
-    setReports(data ?? [])
+    const [reportsRes, callsRes] = await Promise.all([
+      supabase
+        .from('closer_daily_reports')
+        .select('*')
+        .gte('date', fromDate)
+        .lte('date', toDate)
+        .order('date', { ascending: false }),
+      supabase
+        .from('calls')
+        .select('id, status, start_date, closer_name')
+        .gte('start_date', fromDate)
+        .lte('start_date', toDate + 'T23:59:59'),
+    ])
+    setReports(reportsRes.data ?? [])
+    setCallsData((callsRes.data ?? []) as CallSummary[])
     setLoading(false)
   }, [supabase, fromDate, toDate])
 
-  useEffect(() => { fetchReports() }, [fetchReports])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const closerNames = useMemo(() => {
     const names = Array.from(new Set(reports.map((r) => r.closer_name))).sort()
@@ -221,6 +237,33 @@ export default function CloserDashboardPage() {
       callsPerWeek: safeDiv(totalMeetings, weeks),
     }
   }, [filtered, rangeDays])
+
+  // ── KPIs from calls table ──
+  const callsFiltered = useMemo(
+    () => selectedCloser === 'Todos' ? callsData : callsData.filter(c => c.closer_name === selectedCloser),
+    [callsData, selectedCloser]
+  )
+
+  const callKPIs = useMemo(() => {
+    const totalMeetings = callsFiltered.length
+    const showedUp = callsFiltered.filter(c => c.status === 'Showed Up').length
+    const noShows = callsFiltered.filter(c => c.status === 'No show').length
+    const cancelled = callsFiltered.filter(c => c.status === 'Cancelled').length
+    const showRate = safeDiv(showedUp, totalMeetings) * 100
+    const callsPerWeek = safeDiv(totalMeetings, rangeDays / 7)
+    return { totalMeetings, showedUp, noShows, cancelled, showRate, callsPerWeek }
+  }, [callsFiltered, rangeDays])
+
+  // ── KPIs from closer_daily_reports ──
+  const reportKPIs = useMemo(() => {
+    const offersProposed = s(filtered, 'offers_proposed')
+    const wonDeals = s(filtered, 'won_deals')
+    const cashCollected = s(filtered, 'cash_collected')
+    const recurrentCash = s(filtered, 'recurrent_cash')
+    const offerRate = safeDiv(offersProposed, callKPIs.showedUp) * 100
+    const closeRate = safeDiv(wonDeals, offersProposed) * 100
+    return { offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate }
+  }, [filtered, callKPIs.showedUp])
 
   // ── Revenue ──
   const revenue = useMemo(() => {
@@ -272,26 +315,28 @@ export default function CloserDashboardPage() {
   // ── Closer comparison (only when "Todos") ──
   const closerComparison = useMemo(() => {
     if (selectedCloser !== 'Todos') return []
-    const byCloser: Record<string, {
-      closer_name: string
-      meetings: number
-      showed: number
-      offers: number
-      won: number
-      cash: number
-    }> = {}
-    for (const r of reports) {
-      if (!byCloser[r.closer_name]) {
-        byCloser[r.closer_name] = { closer_name: r.closer_name, meetings: 0, showed: 0, offers: 0, won: 0, cash: 0 }
-      }
-      byCloser[r.closer_name].meetings += r.total_meetings
-      byCloser[r.closer_name].showed += r.showed_meetings
-      byCloser[r.closer_name].offers += r.offers_proposed
-      byCloser[r.closer_name].won += r.won_deals
-      byCloser[r.closer_name].cash += r.cash_collected
+    const callsByCloser: Record<string, { total: number; showed: number; noShows: number }> = {}
+    for (const c of callsData) {
+      if (!c.closer_name) continue
+      if (!callsByCloser[c.closer_name]) callsByCloser[c.closer_name] = { total: 0, showed: 0, noShows: 0 }
+      callsByCloser[c.closer_name].total++
+      if (c.status === 'Showed Up') callsByCloser[c.closer_name].showed++
+      if (c.status === 'No show')   callsByCloser[c.closer_name].noShows++
     }
-    return Object.values(byCloser).sort((a, b) => b.cash - a.cash)
-  }, [reports, selectedCloser])
+    const reportsByCloser: Record<string, { offers: number; won: number; cash: number }> = {}
+    for (const r of reports) {
+      if (!reportsByCloser[r.closer_name]) reportsByCloser[r.closer_name] = { offers: 0, won: 0, cash: 0 }
+      reportsByCloser[r.closer_name].offers += r.offers_proposed
+      reportsByCloser[r.closer_name].won    += r.won_deals
+      reportsByCloser[r.closer_name].cash   += r.cash_collected
+    }
+    const names = new Set([...Object.keys(callsByCloser), ...Object.keys(reportsByCloser)])
+    return Array.from(names).map(name => {
+      const c = callsByCloser[name]   ?? { total: 0, showed: 0, noShows: 0 }
+      const r = reportsByCloser[name] ?? { offers: 0, won: 0, cash: 0 }
+      return { closer_name: name, meetings: c.total, showed: c.showed, offers: r.offers, won: r.won, cash: r.cash }
+    }).sort((a, b) => b.cash - a.cash)
+  }, [callsData, reports, selectedCloser])
 
   // ── Pagination ──
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
@@ -365,7 +410,7 @@ export default function CloserDashboardPage() {
               {[...Array(3)].map((_, i) => <div key={i} className="h-20 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />)}
             </div>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && callsData.length === 0 ? (
           <EmptyState
             title="No hay reportes en este período"
             description="Crea el primer reporte de closing para ver métricas aquí."
@@ -373,37 +418,47 @@ export default function CloserDashboardPage() {
           />
         ) : (
           <>
-            {/* ── Section 1: KPI Goal Cards ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            {/* ── Section 1a: KPI Goal Cards — from calls table ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-1">
               <KpiGoalCard
                 label={GOALS.closing.showRate.label}
                 description={GOALS.closing.showRate.description}
-                value={kpis.showRate}
+                value={callKPIs.showRate}
                 unit="%"
                 goal={GOALS.closing.showRate}
               />
+              <VolumeCard label="No Shows" value={callKPIs.noShows} sub="llamadas no realizadas" />
+              <VolumeCard label="Canceladas" value={callKPIs.cancelled} sub="de total agendadas" />
+              <KpiGoalCard
+                label={GOALS.closing.callsPerWeek.label}
+                description={GOALS.closing.callsPerWeek.description}
+                value={callKPIs.callsPerWeek}
+                unit=""
+                goal={GOALS.closing.callsPerWeek}
+              />
+            </div>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Basado en llamadas reales</p>
+
+            {/* ── Section 1b: KPI Goal Cards — from closer reports ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-1">
               <KpiGoalCard
                 label={GOALS.closing.offerRate.label}
                 description={GOALS.closing.offerRate.description}
-                value={kpis.offerRate}
+                value={reportKPIs.offerRate}
                 unit="%"
                 goal={GOALS.closing.offerRate}
               />
               <KpiGoalCard
                 label={GOALS.closing.closeRate.label}
                 description={GOALS.closing.closeRate.description}
-                value={kpis.closeRate}
+                value={reportKPIs.closeRate}
                 unit="%"
                 goal={GOALS.closing.closeRate}
               />
-              <KpiGoalCard
-                label={GOALS.closing.callsPerWeek.label}
-                description={GOALS.closing.callsPerWeek.description}
-                value={kpis.callsPerWeek}
-                unit=""
-                goal={GOALS.closing.callsPerWeek}
-              />
+              <VolumeCard label="Won Deals" value={reportKPIs.wonDeals} sub={`${fmtPct(reportKPIs.closeRate)} close rate`} />
+              <VolumeCard label="Cash Collected" value={fmtCash(reportKPIs.cashCollected)} sub="ingreso del período" />
             </div>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-6">Basado en reportes del closer</p>
 
             {/* ── Section 2: Revenue Cards ── */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -431,23 +486,23 @@ export default function CloserDashboardPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <VolumeCard
                 label="Total Meetings"
-                value={volume.meetings}
-                sub={`${fmtPct(kpis.showRate)} show rate`}
+                value={callKPIs.totalMeetings}
+                sub={`${fmtPct(callKPIs.showRate)} show rate`}
               />
               <VolumeCard
                 label="Showed"
-                value={volume.showed}
-                sub={`${fmtPct(kpis.offerRate)} offer rate`}
+                value={callKPIs.showedUp}
+                sub={`${fmtPct(reportKPIs.offerRate)} offer rate`}
               />
               <VolumeCard
                 label="Won Deals"
-                value={volume.won}
-                sub={`${fmtPct(kpis.closeRate)} close rate`}
+                value={reportKPIs.wonDeals}
+                sub={`${fmtPct(reportKPIs.closeRate)} close rate`}
               />
               <VolumeCard
                 label="No-Shows"
-                value={volume.noShows}
-                sub={`${fmtPct(safeDiv(volume.noShows, volume.meetings) * 100)} del total`}
+                value={callKPIs.noShows}
+                sub={`${fmtPct(safeDiv(callKPIs.noShows, callKPIs.totalMeetings) * 100)} del total`}
               />
             </div>
 
