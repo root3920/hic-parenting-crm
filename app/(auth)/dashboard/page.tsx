@@ -40,7 +40,7 @@ interface DashboardStats {
   spcNewMembers: number
   churnRate: number
   recentTransactions: Transaction[]
-  dailyRevenue: { date: string; revenue: number }[]
+  dailyRevenue: { label: string; revenue: number }[]
 }
 
 const chartVariants = {
@@ -121,8 +121,8 @@ export default function DashboardPage() {
         dailyMap[d] = (dailyMap[d] ?? 0) + t.cost
       })
       const dailyRevenue = Object.entries(dailyMap)
-        .map(([date, revenue]) => ({ date, revenue }))
-        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(([date, revenue]) => ({ label: date, revenue }))
+        .sort((a, b) => a.label.localeCompare(b.label))
 
       setStats({
         totalRevenue,

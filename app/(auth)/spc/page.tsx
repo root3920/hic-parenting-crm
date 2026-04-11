@@ -153,7 +153,7 @@ export default function SpcPage() {
   })
   const cohortData = Object.entries(cohortMap)
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([date, revenue]) => ({ date, revenue }))
+    .map(([date, revenue]) => ({ label: date, revenue }))
 
   const urgentTrials = trialMembers
     .filter((m) => m.trial_end_date && daysUntil(m.trial_end_date) <= 14)
