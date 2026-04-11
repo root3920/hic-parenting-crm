@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Call } from '@/types'
 import { Video, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { US_TIMEZONES, formatDateInTimezone, formatTimeInTimezone } from '@/lib/timezones'
+import { useUserTimezone } from '@/hooks/useUserTimezone'
 
 const STATUS_BORDER: Record<string, string> = {
   'Scheduled':   'border-l-blue-400',
@@ -22,16 +24,6 @@ const CALL_TYPE_STYLES: Record<string, string> = {
   'Interview':    'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300',
 }
 
-function formatCallDate(dateStr: string) {
-  const d = new Date(dateStr)
-  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-  const h = d.getHours() % 12 || 12
-  const m = d.getMinutes().toString().padStart(2, '0')
-  const ampm = d.getHours() >= 12 ? 'pm' : 'am'
-  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} · ${h}:${m}${ampm}`
-}
-
 function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]?.toUpperCase() ?? '').join('')
 }
@@ -43,6 +35,8 @@ interface Props {
 
 export function UpcomingCallCard({ call, onDetailClick }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const { timezone } = useUserTimezone()
+  const tzAbbr = US_TIMEZONES.find(t => t.value === timezone)?.abbr ?? 'EST'
 
   return (
     <div
@@ -59,7 +53,9 @@ export function UpcomingCallCard({ call, onDetailClick }: Props) {
           </div>
           <div>
             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">{call.full_name}</p>
-            <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-0.5">{formatCallDate(call.start_date)}</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-0.5">
+              {formatDateInTimezone(call.start_date, timezone)} · {formatTimeInTimezone(call.start_date, timezone)} {tzAbbr}
+            </p>
           </div>
         </div>
         <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0', STATUS_STYLES[call.status] ?? 'bg-zinc-100 text-zinc-600')}>
