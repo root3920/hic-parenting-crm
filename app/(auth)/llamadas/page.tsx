@@ -11,7 +11,7 @@ import { UpcomingCallCard } from '@/components/llamadas/UpcomingCallCard'
 import {
   Calendar, CheckCircle, XCircle, UserX, RefreshCw,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
-  Eye, ExternalLink, Search, Loader2, Check,
+  Eye, ExternalLink, Search, Loader2, Check, Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -59,6 +59,16 @@ const PIE_COLORS: Record<string, string> = {
 }
 
 const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show'] as const
+
+const CLOSERS = [
+  'Marcela HIC Parenting',
+  'Cali Luna',
+]
+
+const SETTERS = [
+  'Valentina Llano',
+  'Marcela Collier',
+]
 
 const STATUS_DOT: Record<string, string> = {
   'Scheduled':   'bg-blue-500',
@@ -181,6 +191,10 @@ export default function LlamadasPage() {
   const [detailCall, setDetailCall] = useState<Call | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
+  const [editingCell, setEditingCell] = useState<{
+    callId: string
+    field: 'closer_name' | 'setter_name'
+  } | null>(null)
 
   // Debounce search
   useEffect(() => {
@@ -585,12 +599,66 @@ export default function LlamadasPage() {
                                   </div>
                                 </td>
                                 {/* Closer */}
-                                <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap max-w-[120px] truncate">
-                                  {call.closer_name ?? '—'}
+                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                  {editingCell?.callId === call.id && editingCell?.field === 'closer_name' ? (
+                                    <select
+                                      autoFocus
+                                      defaultValue={call.closer_name ?? ''}
+                                      onChange={async (e) => {
+                                        const val = e.target.value || null
+                                        await supabase.from('calls').update({ closer_name: val }).eq('id', call.id)
+                                        setCalls(prev => prev.map(c => c.id === call.id ? { ...c, closer_name: val } : c))
+                                        setEditingCell(null)
+                                        toast.success('Closer actualizado')
+                                      }}
+                                      onBlur={() => setEditingCell(null)}
+                                      onKeyDown={(e) => e.key === 'Escape' && setEditingCell(null)}
+                                      className="text-xs border rounded px-2 py-1 bg-white dark:bg-zinc-800 shadow-sm focus:outline-none"
+                                    >
+                                      <option value="">— Sin closer</option>
+                                      {CLOSERS.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ callId: call.id, field: 'closer_name' })}
+                                      className="group flex items-center gap-1 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded px-1 py-0.5 transition-colors text-zinc-600 dark:text-zinc-400"
+                                      title="Click para editar"
+                                    >
+                                      {call.closer_name ?? <span className="text-zinc-400">—</span>}
+                                      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
+                                    </span>
+                                  )}
                                 </td>
                                 {/* Setter */}
-                                <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap max-w-[120px] truncate">
-                                  {call.setter_name ?? '—'}
+                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                  {editingCell?.callId === call.id && editingCell?.field === 'setter_name' ? (
+                                    <select
+                                      autoFocus
+                                      defaultValue={call.setter_name ?? ''}
+                                      onChange={async (e) => {
+                                        const val = e.target.value || null
+                                        await supabase.from('calls').update({ setter_name: val }).eq('id', call.id)
+                                        setCalls(prev => prev.map(c => c.id === call.id ? { ...c, setter_name: val } : c))
+                                        setEditingCell(null)
+                                        toast.success('Setter actualizado')
+                                      }}
+                                      onBlur={() => setEditingCell(null)}
+                                      onKeyDown={(e) => e.key === 'Escape' && setEditingCell(null)}
+                                      className="text-xs border rounded px-2 py-1 bg-white dark:bg-zinc-800 shadow-sm focus:outline-none"
+                                    >
+                                      <option value="">— Sin setter</option>
+                                      {SETTERS.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ callId: call.id, field: 'setter_name' })}
+                                      className="group flex items-center gap-1 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded px-1 py-0.5 transition-colors text-zinc-600 dark:text-zinc-400"
+                                      title="Click para editar"
+                                    >
+                                      {call.setter_name ?? <span className="text-zinc-400">—</span>}
+                                      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
+                                    </span>
+                                  )}
                                 </td>
                                 {/* Reporte */}
                                 <td className="py-2.5 px-3">

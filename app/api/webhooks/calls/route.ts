@@ -6,6 +6,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+function inferSetter(calendarName: string, explicitSetter?: string): string | null {
+  if (explicitSetter) return explicitSetter
+  const cal = (calendarName || '').toLowerCase()
+  if (cal.includes('valentina')) return 'Valentina Llano'
+  if (cal.includes('marcela collier')) return 'Marcela Collier'
+  return null
+}
+
 // Map GHL appoinmentStatus to our calls.status
 // Note: GHL typo — field is "appoinmentStatus" (one 'i')
 function mapStatus(appoinmentStatus: string): string {
@@ -65,6 +73,7 @@ export async function POST(req: NextRequest) {
     const closerName     = body?.customData?.closer_name ||
                            `${body?.user?.firstName ?? ''} ${body?.user?.lastName ?? ''}`.trim() ||
                            null
+    const setterName     = inferSetter(calendarName, body?.customData?.setter_name)
     const utmSource      = body?.customData?.utm_source       ?? null
     const utmMedium      = body?.customData?.utm_medium       ?? null
     const utmCampaign    = body?.customData?.utm_campaign     ?? null
@@ -87,6 +96,7 @@ export async function POST(req: NextRequest) {
     console.log(`appoinmentStatus: ${appStatus} → mapped to: ${status}`)
     console.log(`Contact: ${fullName} | ${email}`)
     console.log(`Closer: ${closerName}`)
+    console.log(`Setter: ${setterName}`)
     console.log(`Time (local): ${startTime} (${sourceTimezone})`)
     console.log(`Time (UTC):   ${startUTC}`)
     console.log('====================')
@@ -149,6 +159,7 @@ export async function POST(req: NextRequest) {
           call_type:          callType,
           calendar:           calendarName,
           closer_name:        closerName,
+          setter_name:        setterName,
           utm_source:         utmSource,
           utm_medium:         utmMedium,
           utm_campaign:       utmCampaign,
