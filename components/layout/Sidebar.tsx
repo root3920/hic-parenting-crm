@@ -49,9 +49,11 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center justify-between h-14 px-4 border-b border-zinc-200 dark:border-zinc-800">
         {!collapsed && (
-          <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 truncate">
-            HIC Parenting
-          </span>
+          <img
+            src="/logo.png"
+            alt="HIC Parenting Education"
+            className="h-8 w-auto object-contain"
+          />
         )}
         <Button
           variant="ghost"
