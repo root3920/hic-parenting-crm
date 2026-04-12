@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Plus, X, Trash2, RotateCcw, ChevronRight, Copy, CheckCircle2, Download } from 'lucide-react'
+import { Search, Plus, X, Trash2, RotateCcw, ChevronRight, Copy, CheckCircle2, Download, RefreshCw } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
@@ -194,6 +194,9 @@ export default function SalesPage() {
   const [confirm, setConfirm] = useState<ConfirmAction>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
+  const [syncing, setSyncing] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
   const [showRecoveryPanel, setShowRecoveryPanel] = useState(false)
   const [recoverySearch, setRecoverySearch] = useState('')
   const [recoveryTab, setRecoveryTab] = useState<'all' | 'week' | 'month'>('all')
@@ -248,7 +251,8 @@ export default function SalesPage() {
 
     fetchTransactions()
     return () => { cancelled = true }
-  }, [fromDate, toDate])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromDate, toDate, refreshKey])
 
   function setField(field: keyof FormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -557,6 +561,37 @@ export default function SalesPage() {
                 />
               </>
             )}
+
+            <button
+              onClick={async () => {
+                setSyncing(true)
+                try {
+                  const res = await fetch('/api/sync/kajabi', {
+                    method: 'POST',
+                    headers: { 'x-sync-secret': 'hic_sync_2026' },
+                  })
+                  const data = await res.json()
+                  if (!res.ok) throw new Error(data.error || 'Sync failed')
+                  toast.success(
+                    `Sync completado: ${data.failed} fallidas, ${data.refunded} reembolsos, ${data.updated} actualizadas`
+                  )
+                  setRefreshKey((k) => k + 1)
+                } catch {
+                  toast.error('Error en sync de Kajabi')
+                } finally {
+                  setSyncing(false)
+                }
+              }}
+              disabled={syncing}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors',
+                'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400',
+                'hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-60'
+              )}
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', syncing && 'animate-spin')} />
+              {syncing ? 'Sincronizando...' : 'Sync Kajabi'}
+            </button>
 
             <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
