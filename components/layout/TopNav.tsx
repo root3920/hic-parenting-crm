@@ -69,13 +69,12 @@ export function TopNav() {
       >
         <div className="w-full flex items-center px-4 md:px-8 gap-6">
           {/* Logo */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600">
-              <span className="text-white font-bold text-xs">H</span>
-            </div>
-            <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 whitespace-nowrap hidden sm:block">
-              HIC Parenting
-            </span>
+          <div className="flex items-center shrink-0">
+            <img
+              src="/logo.png"
+              alt="HIC Parenting Education"
+              className="h-9 w-auto object-contain"
+            />
           </div>
 
           {/* Desktop nav pills */}
