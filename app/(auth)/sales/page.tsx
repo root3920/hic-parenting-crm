@@ -10,6 +10,7 @@ import { DonutChart } from '@/components/charts/DonutChart'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { StatusPill } from '@/components/shared/StatusPill'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { getCanonicalProduct } from '@/lib/products'
 import { Transaction } from '@/types'
 import {
   Table,
@@ -364,16 +365,20 @@ export default function SalesPage() {
     { name: 'GoHighLevel', value: ghl, color: '#3B6D11' },
   ]
 
-  const productMap: Record<string, ProductStat> = {}
-  active.forEach((t) => {
-    const key = t.offer_title ?? '(sin título)'
-    if (!productMap[key]) {
-      productMap[key] = { name: key, revenue: 0, count: 0 }
-    }
-    productMap[key].revenue += Number(t.cost) || 0
-    productMap[key].count++
-  })
-  const products = Object.values(productMap).sort((a, b) => b.revenue - a.revenue)
+  const canonicalProductMap = new Map<string, { revenue: number; count: number }>()
+  for (const tx of transactions) {
+    if (tx.status === 'refunded' || tx.status === 'failed') continue
+    const canonical = getCanonicalProduct(tx.offer_title || '')
+    const existing = canonicalProductMap.get(canonical) || { revenue: 0, count: 0 }
+    canonicalProductMap.set(canonical, {
+      revenue: existing.revenue + (Number(tx.cost) || 0),
+      count: existing.count + 1,
+    })
+  }
+  const products = Array.from(canonicalProductMap.entries())
+    .map(([name, data]) => ({ name, ...data }))
+    .filter((p) => p.revenue > 0)
+    .sort((a, b) => b.revenue - a.revenue)
   const maxRevenue = products[0]?.revenue ?? 1
 
   // ── Recuperación de compras ──────────────────────────────────────────────
@@ -406,7 +411,7 @@ export default function SalesPage() {
   const failedByProduct = useMemo(() => {
     const map: Record<string, number> = {}
     transactions.filter(t => t.status === 'failed').forEach(t => {
-      const key = t.offer_title ?? '(sin título)'
+      const key = getCanonicalProduct(t.offer_title || '')
       map[key] = (map[key] ?? 0) + 1
     })
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
@@ -768,7 +773,7 @@ export default function SalesPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="truncate text-zinc-700 dark:text-zinc-300 max-w-xs">{p.name}</span>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-zinc-400">{p.count} sales</span>
+                        <span className="text-xs text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">{p.count} ventas</span>
                         <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatCurrency(p.revenue)}</span>
                       </div>
                     </div>
@@ -1013,7 +1018,7 @@ export default function SalesPage() {
                         </td>
                         <td className="px-3 py-3 hidden md:table-cell">
                           <span className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 max-w-[180px]">
-                            {(t.offer_title ?? '').slice(0, 35)}{(t.offer_title?.length ?? 0) > 35 ? '…' : ''}
+                            {getCanonicalProduct(t.offer_title || '')}
                           </span>
                         </td>
                         <td className="px-3 py-3 text-right">
