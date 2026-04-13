@@ -52,6 +52,7 @@ export async function middleware(request: NextRequest) {
   const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback']
   if (
     pathname.startsWith('/api/webhooks') ||
+    pathname.startsWith('/api/invite') ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
   ) {
     return NextResponse.next()
