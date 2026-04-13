@@ -13,41 +13,48 @@ export default function SetupPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const supabase = createClient()
+    const handleInvite = async () => {
+      const supabase = createClient()
 
-    // Supabase automatically processes the hash on load.
-    // Listen for the session to be established.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') && session) {
-          setReady(true)
+      const hash = window.location.hash.substring(1)
+      const params = new URLSearchParams(hash)
+      const tokenHash = params.get('access_token')
+      const type = params.get('type')
+
+      console.log('Token hash:', tokenHash)
+      console.log('Type:', type)
+
+      if (!tokenHash) {
+        setError('Link inválido. Pide una nueva invitación.')
+        return
+      }
+
+      try {
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'invite',
+        })
+
+        console.log('verifyOtp result:', data, error)
+
+        if (error) {
+          console.error('verifyOtp error:', error)
+          setError(`Error: ${error.message}`)
+          return
         }
-      }
-    )
 
-    // Also check immediately in case the event already fired
-    setTimeout(async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        setReady(true)
-        return
+        if (data.session) {
+          setReady(true)
+          return
+        }
+      } catch (err) {
+        console.error('Caught error:', err)
       }
 
-      const hash = window.location.hash
-      if (!hash || !hash.includes('access_token')) {
-        setError('Link inválido o expirado. Pide una nueva invitación.')
-        return
-      }
+      setError('Link inválido o expirado. Pide una nueva invitación.')
+    }
 
-      // Hash exists — wait for onAuthStateChange to fire
-      setTimeout(async () => {
-        const { data: { session: s } } = await supabase.auth.getSession()
-        if (s) setReady(true)
-        else setError('Link inválido o expirado. Pide una nueva invitación.')
-      }, 2000)
-    }, 500)
-
-    return () => subscription.unsubscribe()
+    handleInvite()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async () => {
