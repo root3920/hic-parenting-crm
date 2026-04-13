@@ -33,7 +33,6 @@ const ALL_NAV_ITEMS = [
   { href: '/llamadas',     label: 'Llamadas',     icon: Phone,           roles: ['admin', 'closer'] as UserRole[] },
   { href: '/spc',          label: 'SPC Members',  icon: Users,           roles: ['admin'] as UserRole[] },
   { href: '/equipo/csm',   label: 'Equipo',       icon: UsersRound,      roles: ['admin'] as UserRole[] },
-  { href: '/equipo/setter',label: 'Mi equipo',    icon: UsersRound,      roles: ['setter'] as UserRole[] },
   { href: '/goals',        label: 'Metas',        icon: Target,          roles: ['admin'] as UserRole[] },
 ]
 
