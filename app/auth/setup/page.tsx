@@ -14,20 +14,39 @@ export default function SetupPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
+    const exchangeToken = async () => {
+      const hash = window.location.hash.substring(1)
+      const params = new URLSearchParams(hash)
+      const accessToken = params.get('access_token')
+      const type = params.get('type')
+
+      if (!accessToken) {
+        setError('Link inválido o expirado. Pide una nueva invitación.')
+        return
+      }
+
+      if (type === 'invite') {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: accessToken,
+          type: 'invite',
+        })
+
+        if (error) {
+          const { error: error2 } = await supabase.auth.exchangeCodeForSession(accessToken)
+          if (error2) {
+            setError('Link inválido o expirado. Pide una nueva invitación.')
+            return
+          }
+        }
         setReady(true)
       } else {
-        // Wait for Supabase to process the hash token
-        setTimeout(async () => {
-          const { data: { session: s2 } } = await supabase.auth.getSession()
-          if (s2) setReady(true)
-          else setError('Link inválido o expirado. Pide una nueva invitación.')
-        }, 1500)
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) setReady(true)
+        else setError('Link inválido o expirado. Pide una nueva invitación.')
       }
     }
-    checkSession()
+
+    exchangeToken()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async () => {
