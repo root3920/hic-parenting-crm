@@ -233,13 +233,13 @@ export default function SpcPage() {
 
   const mrrChartData = [
     {
-      label: 'Antes (Mar 27)',
+      label: 'Before (Mar 27)',
       monthly: BASELINE.mrrMonthly,
       annual: BASELINE.mrrAnnual,
       total: BASELINE.mrr,
     },
     {
-      label: 'Ahora',
+      label: 'Now',
       monthly: parseFloat(mrrNowMonthly.toFixed(2)),
       annual: parseFloat(mrrNowAnnual.toFixed(2)),
       total: parseFloat((mrrNowMonthly + mrrNowAnnual).toFixed(2)),
@@ -258,11 +258,11 @@ export default function SpcPage() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'growth', label: 'Crecimiento' },
+    { key: 'growth', label: 'Growth' },
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
-    { key: 'cancellations', label: `Cancelaciones${!loading ? ` (${paidCancels.length + pendingCancels.length})` : ''}` },
+    { key: 'cancellations', label: `Cancellations${!loading ? ` (${paidCancels.length + pendingCancels.length})` : ''}` },
   ]
 
   return (
@@ -323,7 +323,7 @@ export default function SpcPage() {
                         </span>
                       </div>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
-                        +{deltaMembersCount} nuevos · ↑{deltaMembersPct}%
+                        +{deltaMembersCount} new · ↑{deltaMembersPct}%
                       </span>
                     </>
                   )}
@@ -394,10 +394,10 @@ export default function SpcPage() {
                         <span className={`text-2xl font-semibold ${churnColor}`}>
                           {churnRate}%
                         </span>
-                        <span className="text-sm text-zinc-400">mensual</span>
+                        <span className="text-sm text-zinc-400">monthly</span>
                       </div>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${churnBadgeClass}`}>
-                        {thisMonthCancels.length} cancelaciones este mes
+                        {thisMonthCancels.length} cancellations this month
                       </span>
                     </>
                   )}
@@ -410,7 +410,7 @@ export default function SpcPage() {
               {/* Left: Mensuales vs Anuales */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold">Mensuales vs Anuales</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Monthly vs Annual</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   {loading ? (
@@ -423,7 +423,7 @@ export default function SpcPage() {
                       {/* Monthly */}
                       <div>
                         <div className="flex items-center justify-between text-sm mb-2">
-                          <span className="font-medium text-zinc-700 dark:text-zinc-300">Mensual</span>
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">Monthly</span>
                           <span className="text-zinc-600 dark:text-zinc-400 font-medium">
                             {BASELINE.monthlyMembers} → {monthlyCount}{' '}
                             <span className="text-green-600 font-semibold">
@@ -445,12 +445,12 @@ export default function SpcPage() {
                       {/* Annual */}
                       <div>
                         <div className="flex items-center justify-between text-sm mb-2">
-                          <span className="font-medium text-zinc-700 dark:text-zinc-300">Anual</span>
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">Annual</span>
                           <span className="text-zinc-600 dark:text-zinc-400 font-medium">
                             {BASELINE.annualMembers} → {annualCount}{' '}
                             <span className="text-zinc-500 font-normal">
                               {annualCount === BASELINE.annualMembers
-                                ? '(sin cambio)'
+                                ? '(no change)'
                                 : `(+${annualCount - BASELINE.annualMembers})`}
                             </span>
                           </span>
@@ -467,7 +467,7 @@ export default function SpcPage() {
                       </div>
 
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">
-                        Todo el crecimiento vino de planes mensuales
+                        All growth came from monthly plans
                       </p>
                     </>
                   )}
@@ -477,7 +477,7 @@ export default function SpcPage() {
               {/* Right: MRR Antes vs Ahora stacked bar */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold">MRR Antes vs Ahora</CardTitle>
+                  <CardTitle className="text-sm font-semibold">MRR Before vs Now</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
@@ -502,7 +502,7 @@ export default function SpcPage() {
                         <Tooltip
                           formatter={(val, name) => [
                             `$${Number(val).toFixed(2)}`,
-                            name === 'monthly' ? 'Mensual' : 'Anual (prorrateado)',
+                            name === 'monthly' ? 'Monthly' : 'Annual (prorated)',
                           ]}
                           cursor={{ fill: '#f4f4f5' }}
                         />
@@ -511,7 +511,7 @@ export default function SpcPage() {
                           iconSize={8}
                           formatter={(value) => (
                             <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                              {value === 'monthly' ? 'Mensual' : 'Anual (prorrateado)'}
+                              {value === 'monthly' ? 'Monthly' : 'Annual (prorated)'}
                             </span>
                           )}
                         />
@@ -535,7 +535,7 @@ export default function SpcPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold">
-                  Nuevos miembros activos
+                  New active members
                   {!loading && (
                     <span className="ml-2 text-xs font-normal text-zinc-500">
                       ({newSpcMembers.length} desde Mar 27)
@@ -551,7 +551,7 @@ export default function SpcPage() {
                     ))}
                   </div>
                 ) : newSpcMembers.length === 0 ? (
-                  <EmptyState title="Sin nuevos miembros" description="Los miembros que se unan después de Mar 27 aparecerán aquí." />
+                  <EmptyState title="No new members" description="Members who join after Mar 27 will appear here." />
                 ) : (
                   <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {newSpcMembers.map((m, i) => (
@@ -569,7 +569,7 @@ export default function SpcPage() {
                           {m.name}
                         </span>
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium whitespace-nowrap">
-                          Mensual ${m.amount}
+                          Monthly ${m.amount}
                         </span>
                         <span className="text-xs text-zinc-400 whitespace-nowrap hidden sm:block">
                           {formatDate(m.created_at)}
@@ -821,7 +821,7 @@ export default function SpcPage() {
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                    Cancelaciones pagadas
+                    Paid cancellations
                   </p>
                   {loading ? (
                     <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
@@ -830,7 +830,7 @@ export default function SpcPage() {
                       <p className="text-2xl font-semibold text-red-600 dark:text-red-400">
                         {paidCancels.length}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">suscripciones pagadas perdidas</p>
+                      <p className="text-xs text-zinc-500 mt-1">lost paid subscriptions</p>
                     </>
                   )}
                 </CardContent>
@@ -839,7 +839,7 @@ export default function SpcPage() {
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                    Pendientes de cancelar
+                    Pending cancellation
                   </p>
                   {loading ? (
                     <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
@@ -848,7 +848,7 @@ export default function SpcPage() {
                       <p className="text-2xl font-semibold text-amber-600 dark:text-amber-400">
                         {pendingCancels.length}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">aún tienen acceso activo</p>
+                      <p className="text-xs text-zinc-500 mt-1">still have active access</p>
                     </>
                   )}
                 </CardContent>
@@ -857,7 +857,7 @@ export default function SpcPage() {
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                    MRR perdido
+                    MRR lost
                   </p>
                   {loading ? (
                     <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
@@ -866,7 +866,7 @@ export default function SpcPage() {
                       <p className="text-2xl font-semibold text-red-600">
                         {formatCurrency(mrrLost)}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">últimos 60 días</p>
+                      <p className="text-xs text-zinc-500 mt-1">last 60 days</p>
                     </>
                   )}
                 </CardContent>
@@ -875,7 +875,7 @@ export default function SpcPage() {
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                    Churn mensual
+                    Monthly churn
                   </p>
                   {loading ? (
                     <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
@@ -884,17 +884,17 @@ export default function SpcPage() {
                       <p className={`text-2xl font-semibold ${churnColor}`}>
                         {churnRate}%
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">solo cancelaciones pagadas</p>
+                      <p className="text-xs text-zinc-500 mt-1">paid cancellations only</p>
                     </>
                   )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* Cancelaciones por mes chart */}
+            {/* Cancellations by month chart */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Cancelaciones por mes</CardTitle>
+                <CardTitle className="text-sm font-semibold">Cancellations by month</CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -917,7 +917,7 @@ export default function SpcPage() {
                         allowDecimals={false}
                       />
                       <Tooltip
-                        formatter={(val) => [`${val} cancelaciones`, '']}
+                        formatter={(val) => [`${val} cancellations`, '']}
                         cursor={{ fill: '#f4f4f5' }}
                       />
                       <Bar dataKey="revenue" fill="#A32D2D" radius={[3, 3, 0, 0]} maxBarSize={48} />
@@ -932,8 +932,8 @@ export default function SpcPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-red-500 shrink-0" />
-                  <CardTitle className="text-sm font-semibold">Cancelaciones pagadas</CardTitle>
-                  <span className="ml-auto text-xs text-red-600 dark:text-red-400 font-medium">{paidCancels.length} registros</span>
+                  <CardTitle className="text-sm font-semibold">Paid cancellations</CardTitle>
+                  <span className="ml-auto text-xs text-red-600 dark:text-red-400 font-medium">{paidCancels.length} records</span>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -944,20 +944,20 @@ export default function SpcPage() {
                     ))}
                   </div>
                 ) : paidCancels.length === 0 ? (
-                  <EmptyState title="Sin cancelaciones pagadas" description="No hay suscripciones pagadas canceladas." />
+                  <EmptyState title="No paid cancellations" description="No paid subscriptions have been cancelled." />
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Nombre</TableHead>
+                          <TableHead>Name</TableHead>
                           <TableHead className="hidden md:table-cell">Email</TableHead>
                           <TableHead>Plan</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                          <TableHead className="hidden md:table-cell">Plataforma</TableHead>
-                          <TableHead className="hidden lg:table-cell">Suscrito desde</TableHead>
-                          <TableHead className="hidden sm:table-cell">Canceló</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">Días activo</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="hidden md:table-cell">Platform</TableHead>
+                          <TableHead className="hidden lg:table-cell">Subscribed since</TableHead>
+                          <TableHead className="hidden sm:table-cell">Cancelled</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">Days active</TableHead>
                         </AnimatedTableRow>
                       </TableHeader>
                       <TableBody>
@@ -996,11 +996,11 @@ export default function SpcPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
-                  <CardTitle className="text-sm font-semibold">Cancelaciones pendientes</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Pending cancellations</CardTitle>
                   <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                    ⚠️ Oportunidad de retención
+                    ⚠️ Retention opportunity
                   </span>
-                  <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">{pendingCancels.length} registros</span>
+                  <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">{pendingCancels.length} records</span>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -1011,20 +1011,20 @@ export default function SpcPage() {
                     ))}
                   </div>
                 ) : pendingCancels.length === 0 ? (
-                  <EmptyState title="Sin cancelaciones pendientes" description="No hay miembros con cancelación solicitada." />
+                  <EmptyState title="No pending cancellations" description="No members have requested cancellation." />
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Nombre</TableHead>
+                          <TableHead>Name</TableHead>
                           <TableHead className="hidden md:table-cell">Email</TableHead>
                           <TableHead>Plan</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                          <TableHead className="hidden md:table-cell">Plataforma</TableHead>
-                          <TableHead className="hidden lg:table-cell">Suscrito desde</TableHead>
-                          <TableHead className="hidden sm:table-cell">Acceso hasta</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">Días activo</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="hidden md:table-cell">Platform</TableHead>
+                          <TableHead className="hidden lg:table-cell">Subscribed since</TableHead>
+                          <TableHead className="hidden sm:table-cell">Access until</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">Days active</TableHead>
                         </AnimatedTableRow>
                       </TableHeader>
                       <TableBody>
@@ -1065,9 +1065,9 @@ export default function SpcPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-zinc-400 shrink-0" />
-                  <CardTitle className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">Trials cancelados</CardTitle>
-                  <span className="ml-1 text-xs text-zinc-400 italic">Nunca realizaron un pago · no afectan el churn</span>
-                  <span className="ml-auto text-xs text-zinc-400 font-medium">{trialCancels.length} registros</span>
+                  <CardTitle className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">Cancelled trials</CardTitle>
+                  <span className="ml-1 text-xs text-zinc-400 italic">Never made a payment · do not affect churn</span>
+                  <span className="ml-auto text-xs text-zinc-400 font-medium">{trialCancels.length} records</span>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -1078,17 +1078,17 @@ export default function SpcPage() {
                     ))}
                   </div>
                 ) : trialCancels.length === 0 ? (
-                  <EmptyState title="Sin trials cancelados" description="Los trials cancelados aparecerán aquí." />
+                  <EmptyState title="No cancelled trials" description="Cancelled trials will appear here." />
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Nombre</TableHead>
+                          <TableHead>Name</TableHead>
                           <TableHead className="hidden md:table-cell">Email</TableHead>
-                          <TableHead className="hidden md:table-cell">Plataforma</TableHead>
-                          <TableHead className="hidden sm:table-cell">Inicio trial</TableHead>
-                          <TableHead className="hidden sm:table-cell">Canceló</TableHead>
+                          <TableHead className="hidden md:table-cell">Platform</TableHead>
+                          <TableHead className="hidden sm:table-cell">Trial start</TableHead>
+                          <TableHead className="hidden sm:table-cell">Cancelled</TableHead>
                         </AnimatedTableRow>
                       </TableHeader>
                       <TableBody>

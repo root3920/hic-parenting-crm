@@ -79,7 +79,7 @@ function groupTransactions(
       label = sortKey
     } else if (groupBy === 'month') {
       sortKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      label = d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+      label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     } else if (groupBy === 'week') {
       // Anchor to Monday of the week
       const dayOfWeek = d.getDay()
@@ -90,13 +90,13 @@ function groupTransactions(
       const mo = String(monday.getMonth() + 1).padStart(2, '0')
       const dy = String(monday.getDate()).padStart(2, '0')
       sortKey = `${y}-${mo}-${dy}`
-      label = monday.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+      label = monday.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
     } else {
       // day
       sortKey = t.date
       label = mode === '7d'
-        ? d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
-        : d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+        ? d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+        : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
     }
 
     if (!groups[sortKey]) groups[sortKey] = { label, revenue: 0 }
@@ -109,11 +109,11 @@ function groupTransactions(
 }
 
 const CHART_TITLE: Record<DateMode, string> = {
-  all:    'Revenue por año',
-  '1y':   'Revenue mensual — último año',
-  '30d':  'Revenue diario — últimos 30 días',
-  '7d':   'Revenue diario — últimos 7 días',
-  custom: 'Revenue — rango personalizado',
+  all:    'Revenue by year',
+  '1y':   'Monthly Revenue — last year',
+  '30d':  'Daily Revenue — last 30 days',
+  '7d':   'Daily Revenue — last 7 days',
+  custom: 'Revenue — custom range',
 }
 
 function localDateStr(d: Date): string {
@@ -143,8 +143,8 @@ function todayStr() {
 const DATE_MODES: { label: string; value: DateMode }[] = [
   { label: '7d', value: '7d' },
   { label: '30d', value: '30d' },
-  { label: '1 año', value: '1y' },
-  { label: 'Todo', value: 'all' },
+  { label: '1 year', value: '1y' },
+  { label: 'All', value: 'all' },
   { label: 'Custom', value: 'custom' },
 ]
 
@@ -261,7 +261,7 @@ export default function SalesPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.date || !form.offer_title || !form.cost || !form.buyer_name) {
-      toast.error('Completa los campos obligatorios')
+      toast.error('Please fill in all required fields')
       return
     }
 
@@ -294,7 +294,7 @@ export default function SalesPage() {
     setTransactions((prev) => [data as Transaction, ...prev])
     setShowForm(false)
     setForm({ ...emptyForm, date: todayStr() })
-    toast.success('Transacción guardada')
+    toast.success('Transaction saved')
   }
 
   async function handleConfirm() {
@@ -308,10 +308,10 @@ export default function SalesPage() {
         .eq('id', confirm.tx.id)
 
       if (error) {
-        toast.error('Error al eliminar')
+        toast.error('Error deleting')
       } else {
         setTransactions((prev) => prev.filter((t) => t.id !== confirm.tx.id))
-        toast.success('Transacción eliminada')
+        toast.success('Transaction deleted')
       }
     } else {
       const newStatus = confirm.tx.status === 'refunded' ? 'completed' : 'refunded'
@@ -321,13 +321,13 @@ export default function SalesPage() {
         .eq('id', confirm.tx.id)
 
       if (error) {
-        toast.error('Error al actualizar')
+        toast.error('Error updating')
       } else {
         setTransactions((prev) =>
           prev.map((t) => (t.id === confirm.tx.id ? { ...t, status: newStatus } : t))
         )
         toast.success(
-          newStatus === 'refunded' ? 'Marcado como reembolso' : 'Reembolso deshecho'
+          newStatus === 'refunded' ? 'Marked as refunded' : 'Refund undone'
         )
       }
     }
@@ -443,9 +443,9 @@ export default function SalesPage() {
 
   function daysAgo(dateStr: string): string {
     const diff = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86_400_000)
-    if (diff === 0) return 'hoy'
-    if (diff === 1) return 'ayer'
-    return `hace ${diff}d`
+    if (diff === 0) return 'today'
+    if (diff === 1) return 'yesterday'
+    return `${diff}d ago`
   }
 
   function filterRecoveryByTab(list: Transaction[]) {
@@ -472,7 +472,7 @@ export default function SalesPage() {
 
   function exportRecoveryCSV() {
     const rows = [
-      ['nombre', 'email', 'producto', 'monto', 'fecha_intento'],
+      ['name', 'email', 'product', 'amount', 'date'],
       ...filteredToRecover.map(t => [
         t.buyer_name ?? '',
         t.buyer_email ?? '',
@@ -483,7 +483,7 @@ export default function SalesPage() {
     ]
     const csv = rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const a = document.createElement('a'); a.href = url; a.download = 'leads_recuperacion.csv'; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = 'purchase_recovery.csv'; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -491,31 +491,31 @@ export default function SalesPage() {
     setRecoverLoading(true)
     const { error } = await supabase.from('transactions').update({ status: 'recovered' }).eq('id', tx.id)
     setRecoverLoading(false)
-    if (error) { toast.error('Error al actualizar'); return }
+    if (error) { toast.error('Error updating'); return }
     setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, status: 'recovered' } : t))
     setConfirmRecover(null)
-    toast.success(`${tx.buyer_name} marcado como recuperado`)
+    toast.success(`${tx.buyer_name} marked as recovered`)
   }
 
   const confirmMeta = confirm
     ? confirm.type === 'delete'
       ? {
-          title: '¿Eliminar esta transacción?',
-          body: 'Esta acción no se puede deshacer.',
-          confirmLabel: 'Eliminar',
+          title: 'Delete this transaction?',
+          body: 'This action cannot be undone.',
+          confirmLabel: 'Delete',
           confirmClass: 'bg-red-600 hover:bg-red-700 text-white',
         }
       : confirm.tx.status === 'refunded'
       ? {
-          title: '¿Deshacer el reembolso?',
-          body: 'La transacción volverá a contarse en el revenue.',
-          confirmLabel: 'Deshacer reembolso',
+          title: 'Undo refund?',
+          body: 'The transaction will be counted back in revenue.',
+          confirmLabel: 'Undo refund',
           confirmClass: 'bg-amber-500 hover:bg-amber-600 text-white',
         }
       : {
-          title: '¿Marcar como reembolsada?',
-          body: 'El monto se descontará del revenue total.',
-          confirmLabel: 'Marcar reembolso',
+          title: 'Mark as refunded?',
+          body: 'The amount will be deducted from total revenue.',
+          confirmLabel: 'Mark as refund',
           confirmClass: 'bg-amber-500 hover:bg-amber-600 text-white',
         }
     : null
@@ -573,11 +573,11 @@ export default function SalesPage() {
                   const data = await res.json()
                   if (!res.ok) throw new Error(data.error || 'Sync failed')
                   toast.success(
-                    `Sync completado: ${data.failed} fallidas, ${data.refunded} reembolsos, ${data.updated} actualizadas`
+                    `Sync complete: ${data.failed} failed, ${data.refunded} refunds, ${data.updated} updated`
                   )
                   setRefreshKey((k) => k + 1)
                 } catch {
-                  toast.error('Error en sync de Kajabi')
+                  toast.error('Kajabi sync error')
                 } finally {
                   setSyncing(false)
                 }
@@ -590,12 +590,12 @@ export default function SalesPage() {
               )}
             >
               <RefreshCw className={cn('h-3.5 w-3.5', syncing && 'animate-spin')} />
-              {syncing ? 'Sincronizando...' : 'Sync Kajabi'}
+              {syncing ? 'Syncing...' : 'Sync Kajabi'}
             </button>
 
             <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
-              Agregar venta
+              Add Sale
             </Button>
           </div>
         </PageHeader>
@@ -610,7 +610,7 @@ export default function SalesPage() {
                     <div className="h-3 w-24 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                     <div className="h-7 w-32 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                     {loadedCount > 0 && (
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500">{loadedCount.toLocaleString()} cargadas…</p>
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500">{loadedCount.toLocaleString()} loaded…</p>
                     )}
                   </div>
                 ) : (
@@ -618,7 +618,7 @@ export default function SalesPage() {
                     <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Total Revenue</p>
                     <p className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-2">{formatCurrency(totalRevenue)}</p>
                     <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
-                      Bruto: {formatCurrency(grossRevenue)}
+                      Gross: {formatCurrency(grossRevenue)}
                       {refundedAmount > 0 && (
                         <span className="text-red-500 dark:text-red-400"> · -{formatCurrency(refundedAmount)}</span>
                       )}
@@ -629,7 +629,7 @@ export default function SalesPage() {
             </Card>
           </motion.div>
 
-          <KPICard title="Transactions" value={active.length} subtitle="completadas" loading={loading} />
+          <KPICard title="Transactions" value={active.length} subtitle="completed" loading={loading} />
           <KPICard title="Avg Ticket" value={formatCurrency(avgTicket)} subtitle="per transaction" loading={loading} />
           <KPICard
             title="Best Day"
@@ -650,12 +650,12 @@ export default function SalesPage() {
                   </div>
                 ) : (
                   <>
-                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Reembolsos</p>
+                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Refunds</p>
                     <p className="text-xl md:text-2xl font-bold text-red-600 dark:text-red-400 mt-2">
                       {refundedAmount > 0 ? `-${formatCurrency(refundedAmount)}` : '—'}
                     </p>
                     <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
-                      {refunded.length} transacc. reembolsadas
+                      {refunded.length} refunded transactions
                     </p>
                   </>
                 )}
@@ -673,10 +673,10 @@ export default function SalesPage() {
             >
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold">Recuperación de compras</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Purchase Recovery</CardTitle>
                   {pendingRecovery > 0 && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                      {pendingRecovery} pendientes
+                      {pendingRecovery} pending
                     </span>
                   )}
                 </div>
@@ -685,31 +685,31 @@ export default function SalesPage() {
                 {/* 4 metric cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <div className="rounded-lg bg-red-50 dark:bg-red-900/20 px-3 py-2.5">
-                    <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">Compras fallidas</p>
+                    <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">Failed Purchases</p>
                     <p className="text-2xl font-bold text-red-700 dark:text-red-300 mt-1">{totalFailed}</p>
-                    <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">emails únicos</p>
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">unique emails</p>
                   </div>
                   <div className="rounded-lg bg-green-50 dark:bg-green-900/20 px-3 py-2.5">
-                    <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">Recuperadas</p>
+                    <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">Recovered</p>
                     <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">{totalRecovered}</p>
-                    <p className="text-xs text-green-500 dark:text-green-400 mt-0.5">compraron después</p>
+                    <p className="text-xs text-green-500 dark:text-green-400 mt-0.5">purchased after</p>
                   </div>
                   <div className={cn('rounded-lg px-3 py-2.5', Number(recoveryRate) >= 50 ? 'bg-green-50 dark:bg-green-900/20' : Number(recoveryRate) >= 20 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-red-50 dark:bg-red-900/20')}>
-                    <p className={cn('text-xs font-medium uppercase tracking-wide', Number(recoveryRate) >= 50 ? 'text-green-600 dark:text-green-400' : Number(recoveryRate) >= 20 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>Tasa de recuperación</p>
+                    <p className={cn('text-xs font-medium uppercase tracking-wide', Number(recoveryRate) >= 50 ? 'text-green-600 dark:text-green-400' : Number(recoveryRate) >= 20 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>Recovery Rate</p>
                     <p className={cn('text-2xl font-bold mt-1', Number(recoveryRate) >= 50 ? 'text-green-700 dark:text-green-300' : Number(recoveryRate) >= 20 ? 'text-amber-700 dark:text-amber-300' : 'text-red-700 dark:text-red-300')}>{recoveryRate}%</p>
-                    <p className={cn('text-xs mt-0.5', Number(recoveryRate) >= 50 ? 'text-green-500 dark:text-green-400' : Number(recoveryRate) >= 20 ? 'text-amber-500 dark:text-amber-400' : 'text-red-500 dark:text-red-400')}>de fallidos recuperados</p>
+                    <p className={cn('text-xs mt-0.5', Number(recoveryRate) >= 50 ? 'text-green-500 dark:text-green-400' : Number(recoveryRate) >= 20 ? 'text-amber-500 dark:text-amber-400' : 'text-red-500 dark:text-red-400')}>of failed recovered</p>
                   </div>
                   <div className="rounded-lg bg-green-50 dark:bg-green-900/20 px-3 py-2.5">
-                    <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">Revenue recuperado</p>
+                    <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">Recovered Revenue</p>
                     <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">{formatCurrency(recoveredRevenue)}</p>
-                    <p className="text-xs text-green-500 dark:text-green-400 mt-0.5">de clientes recuperados</p>
+                    <p className="text-xs text-green-500 dark:text-green-400 mt-0.5">from recovered buyers</p>
                   </div>
                 </div>
 
                 {/* Progress bar */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Progreso de recuperación</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Recovery progress</span>
                     <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{totalRecovered} / {totalFailed}</span>
                   </div>
                   <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
@@ -723,7 +723,7 @@ export default function SalesPage() {
                 {/* Top 5 products with most failures */}
                 {failedByProduct.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-2">Top productos con más fallos</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-2">Top products with most failures</p>
                     <div className="space-y-2">
                       {failedByProduct.map(([name, count]) => (
                         <div key={name} className="flex items-center gap-3">
@@ -744,7 +744,7 @@ export default function SalesPage() {
                 {/* Footer link */}
                 <div className="flex justify-end pt-1">
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline">
-                    Ver leads <ChevronRight className="h-3.5 w-3.5" />
+                    View leads <ChevronRight className="h-3.5 w-3.5" />
                   </span>
                 </div>
               </CardContent>
@@ -808,7 +808,7 @@ export default function SalesPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="truncate text-zinc-700 dark:text-zinc-300 max-w-xs">{p.name}</span>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">{p.count} ventas</span>
+                        <span className="text-xs text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">{p.count} sales</span>
                         <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatCurrency(p.revenue)}</span>
                       </div>
                     </div>
@@ -856,7 +856,7 @@ export default function SalesPage() {
                       <TableHead>Buyer</TableHead>
                       <TableHead className="hidden md:table-cell">Offer</TableHead>
                       <TableHead className="hidden md:table-cell">Source</TableHead>
-                      <TableHead className="hidden lg:table-cell">Método de pago</TableHead>
+                      <TableHead className="hidden lg:table-cell">Payment Method</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                       <TableHead className="w-20" />
                     </AnimatedTableRow>
@@ -890,17 +890,17 @@ export default function SalesPage() {
                           <div className="flex items-center justify-end gap-2">
                             {tx.status === 'refunded' && (
                               <span className="text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 px-2 py-0.5 rounded-full">
-                                Reembolsado
+                                Refunded
                               </span>
                             )}
                             {tx.status === 'recovered' && (
                               <span className="text-xs font-medium text-teal-700 bg-teal-50 dark:bg-teal-900/20 dark:text-teal-300 px-2 py-0.5 rounded-full">
-                                Recuperado ✓
+                                Recovered ✓
                               </span>
                             )}
                             {tx.status === 'failed' && (
                               <span className="text-xs font-medium text-orange-600 bg-orange-50 dark:bg-orange-900/20 dark:text-orange-400 px-2 py-0.5 rounded-full">
-                                Fallida
+                                Failed
                               </span>
                             )}
                             <span className={`font-semibold text-sm ${tx.status === 'refunded' ? 'line-through text-zinc-400' : tx.status === 'failed' ? 'text-zinc-400' : ''}`}>
@@ -911,7 +911,7 @@ export default function SalesPage() {
                         <TableCell className="w-20">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              title={tx.status === 'refunded' ? 'Deshacer reembolso' : 'Marcar como reembolso'}
+                              title={tx.status === 'refunded' ? 'Undo refund' : 'Mark as refund'}
                               onClick={() => setConfirm({ type: 'refund', tx })}
                               className={`p-1.5 rounded-md transition-colors ${
                                 tx.status === 'refunded'
@@ -922,7 +922,7 @@ export default function SalesPage() {
                               <RotateCcw className="h-4 w-4" />
                             </button>
                             <button
-                              title="Eliminar transacción"
+                              title="Delete transaction"
                               onClick={() => setConfirm({ type: 'delete', tx })}
                               className="p-1.5 rounded-md text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                             >
@@ -952,7 +952,7 @@ export default function SalesPage() {
                 onClick={() => setConfirm(null)}
                 className="px-3 py-1.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleConfirm}
@@ -974,9 +974,9 @@ export default function SalesPage() {
             {/* Header */}
             <div className="flex items-start justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
               <div>
-                <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Leads para recuperación</h2>
+                <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Recovery Leads</h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  {pendingRecovery} {pendingRecovery === 1 ? 'persona que intentó comprar pero no completó' : 'personas que intentaron comprar pero no completaron'}
+                  {pendingRecovery} {pendingRecovery === 1 ? 'person who attempted to buy but did not complete' : 'people who attempted to buy but did not complete'}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -985,7 +985,7 @@ export default function SalesPage() {
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Exportar CSV
+                  Export CSV
                 </button>
                 <button
                   onClick={() => setShowRecoveryPanel(false)}
@@ -999,7 +999,7 @@ export default function SalesPage() {
             {/* Filter tabs + search */}
             <div className="px-5 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 shrink-0 space-y-2.5">
               <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden w-fit">
-                {([['all', 'Todos'], ['week', 'Esta semana'], ['month', 'Este mes']] as const).map(([val, label]) => (
+                {([['all', 'All'], ['week', 'This week'], ['month', 'This month']] as const).map(([val, label]) => (
                   <button
                     key={val}
                     onClick={() => setRecoveryTab(val)}
@@ -1017,7 +1017,7 @@ export default function SalesPage() {
               <div className="relative">
                 <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
-                  placeholder="Buscar por nombre o email..."
+                  placeholder="Search by name or email..."
                   value={recoverySearch}
                   onChange={e => setRecoverySearch(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
@@ -1030,17 +1030,17 @@ export default function SalesPage() {
               {filteredToRecover.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-zinc-400 dark:text-zinc-500">
                   <CheckCircle2 className="h-8 w-8 mb-2 text-green-400" />
-                  <p className="text-sm font-medium">Sin leads pendientes</p>
-                  <p className="text-xs mt-1">Todos los fallidos ya fueron recuperados</p>
+                  <p className="text-sm font-medium">No pending leads</p>
+                  <p className="text-xs mt-1">All failed purchases have been recovered</p>
                 </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800/80 backdrop-blur z-10">
                     <tr>
-                      <th className="text-left px-5 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Nombre</th>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hidden md:table-cell">Producto</th>
-                      <th className="text-right px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Monto</th>
-                      <th className="text-right px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hidden sm:table-cell">Último intento</th>
+                      <th className="text-left px-5 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Name</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hidden md:table-cell">Product</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Amount</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hidden sm:table-cell">Last attempt</th>
                       <th className="px-4 py-2" />
                     </tr>
                   </thead>
@@ -1065,17 +1065,17 @@ export default function SalesPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5 justify-end">
                             <button
-                              title="Copiar email"
+                              title="Copy email"
                               onClick={() => {
                                 navigator.clipboard.writeText(t.buyer_email ?? '')
-                                toast.success('Email copiado')
+                                toast.success('Email copied')
                               }}
                               className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                             >
                               <Copy className="h-3.5 w-3.5" />
                             </button>
                             <button
-                              title="Marcar como recuperado"
+                              title="Mark as recovered"
                               onClick={() => setConfirmRecover(t)}
                               className="p-1.5 rounded-md text-zinc-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors"
                             >
@@ -1098,23 +1098,23 @@ export default function SalesPage() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmRecover(null)} />
           <div className="relative bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-sm animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">¿Marcar como recuperado?</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Mark as recovered?</h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-5">
-              ¿Marcar a <strong className="text-zinc-700 dark:text-zinc-300">{confirmRecover.buyer_name}</strong> como recuperado manualmente?
+              Mark <strong className="text-zinc-700 dark:text-zinc-300">{confirmRecover.buyer_name}</strong> as manually recovered?
             </p>
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setConfirmRecover(null)}
                 className="px-3 py-1.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={() => handleMarkRecovered(confirmRecover)}
                 disabled={recoverLoading}
                 className="px-3 py-1.5 text-xs rounded-md font-medium bg-teal-600 hover:bg-teal-700 text-white transition-colors disabled:opacity-60"
               >
-                {recoverLoading ? 'Guardando...' : 'Marcar recuperado'}
+                {recoverLoading ? 'Saving...' : 'Mark recovered'}
               </button>
             </div>
           </div>
@@ -1130,7 +1130,7 @@ export default function SalesPage() {
           />
           <div className="w-full max-w-md bg-white dark:bg-zinc-900 h-full shadow-xl flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Agregar transacción manual</h2>
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Add Manual Transaction</h2>
               <button
                 onClick={() => setShowForm(false)}
                 className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -1142,7 +1142,7 @@ export default function SalesPage() {
             <form onSubmit={handleSubmit} className="flex-1 flex flex-col p-5 gap-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelClass}>Fecha *</label>
+                  <label className={labelClass}>Date *</label>
                   <input
                     type="date"
                     value={form.date}
@@ -1152,7 +1152,7 @@ export default function SalesPage() {
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Fuente</label>
+                  <label className={labelClass}>Source</label>
                   <select
                     value={form.source}
                     onChange={(e) => setField('source', e.target.value)}
@@ -1163,13 +1163,13 @@ export default function SalesPage() {
                     <option>Manual</option>
                     <option>Stripe</option>
                     <option>PayPal</option>
-                    <option>Otro</option>
+                    <option>Other</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className={labelClass}>Producto / Oferta *</label>
+                <label className={labelClass}>Product / Offer *</label>
                 <input
                   type="text"
                   value={form.offer_title}
@@ -1181,7 +1181,7 @@ export default function SalesPage() {
               </div>
 
               <div>
-                <label className={labelClass}>Monto *</label>
+                <label className={labelClass}>Amount *</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-base font-semibold select-none">$</span>
                   <input
@@ -1198,7 +1198,7 @@ export default function SalesPage() {
               </div>
 
               <div>
-                <label className={labelClass}>Nombre del comprador *</label>
+                <label className={labelClass}>Buyer name *</label>
                 <input
                   type="text"
                   value={form.buyer_name}
@@ -1220,7 +1220,7 @@ export default function SalesPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelClass}>Teléfono</label>
+                  <label className={labelClass}>Phone</label>
                   <input
                     type="text"
                     value={form.buyer_phone}
@@ -1230,7 +1230,7 @@ export default function SalesPage() {
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Moneda</label>
+                  <label className={labelClass}>Currency</label>
                   <select
                     value={form.currency}
                     onChange={(e) => setField('currency', e.target.value)}
@@ -1251,32 +1251,32 @@ export default function SalesPage() {
                   type="text"
                   value={form.transaction_id}
                   onChange={(e) => setField('transaction_id', e.target.value)}
-                  placeholder="txn_xxx o referencia interna"
+                  placeholder="txn_xxx or internal reference"
                   className={inputClass}
                 />
               </div>
 
               <div>
-                <label className={labelClass}>Método de pago</label>
+                <label className={labelClass}>Payment method</label>
                 <select
                   value={form.payment_source}
                   onChange={(e) => setField('payment_source', e.target.value)}
                   className={selectClass}
                 >
-                  <option value="">— Seleccionar —</option>
+                  <option value="">— Select —</option>
                   <option>Stripe</option>
                   <option>PayPal</option>
                   <option>Kajabi Payments</option>
                   <option>Credit Card</option>
                   <option>Bank Transfer</option>
                   <option>Cash</option>
-                  <option>Otro</option>
+                  <option>Other</option>
                 </select>
               </div>
 
               <div className="mt-auto pt-4 border-t border-zinc-200 dark:border-zinc-800">
                 <Button type="submit" disabled={submitting} className="w-full">
-                  {submitting ? 'Guardando...' : 'Guardar transacción'}
+                  {submitting ? 'Saving...' : 'Save transaction'}
                 </Button>
               </div>
             </form>

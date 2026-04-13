@@ -66,7 +66,7 @@ export default function ProfilesPage() {
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false })
-    if (error) toast.error(`Error cargando perfiles: ${error.message}`)
+    if (error) toast.error(`Error loading profiles: ${error.message}`)
     setProfiles(data ?? [])
     setLoading(false)
   }
@@ -80,15 +80,15 @@ export default function ProfilesPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.email || !form.full_name || !form.role) {
-      toast.error('Email, nombre y rol son requeridos')
+      toast.error('Email, name, and role are required')
       return
     }
     if (form.role === 'closer' && !form.closer_name) {
-      toast.error('Selecciona el nombre del closer')
+      toast.error('Select the closer name')
       return
     }
     if (form.role === 'setter' && !form.setter_name) {
-      toast.error('Selecciona el nombre del setter')
+      toast.error('Select the setter name')
       return
     }
 
@@ -108,11 +108,11 @@ export default function ProfilesPage() {
     setSubmitting(false)
 
     if (!res.ok) {
-      toast.error(data.error ?? 'Error al enviar invitación')
+      toast.error(data.error ?? 'Error sending invitation')
       return
     }
 
-    toast.success(`Invitación enviada a ${form.email}`)
+    toast.success(`Invitation sent to ${form.email}`)
     setModalOpen(false)
     setForm(emptyForm)
     fetchProfiles()
@@ -121,14 +121,14 @@ export default function ProfilesPage() {
   return (
     <PageTransition>
       <div className="max-w-5xl mx-auto">
-        <PageHeader title="Perfiles del equipo" description="Gestiona accesos y roles de los miembros">
+        <PageHeader title="Team Profiles" description="Manage access and roles for team members">
           <button
             onClick={() => { setForm(emptyForm); setModalOpen(true) }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
             style={{ backgroundColor: '#185FA5' }}
           >
             <Plus className="h-3.5 w-3.5" />
-            Agregar miembro
+            Add member
           </button>
         </PageHeader>
 
@@ -143,15 +143,15 @@ export default function ProfilesPage() {
           ) : profiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-zinc-400">
               <UserPlus className="h-10 w-10 mb-3 opacity-40" />
-              <p className="text-sm font-medium">No hay perfiles aún</p>
-              <p className="text-xs mt-1">Agrega el primer miembro del equipo</p>
+              <p className="text-sm font-medium">No profiles yet</p>
+              <p className="text-xs mt-1">Add your first team member</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                    {['Nombre', 'Rol', 'Closer name', 'Setter name', 'Creado'].map((h) => (
+                    {['Name', 'Role', 'Closer name', 'Setter name', 'Created'].map((h) => (
                       <th key={h} className="text-left py-3 px-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                         {h}
                       </th>
@@ -170,7 +170,7 @@ export default function ProfilesPage() {
                       <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 text-xs">{p.closer_name ?? '—'}</td>
                       <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 text-xs">{p.setter_name ?? '—'}</td>
                       <td className="py-3 px-4 text-zinc-400 text-xs whitespace-nowrap">
-                        {new Date(p.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {new Date(p.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
                     </tr>
                   ))}
@@ -190,7 +190,7 @@ export default function ProfilesPage() {
           />
           <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-200 dark:border-zinc-700">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Agregar miembro</h2>
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Add member</h2>
               <button
                 onClick={() => setModalOpen(false)}
                 className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -201,12 +201,12 @@ export default function ProfilesPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Nombre completo</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Full name</label>
                 <input
                   type="text"
                   value={form.full_name}
                   onChange={(e) => set('full_name', e.target.value)}
-                  placeholder="Ej: Valentina Llano"
+                  placeholder="E.g.: Valentina Llano"
                   className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                   required
                 />
@@ -218,14 +218,14 @@ export default function ProfilesPage() {
                   type="email"
                   value={form.email}
                   onChange={(e) => set('email', e.target.value)}
-                  placeholder="correo@ejemplo.com"
+                  placeholder="email@example.com"
                   className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Rol</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Role</label>
                 <select
                   value={form.role}
                   onChange={(e) => set('role', e.target.value as Role)}
@@ -240,7 +240,7 @@ export default function ProfilesPage() {
               {form.role === 'closer' && (
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Closer name <span className="text-zinc-400">(debe coincidir con el nombre en la tabla de llamadas)</span>
+                    Closer name <span className="text-zinc-400">(must match the name in the calls table)</span>
                   </label>
                   <select
                     value={form.closer_name}
@@ -248,7 +248,7 @@ export default function ProfilesPage() {
                     className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                     required
                   >
-                    <option value="">Seleccionar...</option>
+                    <option value="">Select...</option>
                     {CLOSER_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
@@ -257,7 +257,7 @@ export default function ProfilesPage() {
               {form.role === 'setter' && (
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Setter name <span className="text-zinc-400">(debe coincidir con el nombre en los reportes)</span>
+                    Setter name <span className="text-zinc-400">(must match the name in the reports)</span>
                   </label>
                   <select
                     value={form.setter_name}
@@ -265,7 +265,7 @@ export default function ProfilesPage() {
                     className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                     required
                   >
-                    <option value="">Seleccionar...</option>
+                    <option value="">Select...</option>
                     {SETTER_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
@@ -277,7 +277,7 @@ export default function ProfilesPage() {
                   onClick={() => setModalOpen(false)}
                   className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                 >
-                  Cancelar
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -285,7 +285,7 @@ export default function ProfilesPage() {
                   className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
                   style={{ backgroundColor: '#185FA5' }}
                 >
-                  {submitting ? 'Enviando...' : 'Enviar invitación'}
+                  {submitting ? 'Sending...' : 'Send Invitation'}
                 </button>
               </div>
             </form>

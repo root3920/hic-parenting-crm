@@ -113,97 +113,97 @@ function ReportDetail({ report, onClose }: { report: CsmReport; onClose: () => v
     <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="text-base">
-          Reporte — {report.csm_name} · {formatDate(report.date)}
+          Report — {report.csm_name} · {formatDate(report.date)}
         </DialogTitle>
       </DialogHeader>
 
       <div className="space-y-5 mt-2">
         {/* Retención */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-red-600 mb-2">Retención</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-red-600 mb-2">Retention</p>
           <div className="grid grid-cols-2 gap-x-6">
-            <Row label="Solicitudes" value={report.r_solicitudes} />
-            <Row label="Salvadas" value={report.r_saved} />
+            <Row label="Requests" value={report.r_solicitudes} />
+            <Row label="Saved" value={report.r_saved} />
             <Row label="Churn" value={report.r_churn} />
-            <Row label="Pausas" value={report.r_pausas} />
+            <Row label="Pauses" value={report.r_pausas} />
           </div>
-          <div className="mt-1"><span className="text-xs text-zinc-400">Razones:</span>{chips(report.r_cancel_reasons)}</div>
+          <div className="mt-1"><span className="text-xs text-zinc-400">Reasons:</span>{chips(report.r_cancel_reasons)}</div>
           {report.r_notas && <p className="text-xs text-zinc-500 italic mt-1">{report.r_notas}</p>}
         </div>
 
         {/* Seguimiento */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Seguimiento</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Follow-up</p>
           <div className="grid grid-cols-2 gap-x-6">
             <Row label="Check-ins" value={report.s_checkins} />
-            <Row label="En riesgo" value={report.s_riesgo} />
+            <Row label="At risk" value={report.s_riesgo} />
             <Row label="Wins" value={report.s_wins} />
-            <Row label="Dudas" value={report.s_dudas} />
+            <Row label="Questions" value={report.s_dudas} />
             <Row label="Engagement" value={report.s_engagement} />
           </div>
-          <div className="mt-1"><span className="text-xs text-zinc-400">Fricciones:</span>{chips(report.s_fricciones)}</div>
+          <div className="mt-1"><span className="text-xs text-zinc-400">Frictions:</span>{chips(report.s_fricciones)}</div>
           {report.s_notas && <p className="text-xs text-zinc-500 italic mt-1">{report.s_notas}</p>}
         </div>
 
         {/* Graduados */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-purple-600 mb-2">Graduados</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-purple-600 mb-2">Graduates</p>
           <div className="grid grid-cols-2 gap-x-6">
-            <Row label="Contactados" value={report.g_contactados} />
-            <Row label="Conversaciones" value={report.g_conversaciones} />
-            <Row label="Llamadas" value={report.g_llamadas} />
-            <Row label="Seguimientos" value={report.g_seguimientos} />
-            <Row label="Sin respuesta" value={report.g_sin_respuesta} />
-            <Row label="Referidos" value={report.g_referidos} />
+            <Row label="Contacted" value={report.g_contactados} />
+            <Row label="Conversations" value={report.g_conversaciones} />
+            <Row label="Calls" value={report.g_llamadas} />
+            <Row label="Follow-ups" value={report.g_seguimientos} />
+            <Row label="No reply" value={report.g_sin_respuesta} />
+            <Row label="Referrals" value={report.g_referidos} />
           </div>
-          <div className="mt-1"><span className="text-xs text-zinc-400">Oportunidades:</span>{chips(report.g_oportunidades)}</div>
-          <div className="mt-1"><span className="text-xs text-zinc-400">Objeciones:</span>{chips(report.g_objeciones)}</div>
+          <div className="mt-1"><span className="text-xs text-zinc-400">Opportunities:</span>{chips(report.g_oportunidades)}</div>
+          <div className="mt-1"><span className="text-xs text-zinc-400">Objections:</span>{chips(report.g_objeciones)}</div>
           {report.g_notas && <p className="text-xs text-zinc-500 italic mt-1">{report.g_notas}</p>}
         </div>
 
         {/* Soporte */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Soporte / Tickets</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Support / Tickets</p>
           <div className="grid grid-cols-2 gap-x-6">
-            <Row label="Recibidos" value={report.t_recibidos} />
-            <Row label="Resueltos" value={report.t_resueltos} />
-            <Row label="Pendientes" value={report.t_pendientes} />
-            <Row label="Escalados" value={report.t_escalados} />
+            <Row label="Received" value={report.t_recibidos} />
+            <Row label="Resolved" value={report.t_resueltos} />
+            <Row label="Pending" value={report.t_pendientes} />
+            <Row label="Escalated" value={report.t_escalados} />
           </div>
-          <div className="mt-1"><span className="text-xs text-zinc-400">Origen:</span>{chips(report.t_origen)}</div>
+          <div className="mt-1"><span className="text-xs text-zinc-400">Origin:</span>{chips(report.t_origen)}</div>
           {report.t_notas && <p className="text-xs text-zinc-500 italic mt-1">{report.t_notas}</p>}
         </div>
 
         {/* Escalamientos */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Escalamientos</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Escalations</p>
           <div className="grid grid-cols-2 gap-x-6">
-            <Row label="Críticos" value={report.e_criticos} />
-            <Row label="A coaches" value={report.e_coaches} />
-            <Row label="A liderazgo" value={report.e_liderazgo} />
-            <Row label="Resueltos" value={report.e_resueltos} />
+            <Row label="Critical" value={report.e_criticos} />
+            <Row label="To coaches" value={report.e_coaches} />
+            <Row label="To leadership" value={report.e_liderazgo} />
+            <Row label="Resolved" value={report.e_resueltos} />
           </div>
           {report.e_caso_relevante && <p className="text-xs text-zinc-500 italic mt-1">{report.e_caso_relevante}</p>}
         </div>
 
         {/* Cierre */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-green-600 mb-2">Cierre del día</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-green-600 mb-2">Daily Closeout</p>
           {report.c_wins && (
             <div className="mb-2">
-              <p className="text-xs text-zinc-400 mb-0.5">¿Qué salió bien?</p>
+              <p className="text-xs text-zinc-400 mb-0.5">What went well?</p>
               <p className="text-xs text-zinc-700 dark:text-zinc-300">{report.c_wins}</p>
             </div>
           )}
           {report.c_riesgos && (
             <div className="mb-2">
-              <p className="text-xs text-zinc-400 mb-0.5">Riesgos</p>
+              <p className="text-xs text-zinc-400 mb-0.5">Risks</p>
               <p className="text-xs text-zinc-700 dark:text-zinc-300">{report.c_riesgos}</p>
             </div>
           )}
           {(report.c_accion1 || report.c_accion2 || report.c_accion3) && (
             <div>
-              <p className="text-xs text-zinc-400 mb-1">Acciones para mañana</p>
+              <p className="text-xs text-zinc-400 mb-1">Actions for tomorrow</p>
               <ol className="space-y-0.5 list-decimal list-inside">
                 {[report.c_accion1, report.c_accion2, report.c_accion3].filter(Boolean).map((a, i) => (
                   <li key={i} className="text-xs text-zinc-700 dark:text-zinc-300">{a}</li>
@@ -224,7 +224,7 @@ export default function CsmDashboardPage() {
   const [preset, setPreset] = useState<Preset>('7d')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [selectedCsm, setSelectedCsm] = useState('Todos')
+  const [selectedCsm, setSelectedCsm] = useState('All')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<CsmReport | null>(null)
 
@@ -241,7 +241,7 @@ export default function CsmDashboardPage() {
       .gte('date', fromDate)
       .lte('date', toDate)
       .order('date', { ascending: false })
-    if (selectedCsm !== 'Todos') q = q.eq('csm_name', selectedCsm)
+    if (selectedCsm !== 'All') q = q.eq('csm_name', selectedCsm)
     const { data } = await q
     setReports(data ?? [])
     setLoading(false)
@@ -251,7 +251,7 @@ export default function CsmDashboardPage() {
 
   const csmNames = useMemo(() => {
     const names = Array.from(new Set(reports.map((r) => r.csm_name)))
-    return ['Todos', ...names]
+    return ['All', ...names]
   }, [reports])
 
   // Aggregated KPIs
@@ -272,10 +272,10 @@ export default function CsmDashboardPage() {
 
     return {
       rescatePct: pct(totalSaved, totalSolicitudes),
-      rescateLabel: `${totalSaved} salvadas de ${totalSolicitudes} solicitudes`,
+      rescateLabel: `${totalSaved} saved of ${totalSolicitudes} requests`,
       churn: totalChurn,
       ticketsPct: pct(totalTicketsResueltos, totalTicketsRecibidos),
-      ticketsLabel: `${totalTicketsResueltos} resueltos de ${totalTicketsRecibidos} recibidos`,
+      ticketsLabel: `${totalTicketsResueltos} resolved of ${totalTicketsRecibidos} received`,
       engMode,
       llamadas: totalLlamadas,
       referidos: totalReferidos,
@@ -340,15 +340,15 @@ export default function CsmDashboardPage() {
     return 'text-red-600 dark:text-red-400'
   }
   function engColor(v: string) {
-    if (v === 'Alto') return 'text-teal-600 dark:text-teal-400'
-    if (v === 'Medio') return 'text-amber-600 dark:text-amber-400'
+    if (v === 'High') return 'text-teal-600 dark:text-teal-400'
+    if (v === 'Medium') return 'text-amber-600 dark:text-amber-400'
     return 'text-red-600 dark:text-red-400'
   }
 
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Client Success — High Ticket" description="Seguimiento diario del equipo CSM">
+        <PageHeader title="Client Success — High Ticket" description="Daily CSM team follow-up">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset buttons */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
@@ -389,7 +389,7 @@ export default function CsmDashboardPage() {
               style={{ backgroundColor: '#1D9E75' }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Nuevo reporte
+              New Report
             </Link>
           </div>
         </PageHeader>
@@ -409,8 +409,8 @@ export default function CsmDashboardPage() {
           </div>
         ) : reports.length === 0 ? (
           <EmptyState
-            title="No hay reportes en este período"
-            description="Crea el primer reporte CSM para ver métricas aquí."
+            title="No reports in this period"
+            description="Create the first CSM report to see metrics here."
             icon={<Plus className="h-10 w-10" />}
           />
         ) : (
@@ -418,19 +418,19 @@ export default function CsmDashboardPage() {
             {/* Section 1 — KPI cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
               <KpiMiniCard
-                label="Tasa de rescate"
+                label="Rescue Rate"
                 value={fmtPct(kpis.rescatePct)}
                 sub={kpis.rescateLabel}
                 color={rescateColor(kpis.rescatePct)}
               />
               <KpiMiniCard
-                label="Churn acumulado"
+                label="Cumulative Churn"
                 value={String(kpis.churn)}
-                sub="cancelaciones en el período"
+                sub="cancellations in the period"
                 color={churnColor(kpis.churn)}
               />
               <KpiMiniCard
-                label="Resolución tickets"
+                label="Ticket Resolution"
                 value={fmtPct(kpis.ticketsPct)}
                 sub={kpis.ticketsLabel}
                 color={ticketColor(kpis.ticketsPct)}
@@ -439,17 +439,17 @@ export default function CsmDashboardPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Engagement</p>
                 <span className={cn(
                   'inline-flex px-2.5 py-1 rounded-full text-sm font-bold',
-                  kpis.engMode === 'Alto' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' :
-                  kpis.engMode === 'Medio' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                  kpis.engMode === 'High' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' :
+                  kpis.engMode === 'Medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
                   'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                 )}>
                   {kpis.engMode}
                 </span>
               </div>
               <KpiMiniCard
-                label="Llamadas agendadas"
+                label="Scheduled Calls"
                 value={String(kpis.llamadas)}
-                sub={`${kpis.referidos} referidos generados`}
+                sub={`${kpis.referidos} referrals generated`}
                 color="text-blue-600 dark:text-blue-400"
               />
             </div>
@@ -458,7 +458,7 @@ export default function CsmDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Retención — Rescates vs Churn</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Retention — Rescues vs Churn</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
@@ -469,11 +469,11 @@ export default function CsmDashboardPage() {
                       <Tooltip
                         formatter={(value, name) => [
                           String(value),
-                          name === 'r_saved' ? 'Rescatadas' : 'Churn',
+                          name === 'r_saved' ? 'Rescued' : 'Churn',
                         ]}
                         contentStyle={{ fontSize: 11 }}
                       />
-                      <Legend formatter={(v) => <span className="text-xs">{v === 'r_saved' ? 'Rescatadas' : 'Churn'}</span>} />
+                      <Legend formatter={(v) => <span className="text-xs">{v === 'r_saved' ? 'Rescued' : 'Churn'}</span>} />
                       <Bar dataKey="r_saved" name="r_saved" fill="#3B6D11" radius={[3, 3, 0, 0]} maxBarSize={32} />
                       <Bar dataKey="r_churn" name="r_churn" fill="#A32D2D" radius={[3, 3, 0, 0]} maxBarSize={32} />
                     </BarChart>
@@ -483,7 +483,7 @@ export default function CsmDashboardPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Tickets — Recibidos vs Resueltos</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Tickets — Received vs Resolved</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
@@ -500,11 +500,11 @@ export default function CsmDashboardPage() {
                       <Tooltip
                         formatter={(value, name) => [
                           String(value),
-                          name === 't_recibidos' ? 'Recibidos' : 'Resueltos',
+                          name === 't_recibidos' ? 'Received' : 'Resolved',
                         ]}
                         contentStyle={{ fontSize: 11 }}
                       />
-                      <Legend formatter={(v) => <span className="text-xs">{v === 't_recibidos' ? 'Recibidos' : 'Resueltos'}</span>} />
+                      <Legend formatter={(v) => <span className="text-xs">{v === 't_recibidos' ? 'Received' : 'Resolved'}</span>} />
                       <Line type="monotone" dataKey="t_recibidos" stroke="#185FA5" strokeWidth={2} dot={false} />
                       <Area type="monotone" dataKey="t_resueltos" stroke="#3B6D11" strokeWidth={2} fill="url(#resueltosFill)" dot={false} />
                     </AreaChart>
@@ -517,26 +517,26 @@ export default function CsmDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Actividad con Graduados</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Graduate Activity</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <MetricRow label="Contactados" value={secondary.contactados} />
-                  <MetricRow label="Conversaciones activas" value={secondary.conversaciones} />
-                  <MetricRow label="Sin respuesta" value={secondary.sinRespuesta} />
-                  <MetricRow label="Referidos" value={secondary.referidos} />
+                  <MetricRow label="Contacted" value={secondary.contactados} />
+                  <MetricRow label="Active conversations" value={secondary.conversaciones} />
+                  <MetricRow label="No reply" value={secondary.sinRespuesta} />
+                  <MetricRow label="Referrals" value={secondary.referidos} />
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Estudiantes en Riesgo</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Students at Risk</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <MetricRow label="En riesgo" value={secondary.riesgo} highlight={secondary.riesgo > 0} />
-                  <MetricRow label="Check-ins realizados" value={secondary.checkins} />
-                  <MetricRow label="Wins / avances" value={secondary.wins} />
+                  <MetricRow label="At risk" value={secondary.riesgo} highlight={secondary.riesgo > 0} />
+                  <MetricRow label="Check-ins done" value={secondary.checkins} />
+                  <MetricRow label="Wins / progress" value={secondary.wins} />
                   <div className="pt-1.5">
-                    <p className="text-xs text-zinc-400 mb-1">Fricciones frecuentes</p>
+                    <p className="text-xs text-zinc-400 mb-1">Common frictions</p>
                     {secondary.fricciones.length === 0 ? (
                       <p className="text-xs text-zinc-400">—</p>
                     ) : (
@@ -552,13 +552,13 @@ export default function CsmDashboardPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Escalamientos</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Escalations</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <MetricRow label="Casos críticos" value={secondary.criticos} highlight={secondary.criticos > 0} />
-                  <MetricRow label="Escalados a coaches" value={secondary.coaches} />
-                  <MetricRow label="Escalados a liderazgo" value={secondary.liderazgo} />
-                  <MetricRow label="Resueltos" value={secondary.escalResueltos} />
+                  <MetricRow label="Critical cases" value={secondary.criticos} highlight={secondary.criticos > 0} />
+                  <MetricRow label="Escalated to coaches" value={secondary.coaches} />
+                  <MetricRow label="Escalated to leadership" value={secondary.liderazgo} />
+                  <MetricRow label="Resolved" value={secondary.escalResueltos} />
                 </CardContent>
               </Card>
             </div>
@@ -567,11 +567,11 @@ export default function CsmDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Razones de cancelación</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Cancellation reasons</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {cancelFreq.length === 0 ? (
-                    <p className="text-xs text-zinc-400 py-4 text-center">Sin datos en este período</p>
+                    <p className="text-xs text-zinc-400 py-4 text-center">No data in this period</p>
                   ) : (
                     <div className="space-y-2.5">
                       {cancelFreq.map(([label, count]) => {
@@ -595,11 +595,11 @@ export default function CsmDashboardPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Fricciones de estudiantes</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Student frictions</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {friccionFreq.length === 0 ? (
-                    <p className="text-xs text-zinc-400 py-4 text-center">Sin datos en este período</p>
+                    <p className="text-xs text-zinc-400 py-4 text-center">No data in this period</p>
                   ) : (
                     <div className="space-y-2.5">
                       {friccionFreq.map(([label, count]) => {
@@ -625,14 +625,14 @@ export default function CsmDashboardPage() {
             {/* Section 5 — Reports table */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Historial de reportes</CardTitle>
+                <CardTitle className="text-sm font-semibold">Report History</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['Fecha', 'CSM', 'Rescate%', 'Churn', 'Tickets%', 'Graduados', 'Riesgo', 'Críticos', 'Engagement', ''].map((h) => (
+                        {['Date', 'CSM', 'Rescue%', 'Churn', 'Tickets%', 'Graduates', 'At risk', 'Critical', 'Engagement', ''].map((h) => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
@@ -661,8 +661,8 @@ export default function CsmDashboardPage() {
                             <td className="px-4 py-3">
                               <span className={cn(
                                 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                                r.s_engagement === 'Alto' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' :
-                                r.s_engagement === 'Medio' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                                r.s_engagement === 'High' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' :
+                                r.s_engagement === 'Medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
                                 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                               )}>
                                 {r.s_engagement}
@@ -673,7 +673,7 @@ export default function CsmDashboardPage() {
                                 onClick={() => setDetailReport(r)}
                                 className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                               >
-                                Ver
+                                View
                               </button>
                             </td>
                           </motion.tr>
@@ -686,7 +686,7 @@ export default function CsmDashboardPage() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
                     <p className="text-xs text-zinc-400">
-                      {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, reports.length)} de {reports.length}
+                      {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, reports.length)} of {reports.length}
                     </p>
                     <div className="flex items-center gap-1">
                       <button

@@ -30,31 +30,31 @@ import type { UserRole } from '@/hooks/useProfile'
 const ALL_NAV_ITEMS = [
   { href: '/dashboard',    label: 'Dashboard',   icon: LayoutDashboard, roles: ['admin'] as UserRole[] },
   { href: '/sales',        label: 'Sales',        icon: DollarSign,      roles: ['admin'] as UserRole[] },
-  { href: '/llamadas',     label: 'Llamadas',     icon: Phone,           roles: ['admin', 'closer'] as UserRole[] },
+  { href: '/llamadas',     label: 'Calls',        icon: Phone,           roles: ['admin', 'closer'] as UserRole[] },
   { href: '/spc',          label: 'SPC Members',  icon: Users,           roles: ['admin'] as UserRole[] },
-  { href: '/equipo/csm',   label: 'Equipo',       icon: UsersRound,      roles: ['admin'] as UserRole[] },
-  { href: '/goals',        label: 'Metas',        icon: Target,          roles: ['admin'] as UserRole[] },
+  { href: '/equipo/csm',   label: 'Team',         icon: UsersRound,      roles: ['admin'] as UserRole[] },
+  { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },
 ]
 
 // Quick-action menu items filtered by role
 const ALL_QUICK_ACTIONS = [
   {
     href: '/equipo/csm/nuevo',
-    label: 'Reporte CSM diario',
+    label: 'Daily CSM Report',
     sub: 'Client Success HT',
     icon: FileText,
     roles: ['admin'] as UserRole[],
   },
   {
     href: '/equipo/setter/nuevo',
-    label: 'Reporte Setter diario',
+    label: 'Daily Setter Report',
     sub: 'Setting Team',
     icon: BarChart2,
     roles: ['admin', 'setter'] as UserRole[],
   },
   {
     href: '/equipo/closer/nuevo',
-    label: 'Reporte Closer diario',
+    label: 'Daily Closer Report',
     sub: 'Closing Team',
     icon: TrendingUp,
     roles: ['admin', 'closer'] as UserRole[],

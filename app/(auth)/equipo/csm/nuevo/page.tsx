@@ -15,11 +15,11 @@ export const dynamic = 'force-dynamic'
 
 const CSM_OPTIONS = ['Ana Sofía', 'Otro CSM']
 
-const CANCEL_REASONS = ['Económica', 'Falta de tiempo', 'No ven resultados', 'Expectativas no cumplidas', 'Plataforma', 'Personal', 'Otro']
-const FRICCIONES = ['Implementación', 'Tiempo', 'Emocional', 'Contenido', 'Plataforma']
-const OPORTUNIDADES = ['Interés en 1:1', 'Interés en grupal', 'Interés en SPC', 'Solo soporte']
-const OBJECIONES = ['Económica', 'Tiempo', 'No es prioridad', 'No ven valor', 'Otro']
-const TICKET_ORIGEN = ['Plataforma', 'Programa', 'Comunicación', 'Expectativas']
+const CANCEL_REASONS = ['Financial', 'Lack of time', 'No results seen', 'Unmet expectations', 'Platform', 'Personal', 'Other']
+const FRICCIONES = ['Implementation', 'Time', 'Emotional', 'Content', 'Platform']
+const OPORTUNIDADES = ['Interest in 1:1', 'Interest in group', 'Interest in SPC', 'Support only']
+const OBJECIONES = ['Financial', 'Time', 'Not a priority', 'No value seen', 'Other']
+const TICKET_ORIGEN = ['Platform', 'Program', 'Communication', 'Expectations']
 
 function today() {
   return new Date().toISOString().split('T')[0]
@@ -74,7 +74,7 @@ const initialState: FormState = {
   r_solicitudes: '', r_saved: '', r_churn: '', r_pausas: '',
   r_cancel_reasons: [], r_notas: '',
   s_checkins: '', s_riesgo: '', s_wins: '', s_dudas: '',
-  s_engagement: 'Alto', s_fricciones: [], s_notas: '',
+  s_engagement: 'High', s_fricciones: [], s_notas: '',
   g_contactados: '', g_conversaciones: '', g_llamadas: '',
   g_seguimientos: '', g_sin_respuesta: '', g_referidos: '',
   g_oportunidades: [], g_objeciones: [], g_notas: '',
@@ -184,7 +184,7 @@ export default function NuevoReporteCsmPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.date || !form.csm_name) {
-      toast.error('Fecha y nombre CSM son requeridos')
+      toast.error('Date and CSM name are required')
       return
     }
     setSubmitting(true)
@@ -219,9 +219,9 @@ export default function NuevoReporteCsmPage() {
     })
     setSubmitting(false)
     if (error) {
-      toast.error(`Error al guardar: ${error.message}`)
+      toast.error(`Error saving: ${error.message}`)
     } else {
-      toast.success('Reporte guardado correctamente')
+      toast.success('Report saved successfully')
       router.push('/equipo/csm')
     }
   }
@@ -236,22 +236,22 @@ export default function NuevoReporteCsmPage() {
             className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Volver al dashboard CSM
+            Back to CSM Dashboard
           </Link>
         </div>
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Cierre diario — Client Success</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Registro diario de actividad y métricas CSM</p>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Daily Closeout — Client Success</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Daily activity log and CSM metrics</p>
         </div>
 
         {/* Live KPI bar */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
           {[
-            { label: 'Tasa de rescate', value: liveKPIs.rescate },
-            { label: 'Churn del día', value: String(liveKPIs.churn) },
-            { label: 'Resolución tickets', value: liveKPIs.tickets },
-            { label: 'Contacto graduados', value: liveKPIs.contacto },
-            { label: 'Llamadas agendadas', value: String(liveKPIs.llamadas) },
+            { label: 'Rescue Rate', value: liveKPIs.rescate },
+            { label: 'Daily Churn', value: String(liveKPIs.churn) },
+            { label: 'Ticket Resolution', value: liveKPIs.tickets },
+            { label: 'Graduate Contact', value: liveKPIs.contacto },
+            { label: 'Scheduled Calls', value: String(liveKPIs.llamadas) },
           ].map(({ label, value }) => (
             <div key={label} className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 text-center">
               <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-0.5">{label}</p>
@@ -265,7 +265,7 @@ export default function NuevoReporteCsmPage() {
           <SectionCard>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <FieldLabel>Fecha</FieldLabel>
+                <FieldLabel>Date</FieldLabel>
                 <input
                   type="date"
                   value={form.date}
@@ -290,25 +290,25 @@ export default function NuevoReporteCsmPage() {
           <SectionCard>
             <SectionHeader
               color="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-              label="🔴 RETENCIÓN"
-              sub="Coaching programs activos"
+              label="🔴 RETENTION"
+              sub="Active coaching programs"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FieldLabel>Solicitudes</FieldLabel><NumberInput value={form.r_solicitudes} onChange={(v) => set('r_solicitudes', v)} /></div>
-              <div><FieldLabel>Salvadas</FieldLabel><NumberInput value={form.r_saved} onChange={(v) => set('r_saved', v)} /></div>
+              <div><FieldLabel>Requests</FieldLabel><NumberInput value={form.r_solicitudes} onChange={(v) => set('r_solicitudes', v)} /></div>
+              <div><FieldLabel>Saved</FieldLabel><NumberInput value={form.r_saved} onChange={(v) => set('r_saved', v)} /></div>
               <div><FieldLabel>Churn</FieldLabel><NumberInput value={form.r_churn} onChange={(v) => set('r_churn', v)} /></div>
             </div>
             <div className="mb-3">
-              <FieldLabel>Pausas / Freezes</FieldLabel>
+              <FieldLabel>Pauses / Freezes</FieldLabel>
               <NumberInput value={form.r_pausas} onChange={(v) => set('r_pausas', v)} />
             </div>
             <div className="mb-3">
-              <FieldLabel>Razones de cancelación</FieldLabel>
+              <FieldLabel>Cancellation reasons</FieldLabel>
               <ChipSelector options={CANCEL_REASONS} value={form.r_cancel_reasons} onChange={(v) => set('r_cancel_reasons', v)} color="coral" />
             </div>
             <div>
-              <FieldLabel>Notas</FieldLabel>
-              <TextArea value={form.r_notas} onChange={(v) => set('r_notas', v)} placeholder="Observaciones sobre retención..." />
+              <FieldLabel>Notes</FieldLabel>
+              <TextArea value={form.r_notas} onChange={(v) => set('r_notas', v)} placeholder="Observations on retention..." />
             </div>
           </SectionCard>
 
@@ -316,29 +316,29 @@ export default function NuevoReporteCsmPage() {
           <SectionCard>
             <SectionHeader
               color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-              label="🔵 SEGUIMIENTO"
-              sub="Estudiantes activos"
+              label="🔵 FOLLOW-UP"
+              sub="Active students"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div><FieldLabel>Check-ins</FieldLabel><NumberInput value={form.s_checkins} onChange={(v) => set('s_checkins', v)} /></div>
-              <div><FieldLabel>En riesgo</FieldLabel><NumberInput value={form.s_riesgo} onChange={(v) => set('s_riesgo', v)} /></div>
-              <div><FieldLabel>Wins / Avances</FieldLabel><NumberInput value={form.s_wins} onChange={(v) => set('s_wins', v)} /></div>
+              <div><FieldLabel>At risk</FieldLabel><NumberInput value={form.s_riesgo} onChange={(v) => set('s_riesgo', v)} /></div>
+              <div><FieldLabel>Wins / Progress</FieldLabel><NumberInput value={form.s_wins} onChange={(v) => set('s_wins', v)} /></div>
             </div>
             <div className="mb-3">
-              <FieldLabel>Dudas resueltas</FieldLabel>
+              <FieldLabel>Resolved questions</FieldLabel>
               <NumberInput value={form.s_dudas} onChange={(v) => set('s_dudas', v)} />
             </div>
             <div className="mb-3">
-              <FieldLabel>Engagement general</FieldLabel>
-              <SegmentedControl options={['Alto', 'Medio', 'Bajo']} value={form.s_engagement} onChange={(v) => set('s_engagement', v)} />
+              <FieldLabel>Overall engagement</FieldLabel>
+              <SegmentedControl options={['High', 'Medium', 'Low']} value={form.s_engagement} onChange={(v) => set('s_engagement', v)} />
             </div>
             <div className="mb-3">
-              <FieldLabel>Fricciones detectadas</FieldLabel>
+              <FieldLabel>Detected frictions</FieldLabel>
               <ChipSelector options={FRICCIONES} value={form.s_fricciones} onChange={(v) => set('s_fricciones', v)} color="blue" />
             </div>
             <div>
-              <FieldLabel>Notas</FieldLabel>
-              <TextArea value={form.s_notas} onChange={(v) => set('s_notas', v)} placeholder="Observaciones sobre seguimiento..." />
+              <FieldLabel>Notes</FieldLabel>
+              <TextArea value={form.s_notas} onChange={(v) => set('s_notas', v)} placeholder="Observations on follow-up..." />
             </div>
           </SectionCard>
 
@@ -346,30 +346,30 @@ export default function NuevoReporteCsmPage() {
           <SectionCard>
             <SectionHeader
               color="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
-              label="🟣 GRADUADOS"
-              sub="Reactivación & seguimiento"
+              label="🟣 GRADUATES"
+              sub="Reactivation & follow-up"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FieldLabel>Contactados</FieldLabel><NumberInput value={form.g_contactados} onChange={(v) => set('g_contactados', v)} /></div>
-              <div><FieldLabel>Conversaciones</FieldLabel><NumberInput value={form.g_conversaciones} onChange={(v) => set('g_conversaciones', v)} /></div>
-              <div><FieldLabel>Llamadas agend.</FieldLabel><NumberInput value={form.g_llamadas} onChange={(v) => set('g_llamadas', v)} /></div>
+              <div><FieldLabel>Contacted</FieldLabel><NumberInput value={form.g_contactados} onChange={(v) => set('g_contactados', v)} /></div>
+              <div><FieldLabel>Conversations</FieldLabel><NumberInput value={form.g_conversaciones} onChange={(v) => set('g_conversaciones', v)} /></div>
+              <div><FieldLabel>Sched. calls</FieldLabel><NumberInput value={form.g_llamadas} onChange={(v) => set('g_llamadas', v)} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FieldLabel>Seguimientos</FieldLabel><NumberInput value={form.g_seguimientos} onChange={(v) => set('g_seguimientos', v)} /></div>
-              <div><FieldLabel>Sin respuesta</FieldLabel><NumberInput value={form.g_sin_respuesta} onChange={(v) => set('g_sin_respuesta', v)} /></div>
-              <div><FieldLabel>Referidos</FieldLabel><NumberInput value={form.g_referidos} onChange={(v) => set('g_referidos', v)} /></div>
+              <div><FieldLabel>Follow-ups</FieldLabel><NumberInput value={form.g_seguimientos} onChange={(v) => set('g_seguimientos', v)} /></div>
+              <div><FieldLabel>No reply</FieldLabel><NumberInput value={form.g_sin_respuesta} onChange={(v) => set('g_sin_respuesta', v)} /></div>
+              <div><FieldLabel>Referrals</FieldLabel><NumberInput value={form.g_referidos} onChange={(v) => set('g_referidos', v)} /></div>
             </div>
             <div className="mb-3">
-              <FieldLabel>Oportunidades detectadas</FieldLabel>
+              <FieldLabel>Detected opportunities</FieldLabel>
               <ChipSelector options={OPORTUNIDADES} value={form.g_oportunidades} onChange={(v) => set('g_oportunidades', v)} color="purple" />
             </div>
             <div className="mb-3">
-              <FieldLabel>Objeciones encontradas</FieldLabel>
+              <FieldLabel>Found objections</FieldLabel>
               <ChipSelector options={OBJECIONES} value={form.g_objeciones} onChange={(v) => set('g_objeciones', v)} color="coral" />
             </div>
             <div>
-              <FieldLabel>Notas</FieldLabel>
-              <TextArea value={form.g_notas} onChange={(v) => set('g_notas', v)} placeholder="Observaciones sobre graduados..." />
+              <FieldLabel>Notes</FieldLabel>
+              <TextArea value={form.g_notas} onChange={(v) => set('g_notas', v)} placeholder="Observations on graduates..." />
             </div>
           </SectionCard>
 
@@ -377,25 +377,25 @@ export default function NuevoReporteCsmPage() {
           <SectionCard>
             <SectionHeader
               color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-              label="🟡 SOPORTE"
+              label="🟡 SUPPORT"
               sub="Tickets"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FieldLabel>Recibidos</FieldLabel><NumberInput value={form.t_recibidos} onChange={(v) => set('t_recibidos', v)} /></div>
-              <div><FieldLabel>Resueltos</FieldLabel><NumberInput value={form.t_resueltos} onChange={(v) => set('t_resueltos', v)} /></div>
-              <div><FieldLabel>Pendientes</FieldLabel><NumberInput value={form.t_pendientes} onChange={(v) => set('t_pendientes', v)} /></div>
+              <div><FieldLabel>Received</FieldLabel><NumberInput value={form.t_recibidos} onChange={(v) => set('t_recibidos', v)} /></div>
+              <div><FieldLabel>Resolved</FieldLabel><NumberInput value={form.t_resueltos} onChange={(v) => set('t_resueltos', v)} /></div>
+              <div><FieldLabel>Pending</FieldLabel><NumberInput value={form.t_pendientes} onChange={(v) => set('t_pendientes', v)} /></div>
             </div>
             <div className="mb-3">
-              <FieldLabel>Escalados</FieldLabel>
+              <FieldLabel>Escalated</FieldLabel>
               <NumberInput value={form.t_escalados} onChange={(v) => set('t_escalados', v)} />
             </div>
             <div className="mb-3">
-              <FieldLabel>Origen de tickets</FieldLabel>
+              <FieldLabel>Ticket origin</FieldLabel>
               <ChipSelector options={TICKET_ORIGEN} value={form.t_origen} onChange={(v) => set('t_origen', v)} color="amber" />
             </div>
             <div>
-              <FieldLabel>Notas</FieldLabel>
-              <TextArea value={form.t_notas} onChange={(v) => set('t_notas', v)} placeholder="Observaciones sobre tickets..." />
+              <FieldLabel>Notes</FieldLabel>
+              <TextArea value={form.t_notas} onChange={(v) => set('t_notas', v)} placeholder="Observations on tickets..." />
             </div>
           </SectionCard>
 
@@ -403,21 +403,21 @@ export default function NuevoReporteCsmPage() {
           <SectionCard>
             <SectionHeader
               color="bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"
-              label="⚫ ESCALAMIENTOS"
-              sub="Casos críticos"
+              label="⚫ ESCALATIONS"
+              sub="Critical cases"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FieldLabel>Críticos</FieldLabel><NumberInput value={form.e_criticos} onChange={(v) => set('e_criticos', v)} /></div>
-              <div><FieldLabel>A coaches</FieldLabel><NumberInput value={form.e_coaches} onChange={(v) => set('e_coaches', v)} /></div>
-              <div><FieldLabel>A liderazgo</FieldLabel><NumberInput value={form.e_liderazgo} onChange={(v) => set('e_liderazgo', v)} /></div>
+              <div><FieldLabel>Critical</FieldLabel><NumberInput value={form.e_criticos} onChange={(v) => set('e_criticos', v)} /></div>
+              <div><FieldLabel>To coaches</FieldLabel><NumberInput value={form.e_coaches} onChange={(v) => set('e_coaches', v)} /></div>
+              <div><FieldLabel>To leadership</FieldLabel><NumberInput value={form.e_liderazgo} onChange={(v) => set('e_liderazgo', v)} /></div>
             </div>
             <div className="mb-3">
-              <FieldLabel>Resueltos</FieldLabel>
+              <FieldLabel>Resolved</FieldLabel>
               <NumberInput value={form.e_resueltos} onChange={(v) => set('e_resueltos', v)} />
             </div>
             <div>
-              <FieldLabel>Caso relevante del día</FieldLabel>
-              <TextArea value={form.e_caso_relevante} onChange={(v) => set('e_caso_relevante', v)} placeholder="Descripción del caso más relevante..." />
+              <FieldLabel>Key case of the day</FieldLabel>
+              <TextArea value={form.e_caso_relevante} onChange={(v) => set('e_caso_relevante', v)} placeholder="Description of the most relevant case..." />
             </div>
           </SectionCard>
 
@@ -425,22 +425,22 @@ export default function NuevoReporteCsmPage() {
           <SectionCard>
             <SectionHeader
               color="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-              label="🟢 CIERRE DEL DÍA"
-              sub="Resumen"
+              label="🟢 DAILY CLOSEOUT"
+              sub="Summary"
             />
             <div className="mb-3">
-              <FieldLabel>¿Qué salió bien hoy?</FieldLabel>
-              <TextArea value={form.c_wins} onChange={(v) => set('c_wins', v)} placeholder="Victorias y logros del día..." />
+              <FieldLabel>What went well today?</FieldLabel>
+              <TextArea value={form.c_wins} onChange={(v) => set('c_wins', v)} placeholder="Wins and achievements of the day..." />
             </div>
             <div className="mb-4">
-              <FieldLabel>¿Qué hay que vigilar?</FieldLabel>
-              <TextArea value={form.c_riesgos} onChange={(v) => set('c_riesgos', v)} placeholder="Riesgos y situaciones a monitorear..." />
+              <FieldLabel>What should we watch?</FieldLabel>
+              <TextArea value={form.c_riesgos} onChange={(v) => set('c_riesgos', v)} placeholder="Risks and situations to monitor..." />
             </div>
-            <FieldLabel>Top 3 acciones para mañana</FieldLabel>
+            <FieldLabel>Top 3 actions for tomorrow</FieldLabel>
             <div className="space-y-2">
-              <TextInput value={form.c_accion1} onChange={(v) => set('c_accion1', v)} placeholder="1. Acción prioritaria..." />
-              <TextInput value={form.c_accion2} onChange={(v) => set('c_accion2', v)} placeholder="2. Acción prioritaria..." />
-              <TextInput value={form.c_accion3} onChange={(v) => set('c_accion3', v)} placeholder="3. Acción prioritaria..." />
+              <TextInput value={form.c_accion1} onChange={(v) => set('c_accion1', v)} placeholder="1. Priority action..." />
+              <TextInput value={form.c_accion2} onChange={(v) => set('c_accion2', v)} placeholder="2. Priority action..." />
+              <TextInput value={form.c_accion3} onChange={(v) => set('c_accion3', v)} placeholder="3. Priority action..." />
             </div>
           </SectionCard>
 
@@ -451,7 +451,7 @@ export default function NuevoReporteCsmPage() {
               className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
               style={{ backgroundColor: '#1D9E75' }}
             >
-              {submitting ? 'Guardando...' : 'Guardar cierre del día'}
+              {submitting ? 'Saving...' : 'Save daily closeout'}
             </button>
           </div>
         </form>

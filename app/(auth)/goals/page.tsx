@@ -218,7 +218,7 @@ export default function GoalsPage() {
       marcelaSparkKey: 'marcelaCloseRate',
     },
     {
-      label: 'Calls / semana',
+      label: 'Calls / week',
       goal: GOALS.closing.callsPerWeek,
       metaLabel: `${GOALS.closing.callsPerWeek.target}–${GOALS.closing.callsPerWeek.targetMax}`,
       caliValue: caliKPIs.callsPerWeek,
@@ -234,7 +234,7 @@ export default function GoalsPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Metas del Equipo" description="KPIs comparados contra benchmarks del equipo">
+        <PageHeader title="Team Goals" description="KPIs compared against team benchmarks">
           <div className="flex items-center gap-2">
             <input
               type="date"
@@ -258,13 +258,13 @@ export default function GoalsPage() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wide font-semibold mb-0.5">
-                  Score del equipo
+                  Team score
                 </p>
                 <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                   {onTargetCount}{' '}
                   <span className="text-zinc-400 dark:text-zinc-500 font-normal text-xl">/ {totalKPIs}</span>
                 </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">KPIs en meta</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">KPIs on target</p>
               </div>
               <div className="text-right">
                 <p className="text-3xl font-bold" style={{ color: scoreColor }}>
@@ -293,7 +293,7 @@ export default function GoalsPage() {
                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'
                 : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
             )}>
-              {settingOnTarget}/3 KPIs en meta
+              {settingOnTarget}/3 KPIs on target
             </span>
           </div>
 
@@ -326,14 +326,14 @@ export default function GoalsPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Tendencia (4 períodos)</CardTitle>
+              <CardTitle className="text-sm font-semibold">Trend (4 periods)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-6">
                 {[
                   { label: 'Pitch Rate', key: 'pitchRate', color: '#185FA5' },
                   { label: 'Booking Rate', key: 'bookingRate', color: '#3B6D11' },
-                  { label: 'Conversión General', key: 'conversionGeneral', color: '#BA7517' },
+                  { label: 'General Conversion', key: 'conversionGeneral', color: '#BA7517' },
                 ].map(({ label, key, color }) => (
                   <div key={key}>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">{label}</p>

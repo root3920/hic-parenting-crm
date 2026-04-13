@@ -252,10 +252,10 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-base leading-none">👥</span>
                       <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                        {stats?.activeMembers ?? 0} miembros activos
+                        {stats?.activeMembers ?? 0} active members
                       </span>
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
-                        ↑{stats?.spcNewMembers ?? 0} nuevos
+                        ↑{stats?.spcNewMembers ?? 0} new
                       </span>
                     </div>
 
@@ -304,7 +304,7 @@ export default function DashboardPage() {
 
                     {/* Right arrow hint */}
                     <span className="ml-auto text-xs text-zinc-400 group-hover:text-[#185FA5] transition-colors hidden sm:block">
-                      Ver SPC →
+                      View SPC →
                     </span>
                   </div>
                 )}

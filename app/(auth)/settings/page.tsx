@@ -129,15 +129,15 @@ export default function SettingsPage() {
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
     if (!inviteForm.email || !inviteForm.full_name || !inviteForm.role) {
-      toast.error('Email, nombre y rol son requeridos')
+      toast.error('Email, name and role are required')
       return
     }
     if (inviteForm.role === 'closer' && !inviteForm.closer_name) {
-      toast.error('Selecciona el nombre del closer')
+      toast.error('Select the closer name')
       return
     }
     if (inviteForm.role === 'setter' && !inviteForm.setter_name) {
-      toast.error('Selecciona el nombre del setter')
+      toast.error('Select the setter name')
       return
     }
 
@@ -157,11 +157,11 @@ export default function SettingsPage() {
     setInviting(false)
 
     if (!res.ok) {
-      toast.error(data.error ?? 'Error al enviar invitación')
+      toast.error(data.error ?? 'Error sending invitation')
       return
     }
 
-    toast.success(`Invitación enviada a ${inviteForm.email}`)
+    toast.success(`Invitation sent to ${inviteForm.email}`)
     setModalOpen(false)
     setInviteForm(emptyInviteForm)
     fetchTeamProfiles()
@@ -195,9 +195,9 @@ export default function SettingsPage() {
         {/* Timezone */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold">Zona horaria</CardTitle>
+            <CardTitle className="text-sm font-semibold">Timezone</CardTitle>
             <CardDescription>
-              Todas las llamadas y fechas se mostrarán en esta zona horaria.
+              All calls and dates will be shown in this timezone.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -215,7 +215,7 @@ export default function SettingsPage() {
                       key={tz.value}
                       onClick={async () => {
                         await updateTimezone(tz.value)
-                        toast.success(`Zona horaria actualizada a ${tz.abbr}`)
+                        toast.success(`Timezone updated to ${tz.abbr}`)
                       }}
                       className={cn(
                         'relative p-4 rounded-xl border-2 text-left transition-all',
@@ -235,7 +235,7 @@ export default function SettingsPage() {
                 </div>
                 {timezone && (
                   <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-                    Hora actual en <strong className="text-zinc-700 dark:text-zinc-300">{timezone}</strong>:{' '}
+                    Current time in <strong className="text-zinc-700 dark:text-zinc-300">{timezone}</strong>:{' '}
                     <strong className="text-zinc-700 dark:text-zinc-300">
                       {new Date().toLocaleString('en-US', {
                         timeZone: timezone,
@@ -262,8 +262,8 @@ export default function SettingsPage() {
             <Card className="mb-6">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <div>
-                  <CardTitle className="text-sm font-semibold">Gestión de equipo</CardTitle>
-                  <CardDescription className="mt-1">Invita y administra los accesos del equipo</CardDescription>
+                  <CardTitle className="text-sm font-semibold">Team Management</CardTitle>
+                  <CardDescription className="mt-1">Invite and manage your team's access</CardDescription>
                 </div>
                 <button
                   onClick={() => { setInviteForm(emptyInviteForm); setModalOpen(true) }}
@@ -271,7 +271,7 @@ export default function SettingsPage() {
                   style={{ backgroundColor: '#185FA5' }}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Agregar miembro
+                  Add Member
                 </button>
               </CardHeader>
               <CardContent className="p-0">
@@ -284,15 +284,15 @@ export default function SettingsPage() {
                 ) : teamProfiles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
                     <UserPlus className="h-8 w-8 mb-2 opacity-40" />
-                    <p className="text-sm font-medium">No hay perfiles aún</p>
-                    <p className="text-xs mt-0.5">Agrega el primer miembro del equipo</p>
+                    <p className="text-sm font-medium">No profiles yet</p>
+                    <p className="text-xs mt-0.5">Add your first team member</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                          {['Nombre', 'Rol', 'Closer / Setter name', 'Creado'].map((h) => (
+                          {['Name', 'Role', 'Closer / Setter name', 'Created'].map((h) => (
                             <th key={h} className="text-left py-2.5 px-4 font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                               {h}
                             </th>
@@ -312,7 +312,7 @@ export default function SettingsPage() {
                               {p.closer_name ?? p.setter_name ?? '—'}
                             </td>
                             <td className="py-3 px-4 text-zinc-400 whitespace-nowrap">
-                              {new Date(p.created_at).toLocaleDateString('es-CO', {
+                              {new Date(p.created_at).toLocaleDateString('en-US', {
                                 day: '2-digit', month: 'short', year: 'numeric',
                               })}
                             </td>
@@ -388,7 +388,7 @@ export default function SettingsPage() {
           />
           <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-200 dark:border-zinc-700">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Agregar miembro</h2>
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Add Member</h2>
               <button
                 onClick={() => setModalOpen(false)}
                 className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -399,7 +399,7 @@ export default function SettingsPage() {
 
             <form onSubmit={handleInvite} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Nombre completo</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Full name</label>
                 <input
                   type="text"
                   value={inviteForm.full_name}
@@ -416,14 +416,14 @@ export default function SettingsPage() {
                   type="email"
                   value={inviteForm.email}
                   onChange={(e) => setInvite('email', e.target.value)}
-                  placeholder="correo@ejemplo.com"
+                  placeholder="email@example.com"
                   className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Rol</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Role</label>
                 <select
                   value={inviteForm.role}
                   onChange={(e) => setInvite('role', e.target.value as Role)}
@@ -438,7 +438,7 @@ export default function SettingsPage() {
               {inviteForm.role === 'closer' && (
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Closer name <span className="text-zinc-400 font-normal">(debe coincidir con el nombre en llamadas)</span>
+                    Closer name <span className="text-zinc-400 font-normal">(must match the name used in calls)</span>
                   </label>
                   <select
                     value={inviteForm.closer_name}
@@ -446,7 +446,7 @@ export default function SettingsPage() {
                     className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                     required
                   >
-                    <option value="">Seleccionar...</option>
+                    <option value="">Select...</option>
                     {CLOSER_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
@@ -455,7 +455,7 @@ export default function SettingsPage() {
               {inviteForm.role === 'setter' && (
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Setter name <span className="text-zinc-400 font-normal">(debe coincidir con el nombre en reportes)</span>
+                    Setter name <span className="text-zinc-400 font-normal">(must match the name used in reports)</span>
                   </label>
                   <select
                     value={inviteForm.setter_name}
@@ -463,7 +463,7 @@ export default function SettingsPage() {
                     className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                     required
                   >
-                    <option value="">Seleccionar...</option>
+                    <option value="">Select...</option>
                     {SETTER_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
@@ -475,7 +475,7 @@ export default function SettingsPage() {
                   onClick={() => setModalOpen(false)}
                   className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                 >
-                  Cancelar
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -483,7 +483,7 @@ export default function SettingsPage() {
                   className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
                   style={{ backgroundColor: '#185FA5' }}
                 >
-                  {inviting ? 'Enviando...' : 'Enviar invitación'}
+                  {inviting ? 'Sending...' : 'Send Invitation'}
                 </button>
               </div>
             </form>

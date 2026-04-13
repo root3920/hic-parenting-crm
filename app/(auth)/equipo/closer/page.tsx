@@ -134,32 +134,32 @@ function ReportDetail({ report, onClose }: { report: CloserDailyReport; onClose:
         </div>
         {/* Meetings */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Reuniones</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Meetings</p>
           <Row label="Total meetings" value={report.total_meetings} />
           <Row label="Showed" value={report.showed_meetings} />
           <Row label="Follow-up" value={report.followup_meetings} />
-          <Row label="Canceladas" value={report.cancelled_meetings} />
+          <Row label="Cancelled" value={report.cancelled_meetings} />
           <Row label="No-show" value={report.no_show_meetings} />
-          <Row label="Reagendadas" value={report.rescheduled_meetings} />
+          <Row label="Rescheduled" value={report.rescheduled_meetings} />
         </div>
         {/* Pipeline */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-green-600 mb-2">Ofertas & Cierres</p>
-          <Row label="Total ofertas" value={report.total_offers} />
-          <Row label="Ofertas propuestas" value={report.offers_proposed} />
+          <p className="text-xs font-bold uppercase tracking-wide text-green-600 mb-2">Offers & Closes</p>
+          <Row label="Total offers" value={report.total_offers} />
+          <Row label="Proposed offers" value={report.offers_proposed} />
           <Row label="Won deals" value={report.won_deals} />
           <Row label="Lost deals" value={report.lost_deals} />
         </div>
         {/* Cash */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Ingresos</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Revenue</p>
           <Row label="Cash collected" value={fmtCash(report.cash_collected)} />
-          <Row label="Recurrente / pipeline" value={fmtCash(report.recurrent_cash)} />
+          <Row label="Recurring / pipeline" value={fmtCash(report.recurrent_cash)} />
         </div>
         {/* Feedback */}
         {report.feedback && (
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Feedback / Notas</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Feedback / Notes</p>
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap">{report.feedback}</p>
           </div>
         )}
@@ -177,7 +177,7 @@ export default function CloserDashboardPage() {
   const [preset, setPreset] = useState<Preset>('30d')
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
   const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
-  const [selectedCloser, setSelectedCloser] = useState('Todos')
+  const [selectedCloser, setSelectedCloser] = useState('All')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<CloserDailyReport | null>(null)
   const [callsData, setCallsData] = useState<CallSummary[]>([])
@@ -215,11 +215,11 @@ export default function CloserDashboardPage() {
 
   const closerNames = useMemo(() => {
     const names = Array.from(new Set(reports.map((r) => r.closer_name))).sort()
-    return ['Todos', ...names]
+    return ['All', ...names]
   }, [reports])
 
   const filtered = useMemo(
-    () => selectedCloser === 'Todos' ? reports : reports.filter((r) => r.closer_name === selectedCloser),
+    () => selectedCloser === 'All' ? reports : reports.filter((r) => r.closer_name === selectedCloser),
     [reports, selectedCloser]
   )
 
@@ -240,7 +240,7 @@ export default function CloserDashboardPage() {
 
   // ── KPIs from calls table ──
   const callsFiltered = useMemo(
-    () => selectedCloser === 'Todos' ? callsData : callsData.filter(c => c.closer_name === selectedCloser),
+    () => selectedCloser === 'All' ? callsData : callsData.filter(c => c.closer_name === selectedCloser),
     [callsData, selectedCloser]
   )
 
@@ -314,7 +314,7 @@ export default function CloserDashboardPage() {
 
   // ── Closer comparison (only when "Todos") ──
   const closerComparison = useMemo(() => {
-    if (selectedCloser !== 'Todos') return []
+    if (selectedCloser !== 'All') return []
     const callsByCloser: Record<string, { total: number; showed: number; noShows: number }> = {}
     for (const c of callsData) {
       if (!c.closer_name) continue
@@ -345,7 +345,7 @@ export default function CloserDashboardPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Closing Team" description="Rendimiento del equipo de cierre">
+        <PageHeader title="Closing Team" description="Daily closer team performance">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
               {(['7d', '30d', '90d', 'todo', 'custom'] as Preset[]).map((p) => (
@@ -357,7 +357,7 @@ export default function CloserDashboardPage() {
                     preset === p ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'todo' ? 'Todo' : p === 'custom' ? 'Custom' : p}
+                  {p === 'todo' ? 'All' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>
@@ -387,7 +387,7 @@ export default function CloserDashboardPage() {
             </select>
             {!loading && (
               <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-                {filtered.length} registros
+                {filtered.length} records
               </span>
             )}
             <Link
@@ -396,7 +396,7 @@ export default function CloserDashboardPage() {
               style={{ backgroundColor: '#185FA5' }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Nuevo reporte
+              New Report
             </Link>
           </div>
         </PageHeader>
@@ -412,8 +412,8 @@ export default function CloserDashboardPage() {
           </div>
         ) : filtered.length === 0 && callsData.length === 0 ? (
           <EmptyState
-            title="No hay reportes en este período"
-            description="Crea el primer reporte de closing para ver métricas aquí."
+            title="No reports in this period"
+            description="Create the first closing report to see metrics here."
             icon={<Plus className="h-10 w-10" />}
           />
         ) : (
@@ -427,8 +427,8 @@ export default function CloserDashboardPage() {
                 unit="%"
                 goal={GOALS.closing.showRate}
               />
-              <VolumeCard label="No Shows" value={callKPIs.noShows} sub="llamadas no realizadas" />
-              <VolumeCard label="Canceladas" value={callKPIs.cancelled} sub="de total agendadas" />
+              <VolumeCard label="No Shows" value={callKPIs.noShows} sub="missed calls" />
+              <VolumeCard label="Cancelled" value={callKPIs.cancelled} sub="of total scheduled" />
               <KpiGoalCard
                 label={GOALS.closing.callsPerWeek.label}
                 description={GOALS.closing.callsPerWeek.description}
@@ -437,7 +437,7 @@ export default function CloserDashboardPage() {
                 goal={GOALS.closing.callsPerWeek}
               />
             </div>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Basado en llamadas reales</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on actual calls</p>
 
             {/* ── Section 1b: KPI Goal Cards — from closer reports ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-1">
@@ -456,28 +456,28 @@ export default function CloserDashboardPage() {
                 goal={GOALS.closing.closeRate}
               />
               <VolumeCard label="Won Deals" value={reportKPIs.wonDeals} sub={`${fmtPct(reportKPIs.closeRate)} close rate`} />
-              <VolumeCard label="Cash Collected" value={fmtCash(reportKPIs.cashCollected)} sub="ingreso del período" />
+              <VolumeCard label="Cash Collected" value={fmtCash(reportKPIs.cashCollected)} sub="revenue this period" />
             </div>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-6">Basado en reportes del closer</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-6">Based on closer reports</p>
 
             {/* ── Section 2: Revenue Cards ── */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <RevenueCard
                 label="Cash Collected"
                 value={fmtCash(revenue.cash)}
-                sub={`${revenue.won} deals cerrados`}
+                sub={`${revenue.won} closed deals`}
                 color="bg-blue-600 text-white border-blue-700"
               />
               <RevenueCard
-                label="Pipeline Recurrente"
+                label="Recurring Pipeline"
                 value={fmtCash(revenue.recurrent)}
-                sub="revenue recurrente / pipeline"
+                sub="recurring revenue / pipeline"
                 color="bg-emerald-600 text-white border-emerald-700"
               />
               <RevenueCard
-                label="Valor por reunión"
+                label="Value per meeting"
                 value={isNaN(revenue.perMeeting) ? '—' : fmtCash(revenue.perMeeting)}
-                sub="por reunión efectiva"
+                sub="per effective meeting"
                 color="bg-purple-600 text-white border-purple-700"
               />
             </div>
@@ -502,7 +502,7 @@ export default function CloserDashboardPage() {
               <VolumeCard
                 label="No-Shows"
                 value={callKPIs.noShows}
-                sub={`${fmtPct(safeDiv(callKPIs.noShows, callKPIs.totalMeetings) * 100)} del total`}
+                sub={`${fmtPct(safeDiv(callKPIs.noShows, callKPIs.totalMeetings) * 100)} of total`}
               />
             </div>
 
@@ -510,7 +510,7 @@ export default function CloserDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Cash collected por día</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Cash collected per day</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
@@ -537,7 +537,7 @@ export default function CloserDashboardPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Funnel de cierre</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Closing funnel</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
@@ -547,7 +547,7 @@ export default function CloserDashboardPage() {
                       <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ fontSize: 11 }} />
                       <Legend formatter={(v) => <span className="text-xs">{
-                        v === 'total_meetings' ? 'Total' : v === 'showed_meetings' ? 'Showed' : v === 'offers_proposed' ? 'Ofertas' : 'Won'
+                        v === 'total_meetings' ? 'Total' : v === 'showed_meetings' ? 'Showed' : v === 'offers_proposed' ? 'Offers' : 'Won'
                       }</span>} />
                       <Line type="monotone" dataKey="total_meetings" stroke="#71717a" strokeWidth={2} strokeDasharray="4 2" dot={false} />
                       <Line type="monotone" dataKey="showed_meetings" stroke="#185FA5" strokeWidth={2} dot={false} />
@@ -560,10 +560,10 @@ export default function CloserDashboardPage() {
             </div>
 
             {/* ── Section 5: Closer Comparison (all closers only) ── */}
-            {selectedCloser === 'Todos' && closerComparison.length > 0 && (
+            {selectedCloser === 'All' && closerComparison.length > 0 && (
               <Card className="mb-6">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Comparación por closer</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Closer comparison</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
@@ -604,15 +604,15 @@ export default function CloserDashboardPage() {
             {/* ── Section 6: Historial ── */}
             <Card className="mb-8">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Historial completo</CardTitle>
-                <span className="text-xs text-zinc-400">{filtered.length} registros</span>
+                <CardTitle className="text-sm font-semibold">Full History</CardTitle>
+                <span className="text-xs text-zinc-400">{filtered.length} records</span>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['Fecha', 'Closer', 'Meetings', 'Show%', 'Offer%', 'Close%', 'Cash', 'Won', ''].map((h) => (
+                        {['Date', 'Closer', 'Meetings', 'Show%', 'Offer%', 'Close%', 'Cash', 'Won', ''].map((h) => (
                           <th key={h} className="text-left py-2.5 px-3 font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -651,7 +651,7 @@ export default function CloserDashboardPage() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                     <span className="text-xs text-zinc-400">
-                      Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length}
+                      Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
                     </span>
                     <div className="flex items-center gap-1">
                       <button

@@ -200,7 +200,7 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
             )}
             {hasExistingStatus && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-                Estado actual: {call.status}
+                Current status: {call.status}
               </span>
             )}
           </div>
@@ -212,7 +212,7 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
             href={call.meeting_url}
             target="_blank"
             rel="noopener noreferrer"
-            title="Unirse a llamada"
+            title="Join call"
             className="p-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors shrink-0"
           >
             <Video className="h-4 w-4" />
@@ -224,14 +224,14 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
       <div className="space-y-2.5">
         <div>
           <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-            Estado de la llamada <span className="text-red-400">*</span>
+            Call status <span className="text-red-400">*</span>
           </label>
           <select
             value={report?.call_status ?? ''}
             onChange={(e) => onUpdate('call_status', e.target.value)}
             className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           >
-            <option value="">── Seleccionar ──</option>
+            <option value="">── Select ──</option>
             <option value="Showed Up">Showed Up</option>
             <option value="No Show">No Show</option>
             <option value="Cancelled">Cancelled</option>
@@ -239,24 +239,24 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Siguiente paso</label>
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Next step</label>
           <select
             value={report?.next_step ?? ''}
             onChange={(e) => onUpdate('next_step', e.target.value)}
             className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           >
-            <option value="">── Seleccionar ──</option>
+            <option value="">── Select ──</option>
             <option value="Follow Up">Follow Up</option>
             <option value="Cancelled">Cancelled</option>
             <option value="Rescheduled">Rescheduled</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Resumen de la llamada</label>
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Call summary</label>
           <textarea
             value={report?.call_summary ?? ''}
             onChange={(e) => onUpdate('call_summary', e.target.value)}
-            placeholder="Escribe qué pasó en esta llamada..."
+            placeholder="Describe what happened in this call..."
             rows={2}
             className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y"
           />
@@ -357,7 +357,7 @@ export default function NuevoReporteCloserPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.date || !form.closer_name) {
-      toast.error('Fecha y nombre del closer son requeridos')
+      toast.error('Date and closer name are required')
       return
     }
     setSubmitting(true)
@@ -383,7 +383,7 @@ export default function NuevoReporteCloserPage() {
 
     if (error) {
       setSubmitting(false)
-      toast.error(`Error al guardar: ${error.message}`)
+      toast.error(`Error saving: ${error.message}`)
       return
     }
 
@@ -406,7 +406,7 @@ export default function NuevoReporteCloserPage() {
     }
 
     setSubmitting(false)
-    toast.success('Reporte guardado correctamente')
+    toast.success('Report saved successfully')
     router.push('/equipo/closer')
   }
 
@@ -419,12 +419,12 @@ export default function NuevoReporteCloserPage() {
             className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Volver al dashboard Closer
+            Back to Closer Dashboard
           </Link>
         </div>
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Reporte diario — Closer</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Registro diario de actividad y resultados de cierre</p>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Daily Report — Closer</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Daily activity log and closing results</p>
         </div>
 
         {/* Live KPI bar */}
@@ -447,7 +447,7 @@ export default function NuevoReporteCloserPage() {
           <SectionCard>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <FieldLabel>Fecha</FieldLabel>
+                <FieldLabel>Date</FieldLabel>
                 <input
                   type="date"
                   value={form.date}
@@ -473,7 +473,7 @@ export default function NuevoReporteCloserPage() {
             <SectionHeader
               color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
               label="Meetings"
-              sub="Reuniones del día"
+              sub="Day's meetings"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div><FieldLabel>Total meetings</FieldLabel><NumberInput value={form.total_meetings} onChange={(v) => set('total_meetings', v)} /></div>
@@ -481,9 +481,9 @@ export default function NuevoReporteCloserPage() {
               <div><FieldLabel>Follow-up</FieldLabel><NumberInput value={form.followup_meetings} onChange={(v) => set('followup_meetings', v)} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div><FieldLabel>Canceladas</FieldLabel><NumberInput value={form.cancelled_meetings} onChange={(v) => set('cancelled_meetings', v)} /></div>
+              <div><FieldLabel>Cancelled</FieldLabel><NumberInput value={form.cancelled_meetings} onChange={(v) => set('cancelled_meetings', v)} /></div>
               <div><FieldLabel>No-show</FieldLabel><NumberInput value={form.no_show_meetings} onChange={(v) => set('no_show_meetings', v)} /></div>
-              <div><FieldLabel>Reagendadas</FieldLabel><NumberInput value={form.rescheduled_meetings} onChange={(v) => set('rescheduled_meetings', v)} /></div>
+              <div><FieldLabel>Rescheduled</FieldLabel><NumberInput value={form.rescheduled_meetings} onChange={(v) => set('rescheduled_meetings', v)} /></div>
             </div>
           </SectionCard>
 
@@ -491,10 +491,10 @@ export default function NuevoReporteCloserPage() {
           <SectionCard>
             <div className="flex items-center gap-2 mb-4">
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                Llamadas
+                Calls
               </span>
               <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                Llamadas del día
+                Day's calls
                 {!callsLoading && dayCalls.length > 0 && (
                   <span className="ml-1">
                     ({dayCalls.length})
@@ -512,7 +512,7 @@ export default function NuevoReporteCloserPage() {
               </div>
             ) : dayCalls.length === 0 ? (
               <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center py-4">
-                No se encontraron llamadas para este día
+                No calls found for this day
               </p>
             ) : (
               <div className="space-y-3">
@@ -535,15 +535,15 @@ export default function NuevoReporteCloserPage() {
             <SectionHeader
               color="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
               label="Pipeline"
-              sub="Ofertas & Cierres"
+              sub="Offers & Closes"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FieldLabel>Total ofertas</FieldLabel><NumberInput value={form.total_offers} onChange={(v) => set('total_offers', v)} /></div>
-              <div><FieldLabel>Ofertas propuestas</FieldLabel><NumberInput value={form.offers_proposed} onChange={(v) => set('offers_proposed', v)} /></div>
-              <div><FieldLabel>Deals ganados</FieldLabel><NumberInput value={form.won_deals} onChange={(v) => set('won_deals', v)} /></div>
+              <div><FieldLabel>Total offers</FieldLabel><NumberInput value={form.total_offers} onChange={(v) => set('total_offers', v)} /></div>
+              <div><FieldLabel>Proposed offers</FieldLabel><NumberInput value={form.offers_proposed} onChange={(v) => set('offers_proposed', v)} /></div>
+              <div><FieldLabel>Won deals</FieldLabel><NumberInput value={form.won_deals} onChange={(v) => set('won_deals', v)} /></div>
             </div>
             <div className="max-w-xs">
-              <FieldLabel>Deals perdidos</FieldLabel>
+              <FieldLabel>Lost deals</FieldLabel>
               <NumberInput value={form.lost_deals} onChange={(v) => set('lost_deals', v)} />
             </div>
           </SectionCard>
@@ -553,15 +553,15 @@ export default function NuevoReporteCloserPage() {
             <SectionHeader
               color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
               label="Cash"
-              sub="Ingresos del día"
+              sub="Day's revenue"
             />
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <FieldLabel>Cash collected hoy</FieldLabel>
+                <FieldLabel>Cash collected today</FieldLabel>
                 <NumberInput value={form.cash_collected} onChange={(v) => set('cash_collected', v)} prefix="$" placeholder="0.00" />
               </div>
               <div>
-                <FieldLabel>Recurrente / pipeline</FieldLabel>
+                <FieldLabel>Recurring / pipeline</FieldLabel>
                 <NumberInput value={form.recurrent_cash} onChange={(v) => set('recurrent_cash', v)} prefix="$" placeholder="0.00" />
               </div>
             </div>
@@ -572,12 +572,12 @@ export default function NuevoReporteCloserPage() {
             <SectionHeader
               color="bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"
               label="Notas"
-              sub="Notas & Feedback"
+              sub="Notes & Feedback"
             />
             <textarea
               value={form.feedback}
               onChange={(e) => set('feedback', e.target.value)}
-              placeholder="Detalla cada prospecto: nombre, resultado, próximo paso..."
+              placeholder="Detail each prospect: name, result, next step..."
               rows={5}
               style={{ minHeight: '120px' }}
               className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y"
@@ -591,7 +591,7 @@ export default function NuevoReporteCloserPage() {
               className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
               style={{ backgroundColor: '#185FA5' }}
             >
-              {submitting ? 'Guardando...' : 'Guardar reporte del día'}
+              {submitting ? 'Saving...' : 'Save daily report'}
             </button>
           </div>
         </form>

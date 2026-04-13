@@ -122,20 +122,20 @@ function ReportDetail({ report, onClose }: { report: Row; onClose: () => void })
           ))}
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Conversaciones</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Conversations</p>
           <Row label="Total convos" value={report.total_convos} />
-          <Row label="Calls propuestas" value={report.call_proposed} />
-          <Row label="Calls agendadas" value={report.qualified_calls} />
+          <Row label="Proposed calls" value={report.call_proposed} />
+          <Row label="Scheduled calls" value={report.qualified_calls} />
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Autoevaluación</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Self-evaluation</p>
           <Row label="Performance" value={`${report.performance_score}/10`} />
-          {report.highs && <Row label="Fortalezas" value={report.highs} />}
-          {report.lows && <Row label="A mejorar" value={report.lows} />}
+          {report.highs && <Row label="Strengths" value={report.highs} />}
+          {report.lows && <Row label="To improve" value={report.lows} />}
         </div>
         {report.notes && (
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Notas</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Notes</p>
             <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg px-3 py-2.5">
               <p className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">{report.notes}</p>
             </div>
@@ -156,7 +156,7 @@ export default function SetterDashboardPage() {
   const [preset, setPreset] = useState<Preset>('30d')
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return localDateStr(d) })
   const [customTo, setCustomTo] = useState(() => localDateStr(new Date()))
-  const [selectedSetter, setSelectedSetter] = useState('Todos')
+  const [selectedSetter, setSelectedSetter] = useState('All')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<Row | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null)
@@ -170,10 +170,10 @@ export default function SetterDashboardPage() {
     const { error } = await supabase.from(table).delete().eq('id', deleteTarget.id)
     setDeleting(false)
     if (error) {
-      toast.error(`Error al eliminar: ${error.message}`)
+      toast.error(`Error deleting: ${error.message}`)
     } else {
       setAllRows((prev) => prev.filter((r) => !(r.id === deleteTarget.id && r.source === deleteTarget.source)))
-      toast.success('Registro eliminado')
+      toast.success('Record deleted')
       setDeleteTarget(null)
     }
   }
@@ -231,7 +231,7 @@ export default function SetterDashboardPage() {
 
   // Client-side filter: date range + setter
   const filtered = useMemo(() => {
-    const setterQuery = selectedSetter === 'Todos' ? '' : selectedSetter.toLowerCase().replace('@', '').trim()
+    const setterQuery = selectedSetter === 'All' ? '' : selectedSetter.toLowerCase().replace('@', '').trim()
     return allRows.filter((r: Row) => {
       const matchesSetter = !setterQuery || r.setter_name.toLowerCase().includes(setterQuery)
       const matchesDate   = r.date >= fromDate && r.date <= toDate
@@ -242,7 +242,7 @@ export default function SetterDashboardPage() {
   // Setter names for dropdown
   const setterNames = useMemo(() => {
     const names = Array.from(new Set(allRows.map((r: Row) => r.setter_name as string))).sort()
-    return ['Todos', ...names]
+    return ['All', ...names]
   }, [allRows])
 
   // Reset page when filters change
@@ -316,18 +316,18 @@ export default function SetterDashboardPage() {
         {isSetter && (
           <div className="mb-6 flex items-center justify-between bg-[#185FA5] rounded-xl px-5 py-4 text-white">
             <div>
-              <p className="text-sm font-semibold">Hola{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</p>
-              <p className="text-xs opacity-80 mt-0.5">¿Ya hiciste tu reporte de hoy?</p>
+              <p className="text-sm font-semibold">Hey{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</p>
+              <p className="text-xs opacity-80 mt-0.5">Did you file today's report?</p>
             </div>
             <Link
               href="/equipo/setter/nuevo"
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#185FA5] text-xs font-bold hover:bg-blue-50 transition-colors shrink-0"
             >
-              Hacer reporte de hoy →
+              File today's report →
             </Link>
           </div>
         )}
-        <PageHeader title="Setting Team" description="Rendimiento diario del equipo setter">
+        <PageHeader title="Setting Team" description="Daily setter team performance">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset buttons */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
@@ -342,7 +342,7 @@ export default function SetterDashboardPage() {
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'todo' ? 'Todo' : p === 'custom' ? 'Custom' : p}
+                  {p === 'todo' ? 'All' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>
@@ -372,7 +372,7 @@ export default function SetterDashboardPage() {
             </select>
             {!loading && (
               <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-                {filtered.length} días de datos
+                {filtered.length} days of data
               </span>
             )}
             <Link
@@ -381,7 +381,7 @@ export default function SetterDashboardPage() {
               style={{ backgroundColor: '#185FA5' }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Nuevo reporte
+              New Report
             </Link>
           </div>
         </PageHeader>
@@ -397,8 +397,8 @@ export default function SetterDashboardPage() {
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
-            title="No hay reportes en este período"
-            description="Crea el primer reporte setter para ver métricas aquí."
+            title="No reports in this period"
+            description="Create the first setter report to see metrics here."
             icon={<Plus className="h-10 w-10" />}
           />
         ) : (
@@ -431,16 +431,16 @@ export default function SetterDashboardPage() {
             {/* ── Section 2: Volume Stats ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <VolumeCard label="Total Convos"      value={volume.totalConvos} />
-              <VolumeCard label="Calls Propuestas"  value={volume.totalProposed} />
+              <VolumeCard label="Proposed Calls"  value={volume.totalProposed} />
               <VolumeCard
-                label="Calls Agendadas"
+                label="Scheduled Calls"
                 value={volume.totalBooked}
                 sub={`${volume.bookingPct} booking rate`}
               />
               <VolumeCard
                 label="Avg Performance"
                 value={isNaN(volume.avgPerf) ? '—' : `${volume.avgPerf.toFixed(1)}/10`}
-                sub="/10 autoevaluación"
+                sub="/10 self-evaluation"
               />
             </div>
 
@@ -448,7 +448,7 @@ export default function SetterDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Pipeline de llamadas (diario)</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Call pipeline (daily)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
@@ -457,7 +457,7 @@ export default function SetterDashboardPage() {
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ fontSize: 11 }} />
-                      <Legend formatter={(v) => <span className="text-xs">{v === 'call_proposed' ? 'Propuestas' : 'Agendadas'}</span>} />
+                      <Legend formatter={(v) => <span className="text-xs">{v === 'call_proposed' ? 'Proposed' : 'Scheduled'}</span>} />
                       <Bar dataKey="call_proposed"   fill="#71717a" maxBarSize={32} />
                       <Bar dataKey="qualified_calls" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={32} />
                     </BarChart>
@@ -467,7 +467,7 @@ export default function SetterDashboardPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Tendencia de performance</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Performance trend</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {perfData.sparkline.length > 1 ? (
@@ -482,7 +482,7 @@ export default function SetterDashboardPage() {
                     </ResponsiveContainer>
                   ) : (
                     <div className="h-[220px] flex items-center justify-center">
-                      <p className="text-xs text-zinc-400">Sin suficientes datos</p>
+                      <p className="text-xs text-zinc-400">Not enough data</p>
                     </div>
                   )}
                 </CardContent>
@@ -492,15 +492,15 @@ export default function SetterDashboardPage() {
             {/* ── Section 4: Historial ── */}
             <Card className="mb-8">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Historial completo</CardTitle>
-                <span className="text-xs text-zinc-400">{filtered.length} días de datos</span>
+                <CardTitle className="text-sm font-semibold">Full History</CardTitle>
+                <span className="text-xs text-zinc-400">{filtered.length} days of data</span>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['Fecha', 'Setter', 'Convos', 'Propuestas', 'Agendadas', 'Conv%', 'Perf', 'Fuente', ''].map((h) => (
+                        {['Date', 'Setter', 'Convos', 'Proposed', 'Scheduled', 'Conv%', 'Perf', 'Source', ''].map((h) => (
                           <th key={h} className="text-left py-2.5 px-3 font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -528,12 +528,12 @@ export default function SetterDashboardPage() {
                                   onClick={() => setDetailReport(r)}
                                   className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                                 >
-                                  Ver
+                                  View
                                 </button>
                                 <button
                                   onClick={() => setDeleteTarget(r)}
                                   className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-                                  title="Eliminar registro"
+                                  title="Delete record"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -548,7 +548,7 @@ export default function SetterDashboardPage() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                     <span className="text-xs text-zinc-400">
-                      Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length}
+                      Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
                     </span>
                     <div className="flex items-center gap-1">
                       <button
@@ -582,10 +582,10 @@ export default function SetterDashboardPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base">¿Eliminar este registro?</DialogTitle>
+            <DialogTitle className="text-base">Delete this record?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Esta acción no se puede deshacer.
+            This action cannot be undone.
             {deleteTarget && (
               <span className="block mt-1 font-medium text-zinc-700 dark:text-zinc-300">
                 {formatDate(deleteTarget.date)} · {deleteTarget.setter_name} · {deleteTarget.source}
@@ -597,14 +597,14 @@ export default function SetterDashboardPage() {
               onClick={() => setDeleteTarget(null)}
               className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               onClick={handleDelete}
               disabled={deleting}
               className="px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors disabled:opacity-60"
             >
-              {deleting ? 'Eliminando...' : 'Eliminar'}
+              {deleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </DialogContent>

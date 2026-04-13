@@ -108,7 +108,7 @@ function weekLabel(wk: string): string {
   // wk is YYYY-MM-DD — parse in local time to avoid UTC midnight day shift
   const [y, m, d] = wk.split('-').map(Number)
   const date = new Date(y, m - 1, d)
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   return `${date.getDate()} ${months[date.getMonth()]}`
 }
 
@@ -145,11 +145,11 @@ interface KpiCardDef {
 }
 
 const KPI_CARDS: KpiCardDef[] = [
-  { key: 'scheduled_future', label: 'Próximas',   icon: Calendar,   iconColor: 'text-blue-500',   borderActive: 'border-blue-500',   borderIdle: 'border-zinc-200 dark:border-zinc-800' },
-  { key: 'Showed Up',        label: 'Realizadas', icon: CheckCircle, iconColor: 'text-green-500', borderActive: 'border-green-500',  borderIdle: 'border-zinc-200 dark:border-zinc-800' },
-  { key: 'Cancelled',        label: 'Canceladas', icon: XCircle,     iconColor: 'text-red-500',   borderActive: 'border-red-500',    borderIdle: 'border-zinc-200 dark:border-zinc-800' },
+  { key: 'scheduled_future', label: 'Upcoming',    icon: Calendar,   iconColor: 'text-blue-500',   borderActive: 'border-blue-500',   borderIdle: 'border-zinc-200 dark:border-zinc-800' },
+  { key: 'Showed Up',        label: 'Showed Up',  icon: CheckCircle, iconColor: 'text-green-500', borderActive: 'border-green-500',  borderIdle: 'border-zinc-200 dark:border-zinc-800' },
+  { key: 'Cancelled',        label: 'Cancelled',  icon: XCircle,     iconColor: 'text-red-500',   borderActive: 'border-red-500',    borderIdle: 'border-zinc-200 dark:border-zinc-800' },
   { key: 'No show',          label: 'No Show',    icon: UserX,       iconColor: 'text-amber-500', borderActive: 'border-amber-500',  borderIdle: 'border-zinc-200 dark:border-zinc-800' },
-  { key: 'Rescheduled',      label: 'Reagendadas',icon: RefreshCw,   iconColor: 'text-purple-500',borderActive: 'border-purple-500', borderIdle: 'border-zinc-200 dark:border-zinc-800' },
+  { key: 'Rescheduled',      label: 'Rescheduled',icon: RefreshCw,   iconColor: 'text-purple-500',borderActive: 'border-purple-500', borderIdle: 'border-zinc-200 dark:border-zinc-800' },
 ]
 
 function SortHeader({ label, sortKey: sk, current, dir, onSort }: {
@@ -320,12 +320,12 @@ export default function LlamadasPage() {
     const { error } = await supabase.from('calls').update({ status: newStatus }).eq('id', callId)
     setUpdatingId(null)
     if (error) {
-      toast.error('Error al actualizar el estado')
+      toast.error('Error updating status')
       return
     }
     setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus } : c))
     setDetailCall(prev => prev?.id === callId ? { ...prev, status: newStatus } : prev)
-    toast.success(`Estado actualizado a ${newStatus}`)
+    toast.success(`Status updated to ${newStatus}`)
   }
 
   // ── Analytics: donut data ──
@@ -368,18 +368,18 @@ export default function LlamadasPage() {
         {isCloser && (
           <div className="mb-6 flex items-center justify-between bg-[#185FA5] rounded-xl px-5 py-4 text-white">
             <div>
-              <p className="text-sm font-semibold">Hola{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</p>
-              <p className="text-xs opacity-80 mt-0.5">¿Ya hiciste tu reporte de hoy?</p>
+              <p className="text-sm font-semibold">Hey{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</p>
+              <p className="text-xs opacity-80 mt-0.5">Did you file today's report?</p>
             </div>
             <Link
               href="/equipo/closer/nuevo"
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#185FA5] text-xs font-bold hover:bg-blue-50 transition-colors shrink-0"
             >
-              Hacer reporte de hoy →
+              File today's report →
             </Link>
           </div>
         )}
-        <PageHeader title="Llamadas" description="Pipeline de llamadas y seguimiento">
+        <PageHeader title="Calls" description="Call pipeline and follow-up">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset buttons */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
@@ -392,7 +392,7 @@ export default function LlamadasPage() {
                     preset === p ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'todo' ? 'Todo' : p}
+                  {p === 'todo' ? 'All' : p}
                 </button>
               ))}
             </div>
@@ -403,7 +403,7 @@ export default function LlamadasPage() {
               onChange={(e) => setSelectedCloser(e.target.value)}
               className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
             >
-              <option value="all">Todos los closers</option>
+              <option value="all">All closers</option>
               {closerNames.map(n => <option key={n} value={n}>{n}</option>)}
             </select>
 
@@ -413,7 +413,7 @@ export default function LlamadasPage() {
               onChange={(e) => setSelectedSetter(e.target.value)}
               className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
             >
-              <option value="all">Todos los setters</option>
+              <option value="all">All setters</option>
               {setterNames.map(n => <option key={n} value={n}>{n}</option>)}
             </select>
 
@@ -423,12 +423,12 @@ export default function LlamadasPage() {
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
               className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
             >
-              <option value="all">Todos los estados</option>
-              <option value="scheduled_future">Próximas</option>
-              <option value="Showed Up">Realizadas</option>
-              <option value="Cancelled">Canceladas</option>
+              <option value="all">All statuses</option>
+              <option value="scheduled_future">Upcoming</option>
+              <option value="Showed Up">Showed Up</option>
+              <option value="Cancelled">Cancelled</option>
               <option value="No show">No Show</option>
-              <option value="Rescheduled">Reagendadas</option>
+              <option value="Rescheduled">Rescheduled</option>
             </select>
 
             {/* Search */}
@@ -438,7 +438,7 @@ export default function LlamadasPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar nombre o email..."
+                placeholder="Search name or email..."
                 className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-7 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 w-48"
               />
             </div>
@@ -449,16 +449,16 @@ export default function LlamadasPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
               style={{ backgroundColor: '#185FA5' }}
             >
-              + Nuevo reporte
+              + New Report
             </Link>
           </div>
         </PageHeader>
 
         {/* Timezone indicator */}
         <div className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 mb-4">
-          <span>Mostrando horarios en <strong className="text-zinc-600 dark:text-zinc-400">{tzAbbr}</strong></span>
+          <span>Showing times in <strong className="text-zinc-600 dark:text-zinc-400">{tzAbbr}</strong></span>
           <span>·</span>
-          <Link href="/settings" className="text-blue-500 hover:underline">Cambiar</Link>
+          <Link href="/settings" className="text-blue-500 hover:underline">Change</Link>
         </div>
 
         {loading ? (
@@ -486,7 +486,7 @@ export default function LlamadasPage() {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <Icon className={cn('h-4 w-4', iconColor)} />
-                      {active && <span className="text-xs text-zinc-400">✓ filtro activo</span>}
+                      {active && <span className="text-xs text-zinc-400">✓ filter active</span>}
                     </div>
                     <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{count}</p>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{label}</p>
@@ -504,8 +504,8 @@ export default function LlamadasPage() {
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
                   </span>
                   <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                    Próximas llamadas
-                    <span className="ml-2 text-xs font-normal text-zinc-400">— próximos 7 días</span>
+                    Upcoming Calls
+                    <span className="ml-2 text-xs font-normal text-zinc-400">— next 7 days</span>
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -523,13 +523,13 @@ export default function LlamadasPage() {
             {/* ── Section 3: Calls Table ── */}
             <Card className="mb-6">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Historial de llamadas</CardTitle>
-                <span className="text-xs text-zinc-400">{totalCalls} llamadas encontradas</span>
+                <CardTitle className="text-sm font-semibold">Call History</CardTitle>
+                <span className="text-xs text-zinc-400">{totalCalls} calls found</span>
               </CardHeader>
               <CardContent>
                 {tableData.length === 0 ? (
                   <div className="py-12 text-center">
-                    <p className="text-sm text-zinc-400 dark:text-zinc-500">No se encontraron llamadas con estos filtros</p>
+                    <p className="text-sm text-zinc-400 dark:text-zinc-500">No calls found with these filters</p>
                   </div>
                 ) : (
                   <>
@@ -537,14 +537,14 @@ export default function LlamadasPage() {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                            <SortHeader label="Fecha/Hora" sortKey="start_date" current={sortKey} dir={sortDir} onSort={handleSort} />
-                            <SortHeader label="Nombre" sortKey="full_name" current={sortKey} dir={sortDir} onSort={handleSort} />
-                            <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Tipo</th>
-                            <SortHeader label="Estado" sortKey="status" current={sortKey} dir={sortDir} onSort={handleSort} />
+                            <SortHeader label="Date/Time" sortKey="start_date" current={sortKey} dir={sortDir} onSort={handleSort} />
+                            <SortHeader label="Name" sortKey="full_name" current={sortKey} dir={sortDir} onSort={handleSort} />
+                            <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Type</th>
+                            <SortHeader label="Status" sortKey="status" current={sortKey} dir={sortDir} onSort={handleSort} />
                             <SortHeader label="Closer" sortKey="closer_name" current={sortKey} dir={sortDir} onSort={handleSort} />
                             <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Setter</th>
-                            <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Reporte</th>
-                            <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Acciones</th>
+                            <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Report</th>
+                            <th className="text-left py-2.5 px-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -627,20 +627,20 @@ export default function LlamadasPage() {
                                         await supabase.from('calls').update({ closer_name: val }).eq('id', call.id)
                                         setCalls(prev => prev.map(c => c.id === call.id ? { ...c, closer_name: val } : c))
                                         setEditingCell(null)
-                                        toast.success('Closer actualizado')
+                                        toast.success('Closer updated')
                                       }}
                                       onBlur={() => setEditingCell(null)}
                                       onKeyDown={(e) => e.key === 'Escape' && setEditingCell(null)}
                                       className="text-xs border rounded px-2 py-1 bg-white dark:bg-zinc-800 shadow-sm focus:outline-none"
                                     >
-                                      <option value="">— Sin closer</option>
+                                      <option value="">— No closer</option>
                                       {CLOSERS.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                   ) : (
                                     <span
                                       onClick={() => setEditingCell({ callId: call.id, field: 'closer_name' })}
                                       className="group flex items-center gap-1 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded px-1 py-0.5 transition-colors text-zinc-600 dark:text-zinc-400"
-                                      title="Click para editar"
+                                      title="Click to edit"
                                     >
                                       {call.closer_name ?? <span className="text-zinc-400">—</span>}
                                       <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
@@ -658,20 +658,20 @@ export default function LlamadasPage() {
                                         await supabase.from('calls').update({ setter_name: val }).eq('id', call.id)
                                         setCalls(prev => prev.map(c => c.id === call.id ? { ...c, setter_name: val } : c))
                                         setEditingCell(null)
-                                        toast.success('Setter actualizado')
+                                        toast.success('Setter updated')
                                       }}
                                       onBlur={() => setEditingCell(null)}
                                       onKeyDown={(e) => e.key === 'Escape' && setEditingCell(null)}
                                       className="text-xs border rounded px-2 py-1 bg-white dark:bg-zinc-800 shadow-sm focus:outline-none"
                                     >
-                                      <option value="">— Sin setter</option>
+                                      <option value="">— No setter</option>
                                       {SETTERS.map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                   ) : (
                                     <span
                                       onClick={() => setEditingCell({ callId: call.id, field: 'setter_name' })}
                                       className="group flex items-center gap-1 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded px-1 py-0.5 transition-colors text-zinc-600 dark:text-zinc-400"
-                                      title="Click para editar"
+                                      title="Click to edit"
                                     >
                                       {call.setter_name ?? <span className="text-zinc-400">—</span>}
                                       <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
@@ -688,7 +688,7 @@ export default function LlamadasPage() {
                                       <span className={cn('h-2 w-2 rounded-full', call.call_status === 'Showed Up' ? 'bg-green-500' : 'bg-red-500')} />
                                     </span>
                                   ) : (
-                                    <span className="h-2 w-2 rounded-full bg-zinc-300 dark:bg-zinc-600 inline-block" title="Sin reporte" />
+                                    <span className="h-2 w-2 rounded-full bg-zinc-300 dark:bg-zinc-600 inline-block" title="No report" />
                                   )}
                                 </td>
                                 {/* Acciones */}
@@ -697,7 +697,7 @@ export default function LlamadasPage() {
                                     <button
                                       onClick={() => setDetailCall(call)}
                                       className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-                                      title="Ver detalles"
+                                      title="View details"
                                     >
                                       <Eye className="h-3.5 w-3.5" />
                                     </button>
@@ -707,7 +707,7 @@ export default function LlamadasPage() {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400 transition-colors"
-                                        title="Unirse a llamada"
+                                        title="Join call"
                                       >
                                         <ExternalLink className="h-3.5 w-3.5" />
                                       </a>
@@ -729,7 +729,7 @@ export default function LlamadasPage() {
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                         <span className="text-xs text-zinc-400">
-                          Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, tableData.length)} de {tableData.length}
+                          Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, tableData.length)} of {tableData.length}
                         </span>
                         <div className="flex items-center gap-1">
                           <button
@@ -761,12 +761,12 @@ export default function LlamadasPage() {
                 {/* Donut */}
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">Llamadas por estado — período seleccionado</CardTitle>
+                    <CardTitle className="text-sm font-semibold">Calls by status — selected period</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {donutData.length === 0 ? (
                       <div className="h-48 flex items-center justify-center">
-                        <p className="text-xs text-zinc-400">Sin datos de estado</p>
+                        <p className="text-xs text-zinc-400">No status data</p>
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height={200}>
@@ -785,7 +785,7 @@ export default function LlamadasPage() {
                             ))}
                           </Pie>
                           <Tooltip
-                            formatter={(v, name) => [`${v} llamadas`, name]}
+                            formatter={(v, name) => [`${v} calls`, name]}
                             contentStyle={{ fontSize: 11 }}
                           />
                           <Legend
@@ -802,12 +802,12 @@ export default function LlamadasPage() {
                 {/* Weekly bar */}
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">Volumen de llamadas por semana — últimos 30 días</CardTitle>
+                    <CardTitle className="text-sm font-semibold">Call volume by week — last 30 days</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {weeklyData.length === 0 ? (
                       <div className="h-48 flex items-center justify-center">
-                        <p className="text-xs text-zinc-400">Sin datos recientes</p>
+                        <p className="text-xs text-zinc-400">No recent data</p>
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height={200}>
