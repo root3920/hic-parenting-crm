@@ -48,7 +48,12 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  if (pathname.startsWith('/api/webhooks')) {
+  // Public routes — no auth required
+  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback']
+  if (
+    pathname.startsWith('/api/webhooks') ||
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  ) {
     return NextResponse.next()
   }
 
@@ -56,7 +61,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user && pathname !== '/login') {
+  if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
