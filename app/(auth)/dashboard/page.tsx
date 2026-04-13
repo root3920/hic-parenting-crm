@@ -66,6 +66,7 @@ export default function DashboardPage() {
           supabase
             .from('transactions')
             .select('*')
+            .in('status', ['completed', 'recovered'])
             .gte('date', from)
             .lte('date', to)
             .order('date', { ascending: false }),
