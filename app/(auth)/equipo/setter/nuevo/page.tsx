@@ -10,6 +10,7 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
 
@@ -137,6 +138,14 @@ export default function NuevoReporteSetterPage() {
   const [form, setForm] = useState<FormState>(initialState)
   const [submitting, setSubmitting] = useState(false)
   const [setterOptions, setSetterOptions] = useState<string[]>(DEFAULT_SETTERS)
+  const { profile } = useProfile()
+
+  // Pre-fill setter name from profile when available
+  useEffect(() => {
+    if (profile?.setter_name) {
+      setForm((prev) => ({ ...prev, setter_name: profile.setter_name! }))
+    }
+  }, [profile])
 
   // Fetch distinct setter names from DB and merge with defaults
   useEffect(() => {

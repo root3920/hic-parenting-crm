@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+import { useProfile } from '@/hooks/useProfile'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -148,6 +149,8 @@ function ReportDetail({ report, onClose }: { report: Row; onClose: () => void })
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SetterDashboardPage() {
+  const { profile } = useProfile()
+  const isSetter = profile?.role === 'setter'
   const [allRows, setAllRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('30d')
@@ -309,6 +312,21 @@ export default function SetterDashboardPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
+        {/* Setter role: prominent daily report CTA */}
+        {isSetter && (
+          <div className="mb-6 flex items-center justify-between bg-[#185FA5] rounded-xl px-5 py-4 text-white">
+            <div>
+              <p className="text-sm font-semibold">Hola{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</p>
+              <p className="text-xs opacity-80 mt-0.5">¿Ya hiciste tu reporte de hoy?</p>
+            </div>
+            <Link
+              href="/equipo/setter/nuevo"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#185FA5] text-xs font-bold hover:bg-blue-50 transition-colors shrink-0"
+            >
+              Hacer reporte de hoy →
+            </Link>
+          </div>
+        )}
         <PageHeader title="Setting Team" description="Rendimiento diario del equipo setter">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset buttons */}

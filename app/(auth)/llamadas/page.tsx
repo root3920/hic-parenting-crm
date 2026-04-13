@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useProfile } from '@/hooks/useProfile'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -173,6 +174,8 @@ function SortHeader({ label, sortKey: sk, current, dir, onSort }: {
 export default function LlamadasPage() {
   const supabase = useMemo(() => createClient(), [])
   const { timezone } = useUserTimezone()
+  const { profile } = useProfile()
+  const isCloser = profile?.role === 'closer'
   const tzAbbr = US_TIMEZONES.find(t => t.value === timezone)?.abbr ?? 'EST'
 
   // State
@@ -361,6 +364,21 @@ export default function LlamadasPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
+        {/* Closer role: prominent daily report CTA */}
+        {isCloser && (
+          <div className="mb-6 flex items-center justify-between bg-[#185FA5] rounded-xl px-5 py-4 text-white">
+            <div>
+              <p className="text-sm font-semibold">Hola{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</p>
+              <p className="text-xs opacity-80 mt-0.5">¿Ya hiciste tu reporte de hoy?</p>
+            </div>
+            <Link
+              href="/equipo/closer/nuevo"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#185FA5] text-xs font-bold hover:bg-blue-50 transition-colors shrink-0"
+            >
+              Hacer reporte de hoy →
+            </Link>
+          </div>
+        )}
         <PageHeader title="Llamadas" description="Pipeline de llamadas y seguimiento">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset buttons */}

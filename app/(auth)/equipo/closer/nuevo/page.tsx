@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { formatTimeInTimezone } from '@/lib/timezones'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
+import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
 
@@ -274,6 +275,14 @@ export default function NuevoReporteCloserPage() {
   const [form, setForm] = useState<FormState>(initialState)
   const [submitting, setSubmitting] = useState(false)
   const [closerOptions, setCloserOptions] = useState<string[]>(DEFAULT_CLOSERS)
+  const { profile } = useProfile()
+
+  // Pre-fill closer name from profile when available
+  useEffect(() => {
+    if (profile?.closer_name) {
+      setForm((prev) => ({ ...prev, closer_name: profile.closer_name! }))
+    }
+  }, [profile])
 
   // Llamadas del día
   const [dayCalls, setDayCalls] = useState<DayCall[]>([])

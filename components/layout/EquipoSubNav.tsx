@@ -2,17 +2,23 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users, BarChart2, TrendingUp } from 'lucide-react'
+import { Users, BarChart2, TrendingUp, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useProfile } from '@/hooks/useProfile'
 
-const tabs = [
-  { href: '/equipo/csm', label: 'Client Success HT', icon: Users },
-  { href: '/equipo/setter', label: 'Setting Team', icon: BarChart2 },
-  { href: '/equipo/closer', label: 'Closing Team', icon: TrendingUp },
+const BASE_TABS = [
+  { href: '/equipo/csm',      label: 'Client Success HT', icon: Users,        roles: ['admin'] },
+  { href: '/equipo/setter',   label: 'Setting Team',       icon: BarChart2,    roles: ['admin', 'setter'] },
+  { href: '/equipo/closer',   label: 'Closing Team',       icon: TrendingUp,   roles: ['admin', 'closer'] },
+  { href: '/equipo/profiles', label: 'Perfiles',           icon: ShieldCheck,  roles: ['admin'] },
 ]
 
 export function EquipoSubNav() {
   const pathname = usePathname()
+  const { profile } = useProfile()
+  const role = profile?.role ?? null
+
+  const tabs = BASE_TABS.filter((t) => !role || t.roles.includes(role))
 
   return (
     <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 mb-6">
