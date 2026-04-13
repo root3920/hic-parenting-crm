@@ -11,42 +11,43 @@ export default function SetupPage() {
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
-    const exchangeToken = async () => {
-      const hash = window.location.hash.substring(1)
-      const params = new URLSearchParams(hash)
-      const accessToken = params.get('access_token')
-      const type = params.get('type')
+    const supabase = createClient()
 
-      if (!accessToken) {
+    // Supabase automatically processes the hash on load.
+    // Listen for the session to be established.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') && session) {
+          setReady(true)
+        }
+      }
+    )
+
+    // Also check immediately in case the event already fired
+    setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        setReady(true)
+        return
+      }
+
+      const hash = window.location.hash
+      if (!hash || !hash.includes('access_token')) {
         setError('Link inválido o expirado. Pide una nueva invitación.')
         return
       }
 
-      if (type === 'invite') {
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: accessToken,
-          type: 'invite',
-        })
-
-        if (error) {
-          const { error: error2 } = await supabase.auth.exchangeCodeForSession(accessToken)
-          if (error2) {
-            setError('Link inválido o expirado. Pide una nueva invitación.')
-            return
-          }
-        }
-        setReady(true)
-      } else {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) setReady(true)
+      // Hash exists — wait for onAuthStateChange to fire
+      setTimeout(async () => {
+        const { data: { session: s } } = await supabase.auth.getSession()
+        if (s) setReady(true)
         else setError('Link inválido o expirado. Pide una nueva invitación.')
-      }
-    }
+      }, 2000)
+    }, 500)
 
-    exchangeToken()
+    return () => subscription.unsubscribe()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async () => {
@@ -62,6 +63,7 @@ export default function SetupPage() {
     setLoading(true)
     setError('')
 
+    const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
