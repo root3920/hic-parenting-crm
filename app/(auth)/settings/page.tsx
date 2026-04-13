@@ -90,7 +90,7 @@ export default function SettingsPage() {
 
   async function fetchTeamProfiles() {
     setTeamLoading(true)
-    const res = await fetch('/api/profiles')
+    const res = await fetch('/api/profiles', { cache: 'no-store' })
     const data = await res.json()
     if (data.error) toast.error(`Error: ${data.error}`)
     else setTeamProfiles(data.profiles ?? [])
