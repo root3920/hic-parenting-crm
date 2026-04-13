@@ -28,13 +28,12 @@ import { useProfile } from '@/hooks/useProfile'
 import type { UserRole } from '@/hooks/useProfile'
 
 const ALL_NAV_ITEMS = [
-  { href: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, roles: ['admin'] as UserRole[] },
+  { href: '/dashboard',    label: 'Dashboard',   icon: LayoutDashboard, roles: ['admin'] as UserRole[] },
   { href: '/sales',        label: 'Sales',        icon: DollarSign,      roles: ['admin'] as UserRole[] },
   { href: '/llamadas',     label: 'Llamadas',     icon: Phone,           roles: ['admin', 'closer'] as UserRole[] },
   { href: '/spc',          label: 'SPC Members',  icon: Users,           roles: ['admin'] as UserRole[] },
   { href: '/equipo/csm',   label: 'Equipo',       icon: UsersRound,      roles: ['admin'] as UserRole[] },
   { href: '/equipo/setter',label: 'Mi equipo',    icon: UsersRound,      roles: ['setter'] as UserRole[] },
-  { href: '/equipo/closer',label: 'Mi equipo',    icon: UsersRound,      roles: ['closer'] as UserRole[] },
   { href: '/goals',        label: 'Metas',        icon: Target,          roles: ['admin'] as UserRole[] },
 ]
 
@@ -79,15 +78,16 @@ export function TopNav() {
   const [isOpen, setIsOpen] = useState(false)
   const [quickMenuOpen, setQuickMenuOpen] = useState(false)
   const quickMenuRef = useRef<HTMLDivElement>(null)
-  const { profile } = useProfile()
+  const { profile, loading: profileLoading } = useProfile()
   const role = profile?.role ?? null
 
-  const navItems = ALL_NAV_ITEMS.filter(
-    (item) => !role || item.roles.includes(role)
-  )
-  const quickActions = ALL_QUICK_ACTIONS.filter(
-    (item) => !role || item.roles.includes(role)
-  )
+  // Wait for profile to load before showing nav to avoid flashing all items
+  const navItems = profileLoading
+    ? []
+    : ALL_NAV_ITEMS.filter((item) => !role || item.roles.includes(role))
+  const quickActions = profileLoading
+    ? []
+    : ALL_QUICK_ACTIONS.filter((item) => !role || item.roles.includes(role))
 
   const initials = profile?.full_name ? getInitials(profile.full_name) : 'AD'
 

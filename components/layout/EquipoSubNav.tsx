@@ -2,15 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users, BarChart2, TrendingUp, ShieldCheck } from 'lucide-react'
+import { Users, BarChart2, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 
 const BASE_TABS = [
-  { href: '/equipo/csm',      label: 'Client Success HT', icon: Users,        roles: ['admin'] },
-  { href: '/equipo/setter',   label: 'Setting Team',       icon: BarChart2,    roles: ['admin', 'setter'] },
-  { href: '/equipo/closer',   label: 'Closing Team',       icon: TrendingUp,   roles: ['admin', 'closer'] },
-  { href: '/equipo/profiles', label: 'Perfiles',           icon: ShieldCheck,  roles: ['admin'] },
+  { href: '/equipo/csm',    label: 'Client Success HT', icon: Users,      roles: ['admin'] },
+  { href: '/equipo/setter', label: 'Setting Team',       icon: BarChart2,  roles: ['admin', 'setter'] },
+  { href: '/equipo/closer', label: 'Closing Team',       icon: TrendingUp, roles: ['admin', 'closer'] },
 ]
 
 export function EquipoSubNav() {
