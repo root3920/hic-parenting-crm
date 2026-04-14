@@ -34,7 +34,9 @@
       "Bash(grep -rn --include=*.tsx --include=*.ts -P [áéíóúüñÁÉÍÓÚÜÑ¿¡] app/ components/ lib/)",
       "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/students/)",
       "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/spc/)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git rm:*)",
+      "Bash(git pull:*)"
     ]
   }
 }
