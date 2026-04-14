@@ -121,9 +121,6 @@ function StudentRow({
           </div>
         )}
       </td>
-      {showCohort && (
-        <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(student.graduated_at)}</td>
-      )}
       <td className="px-4 py-3 text-xs text-zinc-400 max-w-[120px] truncate">{student.notes ?? '—'}</td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1016,7 +1013,7 @@ function IndividualTab({ students, actions }: { students: PwuStudent[]; actions:
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
       <table className="w-full text-sm">
-        <TableHeader cols={['Name', 'Email', 'Phone', 'Status', 'Graduated', 'Notes', '']} />
+        <TableHeader cols={['Name', 'Email', 'Phone', 'Status', 'Notes', '']} />
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {sorted.map((s) => (
             <tr key={s.id} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
@@ -1024,7 +1021,6 @@ function IndividualTab({ students, actions }: { students: PwuStudent[]; actions:
               <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">{s.email ?? '—'}</td>
               <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{s.phone ?? '—'}</td>
               <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
-              <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(s.graduated_at)}</td>
               <td className="px-4 py-3 text-xs text-zinc-400 max-w-[120px] truncate">{s.notes ?? '—'}</td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1061,7 +1057,7 @@ function GraduatedTab({ students, actions }: { students: PwuStudent[]; actions: 
       ) : (
         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
-            <TableHeader cols={['Name', 'Email', 'Cohort', 'Type', 'Graduated', '']} />
+            <TableHeader cols={['Name', 'Email', 'Cohort', 'Type', '']} />
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {sorted.map((s) => (
                 <tr key={s.id} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
@@ -1069,7 +1065,6 @@ function GraduatedTab({ students, actions }: { students: PwuStudent[]; actions: 
                   <td className="px-4 py-3 text-xs text-zinc-500">{s.email ?? '—'}</td>
                   <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">{s.type === 'individual' ? '1:1' : `Cohort ${s.cohort}`}</td>
                   <td className="px-4 py-3 text-xs text-zinc-500 capitalize">{s.type === 'individual' ? 'Individual' : 'Group'}</td>
-                  <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(s.graduated_at)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
