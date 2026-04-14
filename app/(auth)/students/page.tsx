@@ -14,6 +14,7 @@ import {
   CreditCard,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getCanonicalProduct } from '@/lib/products'
 import type { PwuStudent, StudentNote, Transaction, StudentPaymentPlan } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -1092,7 +1093,12 @@ export default function StudentsPage() {
         .select('*')
         .eq('buyer_email', selectedStudent.email)
         .order('date', { ascending: false })
-        .then(({ data }) => setProfileTransactions(data ?? []))
+        .then(({ data }) => {
+          const pwu = (data ?? []).filter((tx) =>
+            getCanonicalProduct(tx.offer_title).startsWith('Parenting With Understanding')
+          )
+          setProfileTransactions(pwu)
+        })
     } else {
       setProfileTransactions([])
     }
