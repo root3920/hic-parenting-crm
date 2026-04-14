@@ -9,9 +9,9 @@ import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import {
   Plus, Download, X, GraduationCap, Search,
-  Pencil, FileText, PauseCircle, Trash2, ChevronDown, ChevronUp,
+  Pencil, FileText, PauseCircle, Trash2,
   Phone, Mail, Calendar, Clock, MessageSquare, ExternalLink,
-  CreditCard,
+  CreditCard, List, LayoutGrid, Table2, ArrowUpDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getCanonicalProduct } from '@/lib/products'
@@ -87,98 +87,6 @@ function sortStudents(students: PwuStudent[]) {
   return [...students].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))
 }
 
-// ─── Student Row ─────────────────────────────────────────────────────────────
-
-function StudentRow({
-  student,
-  showCohort = false,
-  showType = false,
-  onEdit,
-  onNotes,
-  onGraduate,
-  onPause,
-  onDelete,
-  onStatusChange,
-  onSelect,
-}: {
-  student: PwuStudent
-  showCohort?: boolean
-  showType?: boolean
-  onEdit: (s: PwuStudent) => void
-  onNotes: (s: PwuStudent) => void
-  onGraduate: (s: PwuStudent) => void
-  onPause: (s: PwuStudent) => void
-  onDelete: (s: PwuStudent) => void
-  onStatusChange: (s: PwuStudent, status: StudentStatus) => void
-  onSelect: (s: PwuStudent) => void
-}) {
-  const [statusOpen, setStatusOpen] = useState(false)
-
-  return (
-    <tr
-      onClick={() => onSelect(student)}
-      className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group cursor-pointer"
-    >
-      <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100 text-sm whitespace-nowrap">
-        {fullName(student)}
-      </td>
-      <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">{student.email ?? '—'}</td>
-      {showCohort && (
-        <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
-          {student.type === 'individual' ? '1:1' : `Cohort ${student.cohort}`}
-        </td>
-      )}
-      {showType && (
-        <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap capitalize">
-          {student.type === 'individual' ? 'Individual' : 'Group'}
-        </td>
-      )}
-      <td className="px-4 py-3 relative" onClick={(e) => e.stopPropagation()}>
-        <button onClick={() => setStatusOpen((v) => !v)}>
-          <StatusBadge status={student.status} />
-        </button>
-        {statusOpen && (
-          <div className="absolute z-20 top-full left-0 mt-1 w-40 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden">
-            {STATUS_ORDER.map((s) => (
-              <button
-                key={s}
-                onClick={() => { onStatusChange(student, s); setStatusOpen(false) }}
-                className={cn(
-                  'w-full text-left px-3 py-2 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors',
-                  student.status === s && 'font-semibold'
-                )}
-              >
-                <StatusBadge status={s} />
-              </button>
-            ))}
-          </div>
-        )}
-      </td>
-      <td className="px-4 py-3"><LastContactBadge ts={student.last_contacted_at} /></td>
-      <td className="px-4 py-3 text-xs text-zinc-400 max-w-[120px] truncate">{student.notes ?? '—'}</td>
-      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ActionBtn title="Edit" onClick={() => onEdit(student)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
-          <ActionBtn title="Notes" onClick={() => onNotes(student)}><FileText className="h-3.5 w-3.5" /></ActionBtn>
-          {student.status === 'active' && (
-            <ActionBtn title="Graduate" onClick={() => onGraduate(student)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
-              <GraduationCap className="h-3.5 w-3.5" />
-            </ActionBtn>
-          )}
-          {student.status === 'active' && (
-            <ActionBtn title="Pause" onClick={() => onPause(student)} className="text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20">
-              <PauseCircle className="h-3.5 w-3.5" />
-            </ActionBtn>
-          )}
-          <ActionBtn title="Delete" onClick={() => onDelete(student)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
-            <Trash2 className="h-3.5 w-3.5" />
-          </ActionBtn>
-        </div>
-      </td>
-    </tr>
-  )
-}
-
 function ActionBtn({ children, title, onClick, className }: {
   children: React.ReactNode
   title: string
@@ -193,72 +101,6 @@ function ActionBtn({ children, title, onClick, className }: {
     >
       {children}
     </button>
-  )
-}
-
-function TableHeader({ cols }: { cols: string[] }) {
-  return (
-    <thead>
-      <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-        {cols.map((h) => (
-          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap">
-            {h}
-          </th>
-        ))}
-      </tr>
-    </thead>
-  )
-}
-
-// ─── Cohort Card ─────────────────────────────────────────────────────────────
-
-function CohortCard({
-  cohort, students, actions,
-}: {
-  cohort: string
-  students: PwuStudent[]
-  actions: StudentActions
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const graduated = students.filter((s) => s.status === 'graduated').length
-  const total = students.length
-  const pct = total > 0 ? Math.round((graduated / total) * 100) : 0
-  const sorted = sortStudents(students)
-
-  return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Cohort {cohort}</span>
-          <span className="text-xs text-zinc-400">{total} {total === 1 ? 'student' : 'students'}</span>
-        </div>
-        <div className="mb-2">
-          <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-          </div>
-          <p className="text-xs text-zinc-400 mt-1">{pct}% graduated</p>
-        </div>
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline mt-1"
-        >
-          {expanded ? 'Hide students' : 'View students'}
-          {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-        </button>
-      </div>
-      {expanded && (
-        <div className="border-t border-zinc-100 dark:border-zinc-800 overflow-x-auto">
-          <table className="w-full text-sm">
-            <TableHeader cols={['Name', 'Email', 'Status', 'Last Contact', 'Notes', '']} />
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {sorted.map((s) => (
-                <StudentRow key={s.id} student={s} {...actions} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -1018,6 +860,7 @@ function ConfirmModal({
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Tab = 'all' | 'group' | 'individual' | 'graduated' | 'paused'
+type ViewMode = 'list' | 'card' | 'table'
 
 interface StudentActions {
   onEdit: (s: PwuStudent) => void
@@ -1042,6 +885,10 @@ export default function StudentsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCohort, setFilterCohort] = useState<string>('all')
   const [filterType, setFilterType] = useState<string>('all')
+
+  // View mode & sidebar
+  const [view, setView] = useState<ViewMode>('list')
+  const [sidebarCohort, setSidebarCohort] = useState<string>('all')
 
   // Modals
   const [addOpen, setAddOpen] = useState(false)
@@ -1161,18 +1008,13 @@ export default function StudentsPage() {
     return list
   }, [students, tab, filterStatus, filterCohort, filterType, search])
 
-  // Cohort grouping for group tab — only numeric cohorts
-  const cohortGroups = useMemo(() => {
-    if (tab !== 'group') return []
-    const map: Record<string, PwuStudent[]> = {}
-    for (const s of filtered) {
-      if (!isNaN(Number(s.cohort))) {
-        if (!map[s.cohort]) map[s.cohort] = []
-        map[s.cohort].push(s)
-      }
+  // Students to display — respects sidebar cohort selection for group tab
+  const displayStudents = useMemo(() => {
+    if (tab === 'group' && sidebarCohort !== 'all') {
+      return filtered.filter((s) => s.cohort === sidebarCohort)
     }
-    return sortCohorts(Object.keys(map)).map((c) => ({ cohort: c, students: map[c] }))
-  }, [filtered, tab])
+    return filtered
+  }, [filtered, tab, sidebarCohort])
 
   // ─── Actions ───────────────────────────────────────────────────────────────
 
@@ -1441,93 +1283,202 @@ export default function StudentsPage() {
           ))}
         </div>
 
-        {/* Tab nav */}
-        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 mb-4 overflow-x-auto">
-          {tabs.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={cn(
-                'px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors',
-                tab === key
-                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+        {/* Split layout */}
+        <div className={cn('flex gap-4', tab === 'group' ? 'items-start' : '')}>
+
+          {/* ── Cohort Sidebar (group tab only) ── */}
+          {tab === 'group' && (
+            <div className="w-[220px] shrink-0 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden sticky top-4 self-start">
+              <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-zinc-800">
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Cohorts</p>
+              </div>
+              <div className="overflow-y-auto max-h-[calc(100vh-320px)]">
+                <button
+                  onClick={() => setSidebarCohort('all')}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium transition-colors',
+                    sidebarCohort === 'all'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                  )}
+                >
+                  <span>All Cohorts</span>
+                  <span className={cn(
+                    'text-xs px-1.5 py-0.5 rounded-full font-semibold',
+                    sidebarCohort === 'all'
+                      ? 'bg-blue-100 dark:bg-blue-800/60 text-blue-700 dark:text-blue-300'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                  )}>
+                    {filtered.length}
+                  </span>
+                </button>
+                {groupCohorts.map((cohort) => {
+                  const count = filtered.filter((s) => s.cohort === cohort).length
+                  const isSelected = sidebarCohort === cohort
+                  return (
+                    <button
+                      key={cohort}
+                      onClick={() => setSidebarCohort(cohort)}
+                      className={cn(
+                        'w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium transition-colors',
+                        isSelected
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                      )}
+                    >
+                      <span>Cohort {cohort}</span>
+                      <span className={cn(
+                        'text-xs px-1.5 py-0.5 rounded-full font-semibold',
+                        isSelected
+                          ? 'bg-blue-100 dark:bg-blue-800/60 text-blue-700 dark:text-blue-300'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                      )}>
+                        {count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Main Panel ── */}
+          <div className="flex-1 min-w-0">
+
+            {/* Tabs + view toggle */}
+            <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 overflow-x-auto">
+                {tabs.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => { setTab(key); setSidebarCohort('all') }}
+                    className={cn(
+                      'px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors',
+                      tab === key
+                        ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 shrink-0">
+                {([
+                  { v: 'list' as ViewMode, Icon: List, title: 'List view' },
+                  { v: 'card' as ViewMode, Icon: LayoutGrid, title: 'Card view' },
+                  { v: 'table' as ViewMode, Icon: Table2, title: 'Table view' },
+                ]).map(({ v, Icon, title }) => (
+                  <button
+                    key={v}
+                    title={title}
+                    onClick={() => setView(v)}
+                    className={cn(
+                      'p-1.5 rounded-md transition-colors',
+                      view === v
+                        ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search & filters */}
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                <input
+                  className="w-full pl-8 pr-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  placeholder="Search by name or email…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              {tab !== 'group' && tab !== 'individual' && (
+                <select
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                >
+                  <option value="all">All types</option>
+                  <option value="group">Group</option>
+                  <option value="individual">Individual</option>
+                </select>
               )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+              {tab !== 'graduated' && tab !== 'paused' && tab !== 'group' && (
+                <select
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="graduated">Graduated</option>
+                  <option value="paused">Paused</option>
+                  <option value="refund">Refund</option>
+                </select>
+              )}
+              {tab !== 'group' && (
+                <select
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                  value={filterCohort}
+                  onChange={(e) => setFilterCohort(e.target.value)}
+                >
+                  <option value="all">All cohorts</option>
+                  {allCohorts.map((c) => <option key={c} value={c}>{c === '1:1' ? '1:1' : `Cohort ${c}`}</option>)}
+                </select>
+              )}
+            </div>
 
-        {/* Search & filters */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
-            <input
-              className="w-full pl-8 pr-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              placeholder="Search by name or email…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          {tab !== 'group' && tab !== 'individual' && (
-            <select
-              className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-            >
-              <option value="all">All types</option>
-              <option value="group">Group</option>
-              <option value="individual">Individual</option>
-            </select>
-          )}
-          {tab !== 'graduated' && tab !== 'paused' && (
-            <select
-              className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="graduated">Graduated</option>
-              <option value="paused">Paused</option>
-              <option value="refund">Refund</option>
-            </select>
-          )}
-          <select
-            className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-            value={filterCohort}
-            onChange={(e) => setFilterCohort(e.target.value)}
-          >
-            <option value="all">All cohorts</option>
-            {allCohorts.map((c) => <option key={c} value={c}>{c === '1:1' ? '1:1' : `Cohort ${c}`}</option>)}
-          </select>
-        </div>
+            {/* Graduated banner */}
+            {tab === 'graduated' && displayStudents.length > 0 && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3 text-sm text-green-700 dark:text-green-300 font-medium mb-4">
+                {displayStudents.length} {displayStudents.length === 1 ? 'student has' : 'students have'} completed the program 🎓
+              </div>
+            )}
 
-        {/* Content */}
-        {loading ? (
-          <div className="space-y-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-14 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
-            ))}
+            {/* Content */}
+            {loading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-14 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
+                ))}
+              </div>
+            ) : displayStudents.length === 0 ? (
+              <EmptyState
+                title="No students found"
+                description={tab === 'group' ? 'Add group students using the button above.' : 'Add students using the button above.'}
+                icon={<GraduationCap className="h-10 w-10" />}
+              />
+            ) : view === 'card' ? (
+              <CardView
+                students={tab === 'graduated'
+                  ? [...displayStudents].sort((a, b) => (b.graduated_at ?? '').localeCompare(a.graduated_at ?? ''))
+                  : sortStudents(displayStudents)}
+                actions={actions}
+                showCohort={tab !== 'individual'}
+              />
+            ) : view === 'table' ? (
+              <TableView
+                students={displayStudents}
+                actions={actions}
+                showCohort={tab !== 'individual'}
+                showType={tab === 'all'}
+              />
+            ) : (
+              <ListView
+                students={tab === 'graduated'
+                  ? [...displayStudents].sort((a, b) => (b.graduated_at ?? '').localeCompare(a.graduated_at ?? ''))
+                  : sortStudents(displayStudents)}
+                actions={actions}
+                showCohort={tab !== 'individual'}
+              />
+            )}
           </div>
-        ) : filtered.length === 0 && tab !== 'group' ? (
-          <EmptyState
-            title="No students found"
-            description="Add students using the button above."
-            icon={<GraduationCap className="h-10 w-10" />}
-          />
-        ) : tab === 'group' ? (
-          <GroupTab cohortGroups={cohortGroups} actions={actions} />
-        ) : tab === 'individual' ? (
-          <IndividualTab students={filtered} actions={actions} />
-        ) : tab === 'graduated' ? (
-          <GraduatedTab students={filtered} actions={actions} />
-        ) : tab === 'paused' ? (
-          <PausedTab students={filtered} actions={actions} />
-        ) : (
-          <AllTab students={filtered} actions={actions} />
-        )}
+        </div>
       </div>
 
       {/* ── Modals ── */}
@@ -1623,161 +1574,238 @@ export default function StudentsPage() {
   )
 }
 
-// ─── Tab views ────────────────────────────────────────────────────────────────
+// ─── View Components ─────────────────────────────────────────────────────────
 
-function AllTab({ students, actions }: { students: PwuStudent[]; actions: StudentActions }) {
-  const sorted = sortStudents(students)
-  return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
-      <table className="w-full text-sm">
-        <TableHeader cols={['Name', 'Email', 'Cohort', 'Type', 'Status', 'Last Contact', 'Notes', '']} />
-        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {sorted.map((s) => (
-            <StudentRow key={s.id} student={s} showCohort showType {...actions} />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function GroupTab({
-  cohortGroups, actions,
-}: {
-  cohortGroups: { cohort: string; students: PwuStudent[] }[]
+function ListView({ students, actions, showCohort = true }: {
+  students: PwuStudent[]
   actions: StudentActions
+  showCohort?: boolean
 }) {
-  if (cohortGroups.length === 0) {
-    return (
-      <EmptyState
-        title="No group cohorts"
-        description="Add group students to see cohorts here."
-        icon={<GraduationCap className="h-10 w-10" />}
-      />
-    )
-  }
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {cohortGroups.map(({ cohort, students }) => (
-        <CohortCard key={cohort} cohort={cohort} students={students} actions={actions} />
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800">
+      {students.map((s) => (
+        <div
+          key={s.id}
+          onClick={() => actions.onSelect(s)}
+          className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer group transition-colors"
+        >
+          <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xs font-bold text-blue-600 dark:text-blue-300 shrink-0">
+            {initials(s)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate leading-tight">{fullName(s)}</p>
+            <p className="text-xs text-zinc-400 truncate mt-0.5">{s.email ?? '—'}</p>
+          </div>
+          {showCohort && (
+            <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 whitespace-nowrap shrink-0">
+              {s.type === 'individual' ? '1:1' : `C${s.cohort}`}
+            </span>
+          )}
+          <div className="shrink-0"><StatusBadge status={s.status} /></div>
+          <div className="hidden lg:block w-28 text-right shrink-0">
+            <LastContactBadge ts={s.last_contacted_at} />
+          </div>
+          <div className="hidden lg:flex items-center justify-end w-5 shrink-0">
+            {s.notes && <MessageSquare className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-600" />}
+          </div>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
+            <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
+            {s.status === 'active' && (
+              <ActionBtn title="Graduate" onClick={() => actions.onGraduate(s)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
+                <GraduationCap className="h-3.5 w-3.5" />
+              </ActionBtn>
+            )}
+            {s.status === 'active' && (
+              <ActionBtn title="Pause" onClick={() => actions.onPause(s)} className="text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                <PauseCircle className="h-3.5 w-3.5" />
+              </ActionBtn>
+            )}
+            <ActionBtn title="Delete" onClick={() => actions.onDelete(s)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+              <Trash2 className="h-3.5 w-3.5" />
+            </ActionBtn>
+          </div>
+        </div>
       ))}
     </div>
   )
 }
 
-function IndividualTab({ students, actions }: { students: PwuStudent[]; actions: StudentActions }) {
-  const sorted = sortStudents(students)
-  if (sorted.length === 0) {
-    return <EmptyState title="No individual students" description="Add 1:1 students using the button above." icon={<GraduationCap className="h-10 w-10" />} />
+function CardView({ students, actions, showCohort = true }: {
+  students: PwuStudent[]
+  actions: StudentActions
+  showCohort?: boolean
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {students.map((s) => (
+        <div
+          key={s.id}
+          onClick={() => actions.onSelect(s)}
+          className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm cursor-pointer transition-all group"
+        >
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-bold text-blue-600 dark:text-blue-300 shrink-0">
+              {initials(s)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-tight">{fullName(s)}</p>
+              <p className="text-xs text-zinc-400 truncate mt-0.5">{s.email ?? '—'}</p>
+            </div>
+            <StatusBadge status={s.status} />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            {showCohort && (
+              <span className="px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                {s.type === 'individual' ? '1:1' : `Cohort ${s.cohort}`}
+              </span>
+            )}
+            <span className="flex items-center gap-1 text-xs">
+              <Clock className="h-3 w-3 text-zinc-400 shrink-0" />
+              <LastContactBadge ts={s.last_contacted_at} />
+            </span>
+          </div>
+          <div
+            className="flex items-center gap-0.5 pt-2 border-t border-zinc-100 dark:border-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
+            <ActionBtn title="Notes" onClick={() => actions.onNotes(s)}><FileText className="h-3.5 w-3.5" /></ActionBtn>
+            {s.status === 'active' && (
+              <ActionBtn title="Graduate" onClick={() => actions.onGraduate(s)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
+                <GraduationCap className="h-3.5 w-3.5" />
+              </ActionBtn>
+            )}
+            {s.status === 'active' && (
+              <ActionBtn title="Pause" onClick={() => actions.onPause(s)} className="text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                <PauseCircle className="h-3.5 w-3.5" />
+              </ActionBtn>
+            )}
+            <ActionBtn title="Delete" onClick={() => actions.onDelete(s)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+              <Trash2 className="h-3.5 w-3.5" />
+            </ActionBtn>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+type SortKey = 'name' | 'email' | 'status' | 'cohort' | 'last_contacted'
+
+function TableView({ students, actions, showCohort = true, showType = false }: {
+  students: PwuStudent[]
+  actions: StudentActions
+  showCohort?: boolean
+  showType?: boolean
+}) {
+  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [statusOpen, setStatusOpen] = useState<string | null>(null)
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
   }
+
+  const sorted = useMemo(() => {
+    return [...students].sort((a, b) => {
+      let av = '', bv = ''
+      if (sortKey === 'name') { av = fullName(a).toLowerCase(); bv = fullName(b).toLowerCase() }
+      else if (sortKey === 'email') { av = a.email ?? ''; bv = b.email ?? '' }
+      else if (sortKey === 'status') { av = String(STATUS_ORDER.indexOf(a.status)); bv = String(STATUS_ORDER.indexOf(b.status)) }
+      else if (sortKey === 'cohort') { av = a.cohort; bv = b.cohort }
+      else if (sortKey === 'last_contacted') { av = a.last_contacted_at ?? ''; bv = b.last_contacted_at ?? '' }
+      const c = av.localeCompare(bv)
+      return sortDir === 'asc' ? c : -c
+    })
+  }, [students, sortKey, sortDir])
+
+  const thBase = 'px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap select-none'
+  const thSort = cn(thBase, 'cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors')
+  const sortIcon = (key: SortKey) => (
+    <ArrowUpDown className={cn('h-3 w-3 inline ml-1 -mt-0.5', sortKey === key ? 'text-blue-500' : 'text-zinc-300 dark:text-zinc-600')} />
+  )
+
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
       <table className="w-full text-sm">
-        <TableHeader cols={['Name', 'Email', 'Phone', 'Status', 'Last Contact', 'Notes', '']} />
+        <thead>
+          <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+            <th onClick={() => toggleSort('name')} className={thSort}>Name {sortIcon('name')}</th>
+            <th onClick={() => toggleSort('email')} className={thSort}>Email {sortIcon('email')}</th>
+            <th className={thBase}>Phone</th>
+            {showCohort && <th onClick={() => toggleSort('cohort')} className={thSort}>Cohort {sortIcon('cohort')}</th>}
+            {showType && <th className={thBase}>Type</th>}
+            <th onClick={() => toggleSort('status')} className={thSort}>Status {sortIcon('status')}</th>
+            <th onClick={() => toggleSort('last_contacted')} className={thSort}>Last Contacted {sortIcon('last_contacted')}</th>
+            <th className={thBase}>Notes</th>
+            <th className="px-4 py-3" />
+          </tr>
+        </thead>
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {sorted.map((s) => (
             <tr
               key={s.id}
               onClick={() => actions.onSelect(s)}
-              className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group cursor-pointer"
+              className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 cursor-pointer group transition-colors"
             >
-              <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100 text-sm whitespace-nowrap">{fullName(s)}</td>
+              <td className="px-4 py-3 whitespace-nowrap">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xs font-bold text-blue-600 dark:text-blue-300 shrink-0">
+                    {initials(s)}
+                  </div>
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">{fullName(s)}</span>
+                </div>
+              </td>
               <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">{s.email ?? '—'}</td>
               <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{s.phone ?? '—'}</td>
-              <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
+              {showCohort && (
+                <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                  {s.type === 'individual' ? '1:1' : `Cohort ${s.cohort}`}
+                </td>
+              )}
+              {showType && (
+                <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 capitalize whitespace-nowrap">
+                  {s.type === 'individual' ? 'Individual' : 'Group'}
+                </td>
+              )}
+              <td className="px-4 py-3 relative" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => setStatusOpen(statusOpen === s.id ? null : s.id)}>
+                  <StatusBadge status={s.status} />
+                </button>
+                {statusOpen === s.id && (
+                  <div className="absolute z-20 top-full left-0 mt-1 w-40 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden">
+                    {STATUS_ORDER.map((st) => (
+                      <button
+                        key={st}
+                        onClick={() => { actions.onStatusChange(s, st); setStatusOpen(null) }}
+                        className={cn('w-full text-left px-3 py-2 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors', s.status === st && 'font-semibold')}
+                      >
+                        <StatusBadge status={st} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </td>
               <td className="px-4 py-3"><LastContactBadge ts={s.last_contacted_at} /></td>
               <td className="px-4 py-3 text-xs text-zinc-400 max-w-[120px] truncate">{s.notes ?? '—'}</td>
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
                   <ActionBtn title="Notes" onClick={() => actions.onNotes(s)}><FileText className="h-3.5 w-3.5" /></ActionBtn>
-                  {s.status === 'active' && <ActionBtn title="Graduate" onClick={() => actions.onGraduate(s)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"><GraduationCap className="h-3.5 w-3.5" /></ActionBtn>}
-                  {s.status === 'active' && <ActionBtn title="Pause" onClick={() => actions.onPause(s)} className="text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"><PauseCircle className="h-3.5 w-3.5" /></ActionBtn>}
-                  <ActionBtn title="Delete" onClick={() => actions.onDelete(s)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></ActionBtn>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function GraduatedTab({ students, actions }: { students: PwuStudent[]; actions: StudentActions }) {
-  const sorted = [...students].sort((a, b) => {
-    if (!a.graduated_at) return 1
-    if (!b.graduated_at) return -1
-    return b.graduated_at.localeCompare(a.graduated_at)
-  })
-  return (
-    <div className="space-y-4">
-      {sorted.length > 0 && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3 text-sm text-green-700 dark:text-green-300 font-medium">
-          {sorted.length} {sorted.length === 1 ? 'student has' : 'students have'} completed the program 🎓
-        </div>
-      )}
-      {sorted.length === 0 ? (
-        <EmptyState title="No graduated students" description="Students who complete the program appear here." icon={<GraduationCap className="h-10 w-10" />} />
-      ) : (
-        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
-            <TableHeader cols={['Name', 'Email', 'Cohort', 'Type', 'Last Contact', '']} />
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {sorted.map((s) => (
-                <tr
-                  key={s.id}
-                  onClick={() => actions.onSelect(s)}
-                  className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group cursor-pointer"
-                >
-                  <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100 text-sm whitespace-nowrap">{fullName(s)}</td>
-                  <td className="px-4 py-3 text-xs text-zinc-500">{s.email ?? '—'}</td>
-                  <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">{s.type === 'individual' ? '1:1' : `Cohort ${s.cohort}`}</td>
-                  <td className="px-4 py-3 text-xs text-zinc-500 capitalize">{s.type === 'individual' ? 'Individual' : 'Group'}</td>
-                  <td className="px-4 py-3"><LastContactBadge ts={s.last_contacted_at} /></td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
-                      <ActionBtn title="Notes" onClick={() => actions.onNotes(s)}><FileText className="h-3.5 w-3.5" /></ActionBtn>
-                      <ActionBtn title="Delete" onClick={() => actions.onDelete(s)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></ActionBtn>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function PausedTab({ students, actions }: { students: PwuStudent[]; actions: StudentActions }) {
-  if (students.length === 0) {
-    return <EmptyState title="No paused or refunded students" icon={<GraduationCap className="h-10 w-10" />} />
-  }
-  return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
-      <table className="w-full text-sm">
-        <TableHeader cols={['Name', 'Email', 'Cohort', 'Status', 'Last Contact', 'Notes', '']} />
-        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {students.map((s) => (
-            <tr
-              key={s.id}
-              onClick={() => actions.onSelect(s)}
-              className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group cursor-pointer"
-            >
-              <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100 text-sm whitespace-nowrap">{fullName(s)}</td>
-              <td className="px-4 py-3 text-xs text-zinc-500">{s.email ?? '—'}</td>
-              <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">{s.type === 'individual' ? '1:1' : `Cohort ${s.cohort}`}</td>
-              <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
-              <td className="px-4 py-3"><LastContactBadge ts={s.last_contacted_at} /></td>
-              <td className="px-4 py-3 text-xs text-zinc-400 max-w-[140px] truncate">{s.notes ?? '—'}</td>
-              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
-                  <ActionBtn title="Notes" onClick={() => actions.onNotes(s)}><FileText className="h-3.5 w-3.5" /></ActionBtn>
-                  <ActionBtn title="Delete" onClick={() => actions.onDelete(s)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></ActionBtn>
+                  {s.status === 'active' && (
+                    <ActionBtn title="Graduate" onClick={() => actions.onGraduate(s)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
+                      <GraduationCap className="h-3.5 w-3.5" />
+                    </ActionBtn>
+                  )}
+                  {s.status === 'active' && (
+                    <ActionBtn title="Pause" onClick={() => actions.onPause(s)} className="text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                      <PauseCircle className="h-3.5 w-3.5" />
+                    </ActionBtn>
+                  )}
+                  <ActionBtn title="Delete" onClick={() => actions.onDelete(s)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </ActionBtn>
                 </div>
               </td>
             </tr>
