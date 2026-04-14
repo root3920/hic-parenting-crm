@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { KPICard } from '@/components/shared/KPICard'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -19,7 +19,7 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Clock, Mail, MessageSquare, Pencil, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -36,11 +36,6 @@ import {
   LabelList,
   Legend,
 } from 'recharts'
-import {
-  Dialog,
-  DialogContent,
-} from '@/components/ui/dialog'
-import { formatDistanceToNow } from 'date-fns'
 import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
@@ -107,11 +102,29 @@ function daysActive(subscribedAt: string, cancelledAt: string): number {
   )
 }
 
-function noteAgeCls(createdAt: string) {
-  const diff = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-  if (diff < 3) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-  if (diff < 7) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
-  return 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+function formatDateTime(d: string | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function SpcModal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700 w-full max-w-4xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
+          <span />
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  )
 }
 
 function MemberProfileModal({
@@ -121,6 +134,7 @@ function MemberProfileModal({
   addingNote,
   onNoteChange,
   onAddNote,
+  onClose,
 }: {
   selected: SelectedMember
   notes: SpcMemberNote[]
@@ -128,8 +142,11 @@ function MemberProfileModal({
   addingNote: boolean
   onNoteChange: (v: string) => void
   onAddNote: () => void
+  onClose: () => void
 }) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
+  const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
+  const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
 
   const name = selected.data.name
   const email = selected.data.email
@@ -140,169 +157,207 @@ function MemberProfileModal({
   let statusLabel = ''
   let statusCls = ''
   if (selected.kind === 'member') {
-    if (selected.data.status === 'active') { statusLabel = 'Active'; statusCls = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' }
-    else { statusLabel = 'Trial'; statusCls = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' }
-  } else {
-    if (selected.data.cancel_type === 'paid_cancel') { statusLabel = 'Cancelled'; statusCls = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }
-    else if (selected.data.cancel_type === 'pending_cancel') { statusLabel = 'Pending Cancel'; statusCls = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
-    else { statusLabel = 'Trial Cancelled'; statusCls = 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' }
-  }
-
-  let trialStart: string | null = null
-  let expiresDate: string | null = null
-  let daysLeft: number | null = null
-  let memberSince: string | null = null
-  let nextPayment: string | null = null
-
-  if (selected.kind === 'member') {
-    const m = selected.data
-    memberSince = m.joined_at
-    nextPayment = m.next_payment_date ?? null
-    if (m.status === 'trial') {
-      trialStart = m.joined_at
-      expiresDate = m.trial_end_date ?? null
-      daysLeft = m.trial_end_date ? daysUntil(m.trial_end_date) : null
+    if (selected.data.status === 'active') {
+      statusLabel = 'Active'; statusCls = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+    } else {
+      statusLabel = 'Trial'; statusCls = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
     }
   } else {
-    const c = selected.data
-    trialStart = c.subscribed_at
-    expiresDate = c.cancelled_at
-    memberSince = c.subscribed_at
+    if (selected.data.cancel_type === 'paid_cancel') {
+      statusLabel = 'Cancelled'; statusCls = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+    } else if (selected.data.cancel_type === 'pending_cancel') {
+      statusLabel = 'Pending Cancel'; statusCls = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+    } else {
+      statusLabel = 'Trial Cancelled'; statusCls = 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+    }
+  }
+
+  function noteBorderCls(createdAt: string) {
+    const diff = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
+    if (diff < 3) return 'border-green-400 bg-green-50 dark:bg-green-900/10'
+    if (diff < 7) return 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/10'
+    return 'border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800/60'
   }
 
   return (
-    <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto p-0">
+    <SpcModal onClose={onClose}>
       {/* Header */}
-      <div className="flex items-start gap-4 p-6 border-b border-zinc-100 dark:border-zinc-800">
-        <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center justify-center text-lg font-bold shrink-0">
+      <div className="flex items-start gap-4 mb-6 -mt-1">
+        <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-lg font-bold text-blue-600 dark:text-blue-300 shrink-0">
           {getInitials(name)}
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{name}</h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">{email}</p>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-semibold', statusCls)}>
-              {statusLabel}
-            </span>
-            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-              {provider}
-            </span>
-            {plan && (
-              <span className={cn(
-                'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                plan === 'annual' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-              )}>
-                {plan === 'annual' ? 'Annual' : 'Monthly'} · {formatCurrency(amount)}
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{name}</h2>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            {email && (
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
+                <Mail className="h-3 w-3" />{email}
               </span>
             )}
           </div>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-semibold', statusCls)}>
+              {statusLabel}
+            </span>
+            {plan && (
+              <span className={cn(
+                'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold',
+                plan === 'annual'
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                  : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+              )}>
+                {plan === 'annual' ? 'Annual' : 'Monthly'}
+              </span>
+            )}
+            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+              {provider}
+            </span>
+          </div>
+        </div>
+        {/* Quick actions */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Edit"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-100 dark:divide-zinc-800">
-        {/* LEFT: Member Info */}
-        <div className="p-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">Member Info</p>
-          <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 space-y-2.5">
-            {trialStart && (
-              <div className="flex justify-between">
-                <span className="text-xs text-zinc-500">
-                  {selected.kind === 'member' && selected.data.status === 'trial' ? 'Trial Start' : 'Subscribed'}
-                </span>
-                <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{formatDate(trialStart)}</span>
-              </div>
-            )}
-            {expiresDate && (
-              <div className="flex justify-between">
-                <span className="text-xs text-zinc-500">
-                  {selected.kind === 'cancellation' ? 'Cancelled / Access Until' : 'Expires'}
-                </span>
-                <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{formatDate(expiresDate)}</span>
-              </div>
-            )}
-            {daysLeft !== null && (
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-zinc-500">Days Left</span>
-                <span className={cn(
-                  'inline-flex px-2 py-0.5 rounded-full text-xs font-bold',
-                  daysLeft < 0 ? 'bg-red-100 text-red-700' :
-                  daysLeft <= 7 ? 'bg-orange-100 text-orange-700' :
-                  'bg-green-100 text-green-700'
-                )}>
-                  {daysLeft < 0 ? 'Expired' : `${daysLeft}d left`}
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-xs text-zinc-500">Payment Method</span>
-              <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{provider}</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* LEFT: Key Info */}
+        <div>
+          <p className={sectionLabel}>Key Info</p>
+          <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2.5">
+            {/* Member since */}
+            <div className="flex items-center justify-between">
+              <span className={rowLabel}>Member since</span>
+              <span className={rowValue}>
+                {selected.kind === 'member' ? formatDate(selected.data.joined_at) : formatDate(selected.data.subscribed_at)}
+              </span>
             </div>
-            {memberSince && (
-              <div className="flex justify-between">
-                <span className="text-xs text-zinc-500">Member since</span>
-                <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{formatDate(memberSince)}</span>
+            {/* Next Payment (active only) */}
+            {selected.kind === 'member' && selected.data.status === 'active' && (
+              <div className="flex items-center justify-between">
+                <span className={rowLabel}>Next Payment</span>
+                <span className={rowValue}>{formatDate(selected.data.next_payment_date)}</span>
               </div>
             )}
-            {nextPayment && (
-              <div className="flex justify-between">
-                <span className="text-xs text-zinc-500">Next Payment</span>
-                <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{formatDate(nextPayment)}</span>
+            {/* Cancelled (cancellations) */}
+            {selected.kind === 'cancellation' && (
+              <div className="flex items-center justify-between">
+                <span className={rowLabel}>Cancelled</span>
+                <span className={rowValue}>{formatDate(selected.data.cancelled_at)}</span>
+              </div>
+            )}
+            {/* Plan */}
+            <div className="flex items-center justify-between">
+              <span className={rowLabel}>Plan</span>
+              <span className={rowValue}>
+                {plan === 'annual' ? 'Annual' : 'Monthly'} · {formatCurrency(amount)}
+              </span>
+            </div>
+            {/* Payment Method */}
+            <div className="flex items-center justify-between">
+              <span className={rowLabel}>Payment Method</span>
+              <span className={rowValue}>{provider}</span>
+            </div>
+            {/* Days Left */}
+            <div className="flex items-center justify-between">
+              <span className={rowLabel}>Days Left</span>
+              {selected.kind === 'member' && selected.data.status === 'trial' && selected.data.trial_end_date
+                ? (() => {
+                    const d = daysUntil(selected.data.trial_end_date)
+                    return (
+                      <span className={cn(
+                        'inline-flex px-2 py-0.5 rounded-full text-xs font-bold',
+                        d < 0 ? 'bg-red-100 text-red-700' :
+                        d <= 7 ? 'bg-orange-100 text-orange-700' :
+                        'bg-green-100 text-green-700'
+                      )}>
+                        {d < 0 ? 'Expired' : `${d}d left`}
+                      </span>
+                    )
+                  })()
+                : <span className={rowValue}>—</span>
+              }
+            </div>
+            {/* Trial Expires (trials only) */}
+            {selected.kind === 'member' && selected.data.status === 'trial' && selected.data.trial_end_date && (
+              <div className="flex items-center justify-between">
+                <span className={rowLabel}>Trial Expires</span>
+                <span className={rowValue}>{formatDate(selected.data.trial_end_date)}</span>
               </div>
             )}
           </div>
         </div>
 
         {/* RIGHT: Contact Notes */}
-        <div className="p-5 flex flex-col">
-          <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">Contact Notes</p>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2 mb-3">
+            <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />
+            <p className={cn(sectionLabel, 'mb-0')}>Contact Notes</p>
+          </div>
 
           {/* Timeline */}
-          <div className="flex-1 space-y-2 mb-3 max-h-56 overflow-y-auto pr-1">
+          <div className="flex-1 space-y-2 max-h-72 overflow-y-auto pr-1 mb-4">
             {notes.length === 0 ? (
-              <p className="text-xs text-zinc-400 text-center py-6">No notes yet</p>
+              <div className="text-center py-10 text-zinc-400 text-xs">
+                No notes yet. Add the first contact note below.
+              </div>
             ) : (
-              notes.map((n) => (
-                <div key={n.id} className="rounded-lg border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-snug">{n.note}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className={cn('inline-flex px-1.5 py-0.5 rounded text-xs font-medium', noteAgeCls(n.created_at))}>
-                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+              notes.map((note) => (
+                <div key={note.id} className={cn('rounded-xl p-3 border-l-4', noteBorderCls(note.created_at))}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{note.created_by}</span>
+                    <span className="text-xs text-zinc-400 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatDateTime(note.created_at)}
                     </span>
-                    <span className="text-xs text-zinc-400">{n.created_by}</span>
                   </div>
+                  <p className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">{note.note}</p>
                 </div>
               ))
             )}
           </div>
 
           {/* Add note */}
-          <div className="mt-auto">
+          <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4">
             <textarea
-              ref={textareaRef}
               value={noteText}
               onChange={(e) => onNoteChange(e.target.value)}
               onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault()
                   onAddNote()
                 }
               }}
-              placeholder="Add a contact note... (⌘+Enter to save)"
+              placeholder="Add a contact note… (⌘+Enter to save)"
               rows={3}
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-none mb-2"
+              className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-none"
             />
-            <button
-              onClick={onAddNote}
-              disabled={!noteText.trim() || addingNote}
-              className="w-full py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#185FA5' }}
-            >
-              {addingNote ? 'Saving...' : 'Add Note'}
-            </button>
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={onAddNote}
+                disabled={!noteText.trim() || addingNote}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                style={{ backgroundColor: '#185FA5' }}
+              >
+                <MessageSquare className="h-3 w-3" />
+                {addingNote ? 'Saving…' : 'Add Note'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </DialogContent>
+    </SpcModal>
   )
 }
 
@@ -1396,18 +1451,17 @@ export default function SpcPage() {
         )}
       </div>
 
-      <Dialog open={!!selectedMember} onOpenChange={(open) => { if (!open) setSelectedMember(null) }}>
-        {selectedMember && (
-          <MemberProfileModal
-            selected={selectedMember}
-            notes={notes}
-            noteText={noteText}
-            addingNote={addingNote}
-            onNoteChange={setNoteText}
-            onAddNote={handleAddNote}
-          />
-        )}
-      </Dialog>
+      {selectedMember && (
+        <MemberProfileModal
+          selected={selectedMember}
+          notes={notes}
+          noteText={noteText}
+          addingNote={addingNote}
+          onNoteChange={setNoteText}
+          onAddNote={handleAddNote}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
     </PageTransition>
   )
 }
