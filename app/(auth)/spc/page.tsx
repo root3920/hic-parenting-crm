@@ -19,7 +19,7 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, Clock, Mail, MessageSquare, Pencil, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Clock, Mail, MessageSquare, Pencil, Phone, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -37,6 +37,7 @@ import {
   Legend,
 } from 'recharts'
 import { useProfile } from '@/hooks/useProfile'
+import { toast } from 'sonner'
 
 export const dynamic = 'force-dynamic'
 
@@ -127,6 +128,26 @@ function SpcModal({ onClose, children }: { onClose: () => void; children: React.
   )
 }
 
+type MemberStatus = 'active' | 'trial' | 'cancelled' | 'expired'
+
+interface MemberEditForm {
+  name: string
+  email: string
+  phone: string
+  plan: 'monthly' | 'annual'
+  provider: 'Kajabi' | 'Stripe' | 'PayPal'
+  next_payment_date: string
+  joined_at: string
+  status: MemberStatus
+}
+
+const STATUS_CONFIG: Record<MemberStatus, { label: string; cls: string }> = {
+  active:    { label: 'Active',    cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
+  trial:     { label: 'Trial',     cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  expired:   { label: 'Expired',   cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
+}
+
 function MemberProfileModal({
   selected,
   notes,
@@ -135,6 +156,7 @@ function MemberProfileModal({
   onNoteChange,
   onAddNote,
   onClose,
+  onSave,
 }: {
   selected: SelectedMember
   notes: SpcMemberNote[]
@@ -143,32 +165,95 @@ function MemberProfileModal({
   onNoteChange: (v: string) => void
   onAddNote: () => void
   onClose: () => void
+  onSave: (updated: SpcMember) => void
 }) {
+  const supabase = useMemo(() => createClient(), [])
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
   const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
   const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
 
-  const name = selected.data.name
-  const email = selected.data.email
-  const plan = selected.data.plan
-  const amount = selected.data.amount
-  const provider = selected.kind === 'member' ? selected.data.provider : selected.data.source
+  const [isEditing, setIsEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editForm, setEditForm] = useState<MemberEditForm>({
+    name: '', email: '', phone: '', plan: 'monthly',
+    provider: 'Stripe', next_payment_date: '', joined_at: '', status: 'active',
+  })
 
+  function setField<K extends keyof MemberEditForm>(key: K, value: MemberEditForm[K]) {
+    setEditForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function startEdit() {
+    if (selected.kind !== 'member') return
+    const m = selected.data
+    setEditForm({
+      name: m.name,
+      email: m.email,
+      phone: m.phone ?? '',
+      plan: m.plan,
+      provider: m.provider,
+      next_payment_date: m.next_payment_date ?? '',
+      joined_at: m.joined_at ?? '',
+      status: (m.status as MemberStatus) ?? 'active',
+    })
+    setIsEditing(true)
+  }
+
+  async function handleSave() {
+    if (selected.kind !== 'member') return
+    setSaving(true)
+    const { data, error } = await supabase
+      .from('spc_members')
+      .update({
+        name: editForm.name,
+        email: editForm.email,
+        phone: editForm.phone || null,
+        plan: editForm.plan,
+        provider: editForm.provider,
+        next_payment_date: editForm.next_payment_date || null,
+        joined_at: editForm.joined_at || null,
+        status: editForm.status,
+      })
+      .eq('id', selected.data.id)
+      .select()
+      .single()
+    setSaving(false)
+    if (error) {
+      toast.error(`Failed to save: ${error.message}`)
+    } else {
+      toast.success('Member updated successfully')
+      onSave(data as SpcMember)
+      setIsEditing(false)
+    }
+  }
+
+  function handleCancel() {
+    setIsEditing(false)
+  }
+
+  // ── Derived display values (optimistic during edit) ──
+  const displayName     = isEditing ? editForm.name     : selected.data.name
+  const displayEmail    = isEditing ? editForm.email    : selected.data.email
+  const displayPhone    = isEditing ? editForm.phone    : (selected.kind === 'member' ? selected.data.phone : null)
+  const displayPlan     = isEditing ? editForm.plan     : selected.data.plan
+  const displayProvider = isEditing ? editForm.provider : (selected.kind === 'member' ? selected.data.provider : selected.data.source)
+
+  // Status badge — optimistic when editing
   let statusLabel = ''
   let statusCls = ''
   if (selected.kind === 'member') {
-    if (selected.data.status === 'active') {
-      statusLabel = 'Active'; statusCls = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-    } else {
-      statusLabel = 'Trial'; statusCls = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-    }
+    const key = (isEditing ? editForm.status : selected.data.status) as MemberStatus
+    const cfg = STATUS_CONFIG[key] ?? STATUS_CONFIG.active
+    statusLabel = cfg.label; statusCls = cfg.cls
   } else {
     if (selected.data.cancel_type === 'paid_cancel') {
-      statusLabel = 'Cancelled'; statusCls = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+      statusLabel = 'Cancelled'; statusCls = STATUS_CONFIG.cancelled.cls
     } else if (selected.data.cancel_type === 'pending_cancel') {
-      statusLabel = 'Pending Cancel'; statusCls = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+      statusLabel = 'Pending Cancel'
+      statusCls = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
     } else {
-      statusLabel = 'Trial Cancelled'; statusCls = 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+      statusLabel = 'Trial Cancelled'; statusCls = STATUS_CONFIG.expired.cls
     }
   }
 
@@ -181,47 +266,56 @@ function MemberProfileModal({
 
   return (
     <SpcModal onClose={onClose}>
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex items-start gap-4 mb-6 -mt-1">
         <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-lg font-bold text-blue-600 dark:text-blue-300 shrink-0">
-          {getInitials(name)}
+          {getInitials(displayName)}
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{name}</h2>
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{displayName}</h2>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
-            {email && (
+            {displayEmail && (
               <span className="flex items-center gap-1 text-xs text-zinc-400">
-                <Mail className="h-3 w-3" />{email}
+                <Mail className="h-3 w-3" />{displayEmail}
+              </span>
+            )}
+            {displayPhone && (
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
+                <Phone className="h-3 w-3" />{displayPhone}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {/* Status badge — updates optimistically during edit */}
             <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-semibold', statusCls)}>
               {statusLabel}
             </span>
-            {plan && (
+            {displayPlan && (
               <span className={cn(
                 'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold',
-                plan === 'annual'
+                displayPlan === 'annual'
                   ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                   : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
               )}>
-                {plan === 'annual' ? 'Annual' : 'Monthly'}
+                {displayPlan === 'annual' ? 'Annual' : 'Monthly'}
               </span>
             )}
             <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
-              {provider}
+              {displayProvider}
             </span>
           </div>
         </div>
-        {/* Quick actions */}
+        {/* Quick actions — edit only available for spc_members */}
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-            title="Edit"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
+          {selected.kind === 'member' && !isEditing && (
+            <button
+              onClick={startEdit}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
           <button
             className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
             title="Delete"
@@ -232,81 +326,170 @@ function MemberProfileModal({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* LEFT: Key Info */}
+
+        {/* ── LEFT: Key Info (view) or Edit Form ── */}
         <div>
-          <p className={sectionLabel}>Key Info</p>
-          <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2.5">
-            {/* Member since */}
-            <div className="flex items-center justify-between">
-              <span className={rowLabel}>Member since</span>
-              <span className={rowValue}>
-                {selected.kind === 'member' ? formatDate(selected.data.joined_at) : formatDate(selected.data.subscribed_at)}
-              </span>
-            </div>
-            {/* Next Payment (active only) */}
-            {selected.kind === 'member' && selected.data.status === 'active' && (
-              <div className="flex items-center justify-between">
-                <span className={rowLabel}>Next Payment</span>
-                <span className={rowValue}>{formatDate(selected.data.next_payment_date)}</span>
+          {!isEditing ? (
+            <>
+              <p className={sectionLabel}>Key Info</p>
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Member since</span>
+                  <span className={rowValue}>
+                    {selected.kind === 'member' ? formatDate(selected.data.joined_at) : formatDate(selected.data.subscribed_at)}
+                  </span>
+                </div>
+                {selected.kind === 'member' && selected.data.status === 'active' && (
+                  <div className="flex items-center justify-between">
+                    <span className={rowLabel}>Next Payment</span>
+                    <span className={rowValue}>{formatDate(selected.data.next_payment_date)}</span>
+                  </div>
+                )}
+                {selected.kind === 'cancellation' && (
+                  <div className="flex items-center justify-between">
+                    <span className={rowLabel}>Cancelled</span>
+                    <span className={rowValue}>{formatDate(selected.data.cancelled_at)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Plan</span>
+                  <span className={rowValue}>
+                    {selected.data.plan === 'annual' ? 'Annual' : 'Monthly'} · {formatCurrency(selected.data.amount)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Payment Method</span>
+                  <span className={rowValue}>{selected.kind === 'member' ? selected.data.provider : selected.data.source}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Days Left</span>
+                  {selected.kind === 'member' && selected.data.status === 'trial' && selected.data.trial_end_date
+                    ? (() => {
+                        const d = daysUntil(selected.data.trial_end_date)
+                        return (
+                          <span className={cn(
+                            'inline-flex px-2 py-0.5 rounded-full text-xs font-bold',
+                            d < 0 ? 'bg-red-100 text-red-700' :
+                            d <= 7 ? 'bg-orange-100 text-orange-700' :
+                            'bg-green-100 text-green-700'
+                          )}>
+                            {d < 0 ? 'Expired' : `${d}d left`}
+                          </span>
+                        )
+                      })()
+                    : <span className={rowValue}>—</span>
+                  }
+                </div>
+                {selected.kind === 'member' && selected.data.status === 'trial' && selected.data.trial_end_date && (
+                  <div className="flex items-center justify-between">
+                    <span className={rowLabel}>Trial Expires</span>
+                    <span className={rowValue}>{formatDate(selected.data.trial_end_date)}</span>
+                  </div>
+                )}
               </div>
-            )}
-            {/* Cancelled (cancellations) */}
-            {selected.kind === 'cancellation' && (
-              <div className="flex items-center justify-between">
-                <span className={rowLabel}>Cancelled</span>
-                <span className={rowValue}>{formatDate(selected.data.cancelled_at)}</span>
+            </>
+          ) : (
+            /* ── EDIT FORM ── */
+            <>
+              <p className={sectionLabel}>Edit Member</p>
+
+              {/* Status — prominent select */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
+                  Membership Status
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(Object.entries(STATUS_CONFIG) as [MemberStatus, { label: string; cls: string }][]).map(([key, cfg]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setField('status', key)}
+                      className={cn(
+                        'py-1.5 px-2 rounded-lg text-xs font-semibold border-2 transition-all',
+                        editForm.status === key
+                          ? cn('border-current', cfg.cls)
+                          : 'border-transparent bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                      )}
+                    >
+                      {cfg.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
-            {/* Plan */}
-            <div className="flex items-center justify-between">
-              <span className={rowLabel}>Plan</span>
-              <span className={rowValue}>
-                {plan === 'annual' ? 'Annual' : 'Monthly'} · {formatCurrency(amount)}
-              </span>
-            </div>
-            {/* Payment Method */}
-            <div className="flex items-center justify-between">
-              <span className={rowLabel}>Payment Method</span>
-              <span className={rowValue}>{provider}</span>
-            </div>
-            {/* Days Left */}
-            <div className="flex items-center justify-between">
-              <span className={rowLabel}>Days Left</span>
-              {selected.kind === 'member' && selected.data.status === 'trial' && selected.data.trial_end_date
-                ? (() => {
-                    const d = daysUntil(selected.data.trial_end_date)
-                    return (
-                      <span className={cn(
-                        'inline-flex px-2 py-0.5 rounded-full text-xs font-bold',
-                        d < 0 ? 'bg-red-100 text-red-700' :
-                        d <= 7 ? 'bg-orange-100 text-orange-700' :
-                        'bg-green-100 text-green-700'
-                      )}>
-                        {d < 0 ? 'Expired' : `${d}d left`}
-                      </span>
-                    )
-                  })()
-                : <span className={rowValue}>—</span>
-              }
-            </div>
-            {/* Trial Expires (trials only) */}
-            {selected.kind === 'member' && selected.data.status === 'trial' && selected.data.trial_end_date && (
-              <div className="flex items-center justify-between">
-                <span className={rowLabel}>Trial Expires</span>
-                <span className={rowValue}>{formatDate(selected.data.trial_end_date)}</span>
+
+              {/* Fields */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Full name</label>
+                  <input type="text" value={editForm.name} onChange={(e) => setField('name', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Email</label>
+                  <input type="email" value={editForm.email} onChange={(e) => setField('email', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Phone</label>
+                  <input type="text" value={editForm.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="+" className={inputCls} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Plan</label>
+                    <select value={editForm.plan} onChange={(e) => setField('plan', e.target.value as 'monthly' | 'annual')} className={inputCls}>
+                      <option value="monthly">Monthly</option>
+                      <option value="annual">Annual</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Payment Method</label>
+                    <select value={editForm.provider} onChange={(e) => setField('provider', e.target.value as MemberEditForm['provider'])} className={inputCls}>
+                      <option value="Stripe">Stripe</option>
+                      <option value="PayPal">PayPal</option>
+                      <option value="Kajabi">Kajabi Payments</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Member since</label>
+                    <input type="date" value={editForm.joined_at} onChange={(e) => setField('joined_at', e.target.value)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Next Payment</label>
+                    <input type="date" value={editForm.next_payment_date} onChange={(e) => setField('next_payment_date', e.target.value)} className={inputCls} />
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Save / Cancel */}
+              <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
+                  style={{ backgroundColor: '#185FA5' }}
+                >
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* RIGHT: Contact Notes */}
+        {/* ── RIGHT: Contact Notes (always visible) ── */}
         <div className="flex flex-col">
           <div className="flex items-center gap-2 mb-3">
             <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />
             <p className={cn(sectionLabel, 'mb-0')}>Contact Notes</p>
           </div>
 
-          {/* Timeline */}
           <div className="flex-1 space-y-2 max-h-72 overflow-y-auto pr-1 mb-4">
             {notes.length === 0 ? (
               <div className="text-center py-10 text-zinc-400 text-xs">
@@ -328,7 +511,6 @@ function MemberProfileModal({
             )}
           </div>
 
-          {/* Add note */}
           <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4">
             <textarea
               value={noteText}
@@ -1460,6 +1642,10 @@ export default function SpcPage() {
           onNoteChange={setNoteText}
           onAddNote={handleAddNote}
           onClose={() => setSelectedMember(null)}
+          onSave={(updated) => {
+            setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
+            setSelectedMember({ kind: 'member', data: updated })
+          }}
         />
       )}
     </PageTransition>

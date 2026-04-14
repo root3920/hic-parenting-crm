@@ -55,9 +55,10 @@ export interface SpcMember {
   id: string
   name: string
   email: string
+  phone?: string | null
   plan: 'monthly' | 'annual'
   amount: number
-  status: 'active' | 'trial'
+  status: 'active' | 'trial' | 'cancelled' | 'expired'
   provider: 'Kajabi' | 'Stripe' | 'PayPal'
   joined_at: string
   next_payment_date: string
