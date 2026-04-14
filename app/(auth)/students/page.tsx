@@ -562,7 +562,16 @@ export default function StudentsPage() {
     return sortCohorts(Array.from(s))
   }, [students])
 
-  const groupCohorts = useMemo(() => allCohorts.filter((c) => c !== '1:1'), [allCohorts])
+  const groupCohorts = useMemo(() => allCohorts.filter((c) => {
+    const lower = c.toLowerCase()
+    return (
+      c !== '1:1' &&
+      lower !== 'refund' &&
+      lower !== 'unknown' &&
+      lower !== 'pausado' &&
+      !isNaN(Number(c))
+    )
+  }), [allCohorts])
 
   const nextSuggested = useMemo(() => {
     const nums = groupCohorts.map(Number).filter((n) => !isNaN(n))
@@ -597,13 +606,15 @@ export default function StudentsPage() {
     return list
   }, [students, tab, filterStatus, filterCohort, filterType, search])
 
-  // Cohort grouping for group tab
+  // Cohort grouping for group tab — only numeric cohorts
   const cohortGroups = useMemo(() => {
     if (tab !== 'group') return []
     const map: Record<string, PwuStudent[]> = {}
     for (const s of filtered) {
-      if (!map[s.cohort]) map[s.cohort] = []
-      map[s.cohort].push(s)
+      if (!isNaN(Number(s.cohort))) {
+        if (!map[s.cohort]) map[s.cohort] = []
+        map[s.cohort].push(s)
+      }
     }
     return sortCohorts(Object.keys(map)).map((c) => ({ cohort: c, students: map[c] }))
   }, [filtered, tab])
