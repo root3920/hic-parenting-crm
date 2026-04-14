@@ -206,6 +206,39 @@ export interface StudentPaymentPlan {
   created_at: string
 }
 
+export interface SpcReport {
+  id: string
+  date: string
+  rep_name: string
+  // Community
+  c_active_members: number
+  c_new_members: number
+  c_at_risk: number
+  c_churn: number
+  c_reactivated: number
+  c_notas: string | null
+  // Content & Activity
+  a_posts: number
+  a_comments: number
+  a_lives: number
+  a_engagement: string
+  a_notas: string | null
+  // Retention
+  r_requests: number
+  r_saved: number
+  r_churn: number
+  r_cancel_reasons: string[] | null
+  r_notas: string | null
+  // Closeout
+  e_wins: string | null
+  e_risks: string | null
+  e_action1: string | null
+  e_action2: string | null
+  e_action3: string | null
+  e_performance: number
+  created_at: string
+}
+
 export interface CsmReport {
   id: string
   date: string
