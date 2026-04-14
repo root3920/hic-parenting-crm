@@ -210,32 +210,29 @@ export interface SpcReport {
   id: string
   date: string
   rep_name: string
-  // Community
-  c_active_members: number
-  c_new_members: number
-  c_at_risk: number
-  c_churn: number
-  c_reactivated: number
-  c_notas: string | null
+  hours_worked: number
+  // Community metrics
+  community_size: number
+  new_members: number
+  members_welcomed: number
+  members_introduced: number
+  questions_answered: number
+  wins_shared: number
   // Content & Activity
-  a_posts: number
-  a_comments: number
-  a_lives: number
-  a_engagement: string
-  a_notas: string | null
+  published_post: boolean
+  post_type: string | null
+  sent_class_reminder: boolean
   // Retention
-  r_requests: number
-  r_saved: number
-  r_churn: number
-  r_cancel_reasons: string[] | null
-  r_notas: string | null
-  // Closeout
-  e_wins: string | null
-  e_risks: string | null
-  e_action1: string | null
-  e_action2: string | null
-  e_action3: string | null
-  e_performance: number
+  inactive_identified: number
+  checkin_messages_sent: number
+  parent_frustration: boolean
+  parent_frustration_notes: string | null
+  referral_mentioned: boolean
+  referrals_count: number
+  // End of day
+  highs: string | null
+  lows: string | null
+  performance: number
   created_at: string
 }
 
