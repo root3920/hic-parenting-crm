@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getCanonicalProduct } from '@/lib/products'
 
 export async function POST(req: NextRequest) {
   try {
@@ -85,6 +86,31 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('Supabase insert error:', JSON.stringify(error))
       return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+    }
+
+    // Auto-create PWU student on new sale if not already enrolled
+    const canonical = getCanonicalProduct(offer_tittle)
+    if (canonical.startsWith('Parenting With Understanding') && buyer_email) {
+      const { data: existing } = await supabase
+        .from('pwu_students')
+        .select('id')
+        .eq('email', buyer_email)
+        .maybeSingle()
+
+      if (!existing) {
+        const nameParts = (buyer_fullname ?? '').trim().split(/\s+/)
+        const first_name = nameParts[0] || 'Unknown'
+        const last_name = nameParts.slice(1).join(' ') || null
+        await supabase.from('pwu_students').insert({
+          first_name,
+          last_name,
+          email: buyer_email,
+          phone: buyer_phone ?? null,
+          cohort: '1:1',
+          type: 'individual',
+          status: 'active',
+        })
+      }
     }
 
     return NextResponse.json({

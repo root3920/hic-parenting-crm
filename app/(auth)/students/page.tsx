@@ -10,10 +10,11 @@ import { formatDistanceToNow } from 'date-fns'
 import {
   Plus, Download, X, GraduationCap, Search,
   Pencil, FileText, PauseCircle, Trash2, ChevronDown, ChevronUp,
-  Phone, Mail, DollarSign, Calendar, Clock, MessageSquare, ExternalLink,
+  Phone, Mail, Calendar, Clock, MessageSquare, ExternalLink,
+  CreditCard,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { PwuStudent, StudentNote } from '@/types'
+import type { PwuStudent, StudentNote, Transaction, StudentPaymentPlan } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -298,11 +299,39 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
 
+// ─── Transaction Status Badge ─────────────────────────────────────────────────
+
+function TxStatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    completed: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+    refunded:  'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+    failed:    'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+    recovered: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  }
+  return (
+    <span className={cn('inline-flex px-1.5 py-0.5 rounded-full text-xs font-semibold capitalize', map[status] ?? map.completed)}>
+      {status}
+    </span>
+  )
+}
+
+// ─── Payment Plan Form Data ───────────────────────────────────────────────────
+
+interface PaymentPlanFormData {
+  total_installments: number
+  amount_per_installment: number
+  currency: string
+  start_date: string
+  notes: string
+}
+
 // ─── Student Profile Modal ────────────────────────────────────────────────────
 
 function StudentProfileModal({
   student,
   notes,
+  transactions,
+  paymentPlan,
   onClose,
   onEdit,
   onGraduate,
@@ -311,9 +340,12 @@ function StudentProfileModal({
   onAddNote,
   onCohortDateChange,
   onStudentUpdate,
+  onSavePaymentPlan,
 }: {
   student: PwuStudent
   notes: StudentNote[]
+  transactions: Transaction[]
+  paymentPlan: StudentPaymentPlan | null
   onClose: () => void
   onEdit: (s: PwuStudent) => void
   onGraduate: (s: PwuStudent) => void
@@ -322,9 +354,19 @@ function StudentProfileModal({
   onAddNote: (text: string) => Promise<void>
   onCohortDateChange: (date: string) => Promise<void>
   onStudentUpdate: (updated: PwuStudent) => void
+  onSavePaymentPlan: (data: PaymentPlanFormData) => Promise<void>
 }) {
   const [newNote, setNewNote] = useState('')
   const [addingNote, setAddingNote] = useState(false)
+  const [showPlanForm, setShowPlanForm] = useState(false)
+  const [planForm, setPlanForm] = useState<PaymentPlanFormData>(() => ({
+    total_installments: paymentPlan?.total_installments ?? 6,
+    amount_per_installment: paymentPlan?.amount_per_installment ?? 0,
+    currency: paymentPlan?.currency ?? 'USD',
+    start_date: paymentPlan?.start_date ?? '',
+    notes: paymentPlan?.notes ?? '',
+  }))
+  const [savingPlan, setSavingPlan] = useState(false)
 
   async function handleAddNote() {
     if (!newNote.trim()) return
@@ -332,6 +374,27 @@ function StudentProfileModal({
     await onAddNote(newNote.trim())
     setNewNote('')
     setAddingNote(false)
+  }
+
+  async function handleSubmitPlan(e: React.FormEvent) {
+    e.preventDefault()
+    if (!planForm.start_date) { toast.error('Start date is required'); return }
+    setSavingPlan(true)
+    await onSavePaymentPlan(planForm)
+    setSavingPlan(false)
+    setShowPlanForm(false)
+  }
+
+  const paidCount = transactions.filter((t) => t.status === 'completed').length
+  const remaining = paymentPlan ? Math.max(0, paymentPlan.total_installments - paidCount) : 0
+  const progressPct = paymentPlan && paymentPlan.total_installments > 0
+    ? Math.min(100, Math.round((paidCount / paymentPlan.total_installments) * 100))
+    : 0
+
+  function estimateEndDate(startDate: string, months: number) {
+    const d = new Date(startDate + 'T12:00:00')
+    d.setMonth(d.getMonth() + months)
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
   }
 
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
@@ -407,7 +470,7 @@ function StudentProfileModal({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* ── LEFT: Key Info ── */}
+        {/* ── LEFT ── */}
         <div className="space-y-6">
 
           {/* Key Dates */}
@@ -448,37 +511,192 @@ function StudentProfileModal({
             </div>
           </div>
 
-          {/* Linked Transaction */}
+          {/* Transactions */}
           <div>
-            <p className={sectionLabel}>Linked Transaction</p>
-            {student.payment_date || student.payment_amount ? (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <DollarSign className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                  <span className="text-sm font-semibold text-green-800 dark:text-green-300">
-                    {student.payment_amount ? `$${student.payment_amount.toLocaleString()}` : 'Amount unknown'}
-                  </span>
-                </div>
-                {student.payment_date && (
-                  <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {formatDate(student.payment_date)}
-                  </p>
-                )}
-                {student.email && (
-                  <a
-                    href={`/sales?email=${encodeURIComponent(student.email)}`}
-                    className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline mt-2"
-                    onClick={onClose}
-                  >
-                    View in Sales <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
+            <p className={sectionLabel}>Transactions</p>
+            {!student.email ? (
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-center">
+                <p className="text-xs text-zinc-400">No email on record — cannot match transactions</p>
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-center">
+                <p className="text-xs text-zinc-400">No transactions found for {student.email}</p>
               </div>
             ) : (
-              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-center">
-                <p className="text-xs text-zinc-400">No linked transaction</p>
-                <p className="text-xs text-zinc-400 mt-0.5">Auto-matched by email after migration</p>
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                {transactions.map((tx) => (
+                  <div key={tx.id} className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3">
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-tight flex-1 min-w-0 truncate">
+                        {tx.offer_title}
+                      </span>
+                      <span className="text-xs font-semibold text-green-700 dark:text-green-400 whitespace-nowrap">
+                        ${Number(tx.cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TxStatusBadge status={tx.status ?? 'completed'} />
+                        <span className="text-xs text-zinc-400 flex items-center gap-0.5">
+                          <Calendar className="h-3 w-3" />{formatDate(tx.date)}
+                        </span>
+                      </div>
+                      <a
+                        href={`/sales?email=${encodeURIComponent(student.email!)}`}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
+                        onClick={onClose}
+                      >
+                        View in Sales <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Payment Plan */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className={cn(sectionLabel, 'mb-0 flex items-center gap-1.5')}>
+                <CreditCard className="h-3.5 w-3.5" /> Payment Plan
+              </p>
+              {paymentPlan && !showPlanForm && (
+                <button
+                  onClick={() => {
+                    setPlanForm({
+                      total_installments: paymentPlan.total_installments,
+                      amount_per_installment: paymentPlan.amount_per_installment,
+                      currency: paymentPlan.currency,
+                      start_date: paymentPlan.start_date,
+                      notes: paymentPlan.notes ?? '',
+                    })
+                    setShowPlanForm(true)
+                  }}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+
+            {!paymentPlan && !showPlanForm && (
+              <button
+                onClick={() => setShowPlanForm(true)}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <CreditCard className="h-3.5 w-3.5" /> Configure Payment Plan
+              </button>
+            )}
+
+            {showPlanForm && (
+              <form onSubmit={handleSubmitPlan} className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-1">Total installments</label>
+                    <input
+                      type="number" min={1} max={12} required
+                      value={planForm.total_installments}
+                      onChange={(e) => setPlanForm((p) => ({ ...p, total_installments: Number(e.target.value) }))}
+                      className={cn(inputCls, 'text-xs')}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-1">Amount / installment</label>
+                    <input
+                      type="number" min={0} step="0.01" required
+                      value={planForm.amount_per_installment}
+                      onChange={(e) => setPlanForm((p) => ({ ...p, amount_per_installment: Number(e.target.value) }))}
+                      className={cn(inputCls, 'text-xs')}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-1">Start date</label>
+                    <input
+                      type="date" required
+                      value={planForm.start_date}
+                      onChange={(e) => setPlanForm((p) => ({ ...p, start_date: e.target.value }))}
+                      className={cn(inputCls, 'text-xs')}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-1">Currency</label>
+                    <input
+                      type="text"
+                      value={planForm.currency}
+                      onChange={(e) => setPlanForm((p) => ({ ...p, currency: e.target.value }))}
+                      className={cn(inputCls, 'text-xs')}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Notes (optional)</label>
+                  <input
+                    type="text"
+                    value={planForm.notes}
+                    onChange={(e) => setPlanForm((p) => ({ ...p, notes: e.target.value }))}
+                    className={cn(inputCls, 'text-xs')}
+                    placeholder="e.g. 6 monthly payments"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPlanForm(false)}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingPlan}
+                    className="px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
+                    style={{ backgroundColor: '#185FA5' }}
+                  >
+                    {savingPlan ? 'Saving…' : 'Save Plan'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {paymentPlan && !showPlanForm && (
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Total installments</span>
+                  <span className={rowValue}>{paymentPlan.total_installments}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Paid</span>
+                  <span className="text-xs font-medium text-green-600 dark:text-green-400">{paidCount}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Remaining</span>
+                  <span className={rowValue}>{remaining}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Amount / installment</span>
+                  <span className={rowValue}>
+                    {paymentPlan.currency} ${Number(paymentPlan.amount_per_installment).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={rowLabel}>Est. end date</span>
+                  <span className={rowValue}>{estimateEndDate(paymentPlan.start_date, paymentPlan.total_installments)}</span>
+                </div>
+                <div>
+                  <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden mt-1">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1">{progressPct}% paid</p>
+                </div>
+                {paymentPlan.notes && (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">{paymentPlan.notes}</p>
+                )}
               </div>
             )}
           </div>
@@ -836,6 +1054,8 @@ export default function StudentsPage() {
   // Profile modal
   const [selectedStudent, setSelectedStudent] = useState<PwuStudent | null>(null)
   const [profileNotes, setProfileNotes] = useState<StudentNote[]>([])
+  const [profileTransactions, setProfileTransactions] = useState<Transaction[]>([])
+  const [profilePaymentPlan, setProfilePaymentPlan] = useState<StudentPaymentPlan | null>(null)
 
   const fetchStudents = useCallback(async () => {
     setLoading(true)
@@ -850,15 +1070,39 @@ export default function StudentsPage() {
 
   useEffect(() => { fetchStudents() }, [fetchStudents])
 
-  // Fetch notes when a student profile is opened
+  // Fetch notes, transactions, and payment plan when a student profile is opened
   useEffect(() => {
-    if (!selectedStudent) { setProfileNotes([]); return }
+    if (!selectedStudent) {
+      setProfileNotes([])
+      setProfileTransactions([])
+      setProfilePaymentPlan(null)
+      return
+    }
+
     supabase
       .from('student_notes')
       .select('*')
       .eq('student_id', selectedStudent.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => setProfileNotes(data ?? []))
+
+    if (selectedStudent.email) {
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('buyer_email', selectedStudent.email)
+        .order('date', { ascending: false })
+        .then(({ data }) => setProfileTransactions(data ?? []))
+    } else {
+      setProfileTransactions([])
+    }
+
+    supabase
+      .from('student_payment_plans')
+      .select('*')
+      .eq('student_id', selectedStudent.id)
+      .maybeSingle()
+      .then(({ data }) => setProfilePaymentPlan(data ?? null))
   }, [selectedStudent, supabase])
 
   // Derived
@@ -1081,6 +1325,28 @@ export default function StudentsPage() {
     ))
   }
 
+  async function handleSavePaymentPlan(form: PaymentPlanFormData) {
+    if (!selectedStudent) return
+    if (profilePaymentPlan) {
+      const { error } = await supabase
+        .from('student_payment_plans')
+        .update(form)
+        .eq('id', profilePaymentPlan.id)
+      if (error) { toast.error(`Error: ${error.message}`); return }
+      setProfilePaymentPlan({ ...profilePaymentPlan, ...form })
+      toast.success('Payment plan updated')
+    } else {
+      const { data, error } = await supabase
+        .from('student_payment_plans')
+        .insert({ student_id: selectedStudent.id, ...form })
+        .select()
+        .single()
+      if (error) { toast.error(`Error: ${error.message}`); return }
+      setProfilePaymentPlan(data)
+      toast.success('Payment plan saved')
+    }
+  }
+
   function exportCSV() {
     const rows = [
       ['First Name', 'Last Name', 'Email', 'Phone', 'Cohort', 'Type', 'Status', 'Payment Date', 'Payment Amount', 'Last Contacted', 'Notes', 'Created'],
@@ -1264,6 +1530,8 @@ export default function StudentsPage() {
         <StudentProfileModal
           student={selectedStudent}
           notes={profileNotes}
+          transactions={profileTransactions}
+          paymentPlan={profilePaymentPlan}
           onClose={() => setSelectedStudent(null)}
           onEdit={(s) => { setSelectedStudent(null); setEditTarget(s) }}
           onGraduate={(s) => { setSelectedStudent(null); setGraduateTarget(s) }}
@@ -1275,6 +1543,7 @@ export default function StudentsPage() {
             setStudents((prev) => prev.map((s) => s.id === updated.id ? updated : s))
             setSelectedStudent(updated)
           }}
+          onSavePaymentPlan={handleSavePaymentPlan}
         />
       )}
 

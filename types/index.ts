@@ -195,6 +195,17 @@ export interface StudentNote {
   created_at: string
 }
 
+export interface StudentPaymentPlan {
+  id: string
+  student_id: string
+  total_installments: number
+  amount_per_installment: number
+  currency: string
+  start_date: string
+  notes: string | null
+  created_at: string
+}
+
 export interface CsmReport {
   id: string
   date: string
