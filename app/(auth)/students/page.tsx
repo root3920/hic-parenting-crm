@@ -319,15 +319,30 @@ function StudentProfileModal({
           {/* Key Dates */}
           <div>
             <p className={sectionLabel}>Key Dates</p>
+            {(() => {
+              const completed = transactions.filter((t) => t.status === 'completed')
+              const totalPaid = completed.reduce((sum, t) => sum + (Number(t.cost) || 0), 0)
+              const oldestDate = completed.length > 0
+                ? completed.reduce((oldest, t) => t.date < oldest ? t.date : oldest, completed[0].date)
+                : null
+              return (
             <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className={rowLabel}>Payment Date</span>
-                <span className={rowValue}>{formatDate(student.payment_date)}</span>
+                <span className={rowValue}>{formatDate(oldestDate ?? student.payment_date)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className={rowLabel}>Payment Amount</span>
-                <span className={cn(rowValue, student.payment_amount ? 'text-green-600 dark:text-green-400' : '')}>
-                  {student.payment_amount ? `$${student.payment_amount.toLocaleString()}` : '—'}
+                <span className={cn(rowValue, totalPaid > 0 ? 'text-green-600 dark:text-green-400' : '')}>
+                  {totalPaid > 0
+                    ? `$${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : student.payment_amount ? `$${student.payment_amount.toLocaleString()}` : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={rowLabel}>Installments Paid</span>
+                <span className={rowValue}>
+                  {completed.length > 0 ? `${completed.length} ${completed.length === 1 ? 'payment' : 'payments'}` : '—'}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -352,6 +367,8 @@ function StudentProfileModal({
                 <span className={rowValue}>{formatDate(student.created_at)}</span>
               </div>
             </div>
+              )
+            })()}
           </div>
 
           {/* Transactions */}
