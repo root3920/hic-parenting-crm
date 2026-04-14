@@ -12,6 +12,10 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: 'HIC Parenting CRM',
   description: 'Internal CRM Dashboard for HIC Parenting',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/favicon.png',
+  },
 }
 
 export default function RootLayout({
