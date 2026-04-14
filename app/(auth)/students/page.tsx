@@ -6,12 +6,14 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { toast } from 'sonner'
+import { formatDistanceToNow } from 'date-fns'
 import {
   Plus, Download, X, GraduationCap, Search,
   Pencil, FileText, PauseCircle, Trash2, ChevronDown, ChevronUp,
+  Phone, Mail, DollarSign, Calendar, Clock, MessageSquare, ExternalLink,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { PwuStudent } from '@/types'
+import type { PwuStudent, StudentNote } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +32,17 @@ function formatDate(d: string | null) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatDateTime(d: string | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 function fullName(s: PwuStudent) {
   return [s.first_name, s.last_name].filter(Boolean).join(' ')
+}
+
+function initials(s: PwuStudent) {
+  return [s.first_name?.[0], s.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -53,6 +64,21 @@ function StatusBadge({ status }: { status: StudentStatus }) {
   )
 }
 
+function LastContactBadge({ ts }: { ts: string | null }) {
+  if (!ts) return <span className="text-xs text-zinc-400">Never</span>
+
+  const diffMs = Date.now() - new Date(ts).getTime()
+  const days = diffMs / (1000 * 60 * 60 * 24)
+  const label = formatDistanceToNow(new Date(ts), { addSuffix: true })
+
+  const cls =
+    days > 30 ? 'text-red-500 dark:text-red-400' :
+    days > 14 ? 'text-amber-500 dark:text-amber-400' :
+                'text-green-600 dark:text-green-400'
+
+  return <span className={cn('text-xs whitespace-nowrap', cls)}>{label}</span>
+}
+
 const STATUS_ORDER: StudentStatus[] = ['active', 'graduated', 'paused', 'refund']
 
 function sortStudents(students: PwuStudent[]) {
@@ -71,6 +97,7 @@ function StudentRow({
   onPause,
   onDelete,
   onStatusChange,
+  onSelect,
 }: {
   student: PwuStudent
   showCohort?: boolean
@@ -81,11 +108,15 @@ function StudentRow({
   onPause: (s: PwuStudent) => void
   onDelete: (s: PwuStudent) => void
   onStatusChange: (s: PwuStudent, status: StudentStatus) => void
+  onSelect: (s: PwuStudent) => void
 }) {
   const [statusOpen, setStatusOpen] = useState(false)
 
   return (
-    <tr className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
+    <tr
+      onClick={() => onSelect(student)}
+      className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group cursor-pointer"
+    >
       <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100 text-sm whitespace-nowrap">
         {fullName(student)}
       </td>
@@ -100,7 +131,7 @@ function StudentRow({
           {student.type === 'individual' ? 'Individual' : 'Group'}
         </td>
       )}
-      <td className="px-4 py-3 relative">
+      <td className="px-4 py-3 relative" onClick={(e) => e.stopPropagation()}>
         <button onClick={() => setStatusOpen((v) => !v)}>
           <StatusBadge status={student.status} />
         </button>
@@ -121,8 +152,9 @@ function StudentRow({
           </div>
         )}
       </td>
+      <td className="px-4 py-3"><LastContactBadge ts={student.last_contacted_at} /></td>
       <td className="px-4 py-3 text-xs text-zinc-400 max-w-[120px] truncate">{student.notes ?? '—'}</td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <ActionBtn title="Edit" onClick={() => onEdit(student)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
           <ActionBtn title="Notes" onClick={() => onNotes(student)}><FileText className="h-3.5 w-3.5" /></ActionBtn>
@@ -215,7 +247,7 @@ function CohortCard({
       {expanded && (
         <div className="border-t border-zinc-100 dark:border-zinc-800 overflow-x-auto">
           <table className="w-full text-sm">
-            <TableHeader cols={['Name', 'Email', 'Status', 'Notes', '']} />
+            <TableHeader cols={['Name', 'Email', 'Status', 'Last Contact', 'Notes', '']} />
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {sorted.map((s) => (
                 <StudentRow key={s.id} student={s} {...actions} />
@@ -230,11 +262,19 @@ function CohortCard({
 
 // ─── Modal shell ─────────────────────────────────────────────────────────────
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, onClose, children, wide = false }: {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+  wide?: boolean
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700">
+      <div className={cn(
+        'relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700 w-full',
+        wide ? 'max-w-4xl' : 'max-w-md'
+      )}>
         <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-zinc-800">
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
           <button onClick={onClose} className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
@@ -257,6 +297,261 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+
+// ─── Student Profile Modal ────────────────────────────────────────────────────
+
+function StudentProfileModal({
+  student,
+  notes,
+  onClose,
+  onEdit,
+  onGraduate,
+  onPause,
+  onDelete,
+  onAddNote,
+  onCohortDateChange,
+  onStudentUpdate,
+}: {
+  student: PwuStudent
+  notes: StudentNote[]
+  onClose: () => void
+  onEdit: (s: PwuStudent) => void
+  onGraduate: (s: PwuStudent) => void
+  onPause: (s: PwuStudent) => void
+  onDelete: (s: PwuStudent) => void
+  onAddNote: (text: string) => Promise<void>
+  onCohortDateChange: (date: string) => Promise<void>
+  onStudentUpdate: (updated: PwuStudent) => void
+}) {
+  const [newNote, setNewNote] = useState('')
+  const [addingNote, setAddingNote] = useState(false)
+
+  async function handleAddNote() {
+    if (!newNote.trim()) return
+    setAddingNote(true)
+    await onAddNote(newNote.trim())
+    setNewNote('')
+    setAddingNote(false)
+  }
+
+  const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
+  const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
+  const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
+
+  return (
+    <Modal title="" onClose={onClose} wide>
+      {/* Header */}
+      <div className="flex items-start gap-4 mb-6 -mt-1">
+        <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-lg font-bold text-blue-600 dark:text-blue-300 shrink-0">
+          {initials(student)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{fullName(student)}</h2>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            {student.email && (
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
+                <Mail className="h-3 w-3" />{student.email}
+              </span>
+            )}
+            {student.phone && (
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
+                <Phone className="h-3 w-3" />{student.phone}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <StatusBadge status={student.status} />
+            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+              {student.type === 'individual' ? 'Individual 1:1' : 'Group'}
+            </span>
+            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+              {student.type === 'individual' ? '1:1' : `Cohort ${student.cohort}`}
+            </span>
+          </div>
+        </div>
+        {/* Quick actions */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => { onClose(); setTimeout(() => onEdit(student), 50) }}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Edit"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          {student.status === 'active' && (
+            <button
+              onClick={() => { onClose(); setTimeout(() => onGraduate(student), 50) }}
+              className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+              title="Graduate"
+            >
+              <GraduationCap className="h-4 w-4" />
+            </button>
+          )}
+          {student.status === 'active' && (
+            <button
+              onClick={() => { onClose(); setTimeout(() => onPause(student), 50) }}
+              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+              title="Pause"
+            >
+              <PauseCircle className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            onClick={() => { onClose(); setTimeout(() => onDelete(student), 50) }}
+            className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* ── LEFT: Key Info ── */}
+        <div className="space-y-6">
+
+          {/* Key Dates */}
+          <div>
+            <p className={sectionLabel}>Key Dates</p>
+            <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className={rowLabel}>Payment Date</span>
+                <span className={rowValue}>{formatDate(student.payment_date)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={rowLabel}>Payment Amount</span>
+                <span className={cn(rowValue, student.payment_amount ? 'text-green-600 dark:text-green-400' : '')}>
+                  {student.payment_amount ? `$${student.payment_amount.toLocaleString()}` : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className={rowLabel}>Cohort Assigned</span>
+                <input
+                  type="date"
+                  value={student.cohort_assigned_at ?? ''}
+                  onChange={(e) => onCohortDateChange(e.target.value)}
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={rowLabel}>Last Contacted</span>
+                <span className={rowValue}>
+                  {student.last_contacted_at
+                    ? formatDistanceToNow(new Date(student.last_contacted_at), { addSuffix: true })
+                    : 'Never'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={rowLabel}>Enrolled</span>
+                <span className={rowValue}>{formatDate(student.created_at)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Linked Transaction */}
+          <div>
+            <p className={sectionLabel}>Linked Transaction</p>
+            {student.payment_date || student.payment_amount ? (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-semibold text-green-800 dark:text-green-300">
+                    {student.payment_amount ? `$${student.payment_amount.toLocaleString()}` : 'Amount unknown'}
+                  </span>
+                </div>
+                {student.payment_date && (
+                  <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(student.payment_date)}
+                  </p>
+                )}
+                {student.email && (
+                  <a
+                    href={`/sales?email=${encodeURIComponent(student.email)}`}
+                    className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline mt-2"
+                    onClick={onClose}
+                  >
+                    View in Sales <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+            ) : (
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-center">
+                <p className="text-xs text-zinc-400">No linked transaction</p>
+                <p className="text-xs text-zinc-400 mt-0.5">Auto-matched by email after migration</p>
+              </div>
+            )}
+          </div>
+
+          {/* Notes field */}
+          {student.notes && (
+            <div>
+              <p className={sectionLabel}>Notes</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 whitespace-pre-wrap">
+                {student.notes}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ── RIGHT: Contact Notes Timeline ── */}
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2 mb-3">
+            <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />
+            <p className={cn(sectionLabel, 'mb-0')}>Contact Notes</p>
+          </div>
+
+          {/* Timeline */}
+          <div className="flex-1 space-y-2 max-h-72 overflow-y-auto pr-1 mb-4">
+            {notes.length === 0 ? (
+              <div className="text-center py-10 text-zinc-400 text-xs">
+                No notes yet. Add the first contact note below.
+              </div>
+            ) : (
+              notes.map((note) => (
+                <div key={note.id} className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-3 border-l-4 border-blue-400">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{note.created_by}</span>
+                    <span className="text-xs text-zinc-400 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatDateTime(note.created_at)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">{note.note}</p>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Add note */}
+          <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4">
+            <textarea
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote()
+              }}
+              placeholder="Add a contact note… (⌘+Enter to save)"
+              rows={3}
+              className={cn(inputCls, 'resize-none text-xs')}
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={handleAddNote}
+                disabled={!newNote.trim() || addingNote}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                style={{ backgroundColor: '#185FA5' }}
+              >
+                <MessageSquare className="h-3 w-3" />
+                {addingNote ? 'Saving…' : 'Add Note'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
 
 // ─── Student Form Modal ───────────────────────────────────────────────────────
 
@@ -417,7 +712,7 @@ function NewCohortModal({
   )
 }
 
-// ─── Notes Modal ──────────────────────────────────────────────────────────────
+// ─── Notes Modal (legacy quick notes) ────────────────────────────────────────
 
 function NotesModal({
   student, onClose, onSave,
@@ -512,6 +807,7 @@ interface StudentActions {
   onPause: (s: PwuStudent) => void
   onDelete: (s: PwuStudent) => void
   onStatusChange: (s: PwuStudent, status: StudentStatus) => void
+  onSelect: (s: PwuStudent) => void
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -537,8 +833,9 @@ export default function StudentsPage() {
   const [pauseTarget, setPauseTarget] = useState<PwuStudent | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<PwuStudent | null>(null)
 
-  // Cohort hint (for new cohort modal)
-  const [hintCohorts, setHintCohorts] = useState<string[]>([])
+  // Profile modal
+  const [selectedStudent, setSelectedStudent] = useState<PwuStudent | null>(null)
+  const [profileNotes, setProfileNotes] = useState<StudentNote[]>([])
 
   const fetchStudents = useCallback(async () => {
     setLoading(true)
@@ -552,6 +849,17 @@ export default function StudentsPage() {
   }, [supabase])
 
   useEffect(() => { fetchStudents() }, [fetchStudents])
+
+  // Fetch notes when a student profile is opened
+  useEffect(() => {
+    if (!selectedStudent) { setProfileNotes([]); return }
+    supabase
+      .from('student_notes')
+      .select('*')
+      .eq('student_id', selectedStudent.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setProfileNotes(data ?? []))
+  }, [selectedStudent, supabase])
 
   // Derived
   const allCohorts = useMemo(() => {
@@ -718,9 +1026,64 @@ export default function StudentsPage() {
     fetchStudents()
   }
 
+  async function handleAddNote(text: string) {
+    if (!selectedStudent) return
+
+    const { data: { user } } = await supabase.auth.getUser()
+    let authorName = 'Admin'
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+      if (profile?.full_name) authorName = profile.full_name
+    }
+
+    const now = new Date().toISOString()
+
+    const { data: noteData, error } = await supabase
+      .from('student_notes')
+      .insert({ student_id: selectedStudent.id, note: text, created_by: authorName })
+      .select()
+      .single()
+    if (error) { toast.error(`Error: ${error.message}`); return }
+
+    // Update last_contacted_at
+    await supabase
+      .from('pwu_students')
+      .update({ last_contacted_at: now, updated_at: now })
+      .eq('id', selectedStudent.id)
+
+    if (noteData) {
+      setProfileNotes((prev) => [noteData, ...prev])
+    }
+
+    // Update local students list + selectedStudent
+    setStudents((prev) => prev.map((s) =>
+      s.id === selectedStudent.id ? { ...s, last_contacted_at: now } : s
+    ))
+    setSelectedStudent((prev) => prev ? { ...prev, last_contacted_at: now } : null)
+
+    toast.success('Note added')
+  }
+
+  async function handleCohortDateChange(date: string) {
+    if (!selectedStudent) return
+    const { error } = await supabase
+      .from('pwu_students')
+      .update({ cohort_assigned_at: date || null, updated_at: new Date().toISOString() })
+      .eq('id', selectedStudent.id)
+    if (error) { toast.error(`Error: ${error.message}`); return }
+    setSelectedStudent((prev) => prev ? { ...prev, cohort_assigned_at: date || null } : null)
+    setStudents((prev) => prev.map((s) =>
+      s.id === selectedStudent.id ? { ...s, cohort_assigned_at: date || null } : s
+    ))
+  }
+
   function exportCSV() {
     const rows = [
-      ['First Name', 'Last Name', 'Email', 'Phone', 'Cohort', 'Type', 'Status', 'Graduated Date', 'Notes', 'Created'],
+      ['First Name', 'Last Name', 'Email', 'Phone', 'Cohort', 'Type', 'Status', 'Payment Date', 'Payment Amount', 'Last Contacted', 'Notes', 'Created'],
       ...students.map((s) => [
         s.first_name,
         s.last_name ?? '',
@@ -729,7 +1092,9 @@ export default function StudentsPage() {
         s.cohort,
         s.type,
         s.status,
-        s.graduated_at ?? '',
+        s.payment_date ?? '',
+        s.payment_amount ?? '',
+        s.last_contacted_at ? s.last_contacted_at.split('T')[0] : '',
         s.notes ?? '',
         s.created_at.split('T')[0],
       ]),
@@ -747,6 +1112,7 @@ export default function StudentsPage() {
     onPause: setPauseTarget,
     onDelete: setDeleteTarget,
     onStatusChange: handleStatusChange,
+    onSelect: setSelectedStudent,
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -765,7 +1131,7 @@ export default function StudentsPage() {
         <PageHeader title="PWU Students" description="Parenting With Understanding program management">
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => { setHintCohorts(groupCohorts); setAddOpen(true) }}
+              onClick={() => setAddOpen(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition-opacity"
               style={{ backgroundColor: '#185FA5' }}
             >
@@ -892,7 +1258,26 @@ export default function StudentsPage() {
         )}
       </div>
 
-      {/* Modals */}
+      {/* ── Modals ── */}
+
+      {selectedStudent && (
+        <StudentProfileModal
+          student={selectedStudent}
+          notes={profileNotes}
+          onClose={() => setSelectedStudent(null)}
+          onEdit={(s) => { setSelectedStudent(null); setEditTarget(s) }}
+          onGraduate={(s) => { setSelectedStudent(null); setGraduateTarget(s) }}
+          onPause={(s) => { setSelectedStudent(null); setPauseTarget(s) }}
+          onDelete={(s) => { setSelectedStudent(null); setDeleteTarget(s) }}
+          onAddNote={handleAddNote}
+          onCohortDateChange={handleCohortDateChange}
+          onStudentUpdate={(updated) => {
+            setStudents((prev) => prev.map((s) => s.id === updated.id ? updated : s))
+            setSelectedStudent(updated)
+          }}
+        />
+      )}
+
       {addOpen && (
         <StudentFormModal
           title="Add Student"
@@ -970,7 +1355,7 @@ function AllTab({ students, actions }: { students: PwuStudent[]; actions: Studen
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
       <table className="w-full text-sm">
-        <TableHeader cols={['Name', 'Email', 'Cohort', 'Type', 'Status', 'Notes', '']} />
+        <TableHeader cols={['Name', 'Email', 'Cohort', 'Type', 'Status', 'Last Contact', 'Notes', '']} />
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {sorted.map((s) => (
             <StudentRow key={s.id} student={s} showCohort showType {...actions} />
@@ -1013,16 +1398,21 @@ function IndividualTab({ students, actions }: { students: PwuStudent[]; actions:
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
       <table className="w-full text-sm">
-        <TableHeader cols={['Name', 'Email', 'Phone', 'Status', 'Notes', '']} />
+        <TableHeader cols={['Name', 'Email', 'Phone', 'Status', 'Last Contact', 'Notes', '']} />
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {sorted.map((s) => (
-            <tr key={s.id} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
+            <tr
+              key={s.id}
+              onClick={() => actions.onSelect(s)}
+              className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group cursor-pointer"
+            >
               <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100 text-sm whitespace-nowrap">{fullName(s)}</td>
               <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">{s.email ?? '—'}</td>
               <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{s.phone ?? '—'}</td>
               <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
+              <td className="px-4 py-3"><LastContactBadge ts={s.last_contacted_at} /></td>
               <td className="px-4 py-3 text-xs text-zinc-400 max-w-[120px] truncate">{s.notes ?? '—'}</td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
                   <ActionBtn title="Notes" onClick={() => actions.onNotes(s)}><FileText className="h-3.5 w-3.5" /></ActionBtn>
@@ -1057,15 +1447,20 @@ function GraduatedTab({ students, actions }: { students: PwuStudent[]; actions: 
       ) : (
         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
-            <TableHeader cols={['Name', 'Email', 'Cohort', 'Type', '']} />
+            <TableHeader cols={['Name', 'Email', 'Cohort', 'Type', 'Last Contact', '']} />
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {sorted.map((s) => (
-                <tr key={s.id} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
+                <tr
+                  key={s.id}
+                  onClick={() => actions.onSelect(s)}
+                  className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group cursor-pointer"
+                >
                   <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100 text-sm whitespace-nowrap">{fullName(s)}</td>
                   <td className="px-4 py-3 text-xs text-zinc-500">{s.email ?? '—'}</td>
                   <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">{s.type === 'individual' ? '1:1' : `Cohort ${s.cohort}`}</td>
                   <td className="px-4 py-3 text-xs text-zinc-500 capitalize">{s.type === 'individual' ? 'Individual' : 'Group'}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3"><LastContactBadge ts={s.last_contacted_at} /></td>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
                       <ActionBtn title="Notes" onClick={() => actions.onNotes(s)}><FileText className="h-3.5 w-3.5" /></ActionBtn>
@@ -1089,16 +1484,21 @@ function PausedTab({ students, actions }: { students: PwuStudent[]; actions: Stu
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden overflow-x-auto">
       <table className="w-full text-sm">
-        <TableHeader cols={['Name', 'Email', 'Cohort', 'Status', 'Notes', '']} />
+        <TableHeader cols={['Name', 'Email', 'Cohort', 'Status', 'Last Contact', 'Notes', '']} />
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {students.map((s) => (
-            <tr key={s.id} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
+            <tr
+              key={s.id}
+              onClick={() => actions.onSelect(s)}
+              className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group cursor-pointer"
+            >
               <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100 text-sm whitespace-nowrap">{fullName(s)}</td>
               <td className="px-4 py-3 text-xs text-zinc-500">{s.email ?? '—'}</td>
               <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">{s.type === 'individual' ? '1:1' : `Cohort ${s.cohort}`}</td>
               <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
+              <td className="px-4 py-3"><LastContactBadge ts={s.last_contacted_at} /></td>
               <td className="px-4 py-3 text-xs text-zinc-400 max-w-[140px] truncate">{s.notes ?? '—'}</td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
                   <ActionBtn title="Notes" onClick={() => actions.onNotes(s)}><FileText className="h-3.5 w-3.5" /></ActionBtn>

@@ -178,8 +178,21 @@ export interface PwuStudent {
   status: 'active' | 'graduated' | 'paused' | 'refund'
   graduated_at: string | null
   notes: string | null
+  cohort_assigned_at: string | null
+  last_contacted_at: string | null
+  payment_date: string | null
+  payment_amount: number | null
+  transaction_id: string | null
   created_at: string
   updated_at: string
+}
+
+export interface StudentNote {
+  id: string
+  student_id: string
+  note: string
+  created_by: string
+  created_at: string
 }
 
 export interface CsmReport {
