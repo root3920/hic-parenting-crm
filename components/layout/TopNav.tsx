@@ -32,6 +32,7 @@ const ALL_NAV_ITEMS = [
   { href: '/sales',        label: 'Sales',        icon: DollarSign,      roles: ['admin'] as UserRole[] },
   { href: '/llamadas',     label: 'Calls',        icon: Phone,           roles: ['admin', 'closer'] as UserRole[] },
   { href: '/spc',          label: 'SPC Members',  icon: Users,           roles: ['admin'] as UserRole[] },
+  { href: '/students',     label: 'Students',     icon: UsersRound,      roles: ['admin'] as UserRole[] },
   { href: '/equipo/csm',   label: 'Team',         icon: UsersRound,      roles: ['admin'] as UserRole[] },
   { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },
 ]

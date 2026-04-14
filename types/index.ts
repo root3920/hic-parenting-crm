@@ -166,6 +166,22 @@ export interface SetterDailyReport {
   created_at: string
 }
 
+export interface PwuStudent {
+  id: string
+  contact_id: string | null
+  first_name: string
+  last_name: string | null
+  email: string | null
+  phone: string | null
+  cohort: string
+  type: 'group' | 'individual'
+  status: 'active' | 'graduated' | 'paused' | 'refund'
+  graduated_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface CsmReport {
   id: string
   date: string
