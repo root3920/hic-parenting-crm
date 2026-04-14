@@ -559,7 +559,7 @@ export default function StudentsPage() {
   // Derived
   const allCohorts = useMemo(() => {
     const s = new Set(students.map((s) => s.cohort))
-    return sortCohorts([...s])
+    return sortCohorts(Array.from(s))
   }, [students])
 
   const groupCohorts = useMemo(() => allCohorts.filter((c) => c !== '1:1'), [allCohorts])
