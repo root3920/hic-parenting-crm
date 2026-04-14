@@ -1589,37 +1589,58 @@ function ListView({ students, actions, showCohort = true }: {
           onClick={() => actions.onSelect(s)}
           className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer group transition-colors"
         >
+          {/* Avatar */}
           <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xs font-bold text-blue-600 dark:text-blue-300 shrink-0">
             {initials(s)}
           </div>
+
+          {/* Name + email — flex-1, takes remaining space */}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate leading-tight">{fullName(s)}</p>
             <p className="text-xs text-zinc-400 truncate mt-0.5">{s.email ?? '—'}</p>
           </div>
-          {showCohort && (
-            <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 whitespace-nowrap shrink-0">
-              {s.type === 'individual' ? '1:1' : `C${s.cohort}`}
-            </span>
-          )}
-          <div className="shrink-0"><StatusBadge status={s.status} /></div>
-          <div className="hidden lg:block w-28 text-right shrink-0">
+
+          {/* Cohort — fixed 80px, always present (invisible when not applicable) */}
+          <div className="hidden sm:flex w-20 justify-end shrink-0">
+            {showCohort && (
+              <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                {s.type === 'individual' ? '1:1' : `C${s.cohort}`}
+              </span>
+            )}
+          </div>
+
+          {/* Status — fixed 160px */}
+          <div className="w-40 flex justify-end shrink-0">
+            <StatusBadge status={s.status} />
+          </div>
+
+          {/* Last contacted — fixed 160px, hidden on small screens */}
+          <div className="hidden lg:flex w-40 justify-end shrink-0">
             <LastContactBadge ts={s.last_contacted_at} />
           </div>
-          <div className="hidden lg:flex items-center justify-end w-5 shrink-0">
-            {s.notes && <MessageSquare className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-600" />}
-          </div>
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
-            <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}><Pencil className="h-3.5 w-3.5" /></ActionBtn>
-            {s.status === 'active' && (
-              <ActionBtn title="Graduate" onClick={() => actions.onGraduate(s)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
-                <GraduationCap className="h-3.5 w-3.5" />
-              </ActionBtn>
-            )}
-            {s.status === 'active' && (
-              <ActionBtn title="Pause" onClick={() => actions.onPause(s)} className="text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20">
-                <PauseCircle className="h-3.5 w-3.5" />
-              </ActionBtn>
-            )}
+
+          {/* Actions — fixed 80px, always occupy space, visible on hover */}
+          <div
+            className="w-20 flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ActionBtn title="Edit" onClick={() => actions.onEdit(s)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </ActionBtn>
+            <ActionBtn
+              title="Graduate"
+              onClick={() => actions.onGraduate(s)}
+              className={cn('text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20', s.status !== 'active' && 'invisible pointer-events-none')}
+            >
+              <GraduationCap className="h-3.5 w-3.5" />
+            </ActionBtn>
+            <ActionBtn
+              title="Pause"
+              onClick={() => actions.onPause(s)}
+              className={cn('text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20', s.status !== 'active' && 'invisible pointer-events-none')}
+            >
+              <PauseCircle className="h-3.5 w-3.5" />
+            </ActionBtn>
             <ActionBtn title="Delete" onClick={() => actions.onDelete(s)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
               <Trash2 className="h-3.5 w-3.5" />
             </ActionBtn>
