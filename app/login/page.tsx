@@ -41,8 +41,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 mb-4">
-            <span className="text-white font-bold text-lg">H</span>
+          <div className="flex items-center justify-center mb-4">
+            <img src="/logo.png" alt="HIC Parenting" className="h-16 w-auto" />
           </div>
           <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
             HIC Parenting
