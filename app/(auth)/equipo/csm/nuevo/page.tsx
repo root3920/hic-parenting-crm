@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-const CSM_OPTIONS = ['Ana Sofía', 'Otro CSM']
+const CSM_OPTIONS = ['Ana Sofía', 'Mariana Llano']
 
 const CANCEL_REASONS = ['Financial', 'Lack of time', 'No results seen', 'Unmet expectations', 'Platform', 'Personal', 'Other']
 const FRICCIONES = ['Implementation', 'Time', 'Emotional', 'Content', 'Platform']

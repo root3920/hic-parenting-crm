@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -8,10 +8,9 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
-
-const REP_OPTIONS = ['Ana Sofía', 'Otro SPC Rep']
 const POST_TYPES = ['Educational', 'Inspirational', 'Community spotlight', 'Announcement', 'Question / Poll', 'Other']
 
 function today() {
@@ -48,7 +47,7 @@ interface FormState {
 
 const initialState: FormState = {
   date: today(),
-  rep_name: 'Ana Sofía',
+  rep_name: '',
   hours_worked: '',
   community_size: '', new_members: '', members_welcomed: '',
   members_introduced: '', questions_answered: '', wins_shared: '',
