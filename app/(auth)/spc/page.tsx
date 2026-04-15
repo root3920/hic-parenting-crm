@@ -150,6 +150,18 @@ interface MemberEditForm {
   status: MemberStatus
 }
 
+interface CancelEditForm {
+  name: string
+  email: string
+  customer_phone: string
+  cancel_type: 'paid_cancel' | 'pending_cancel' | 'trial_cancel'
+  offer_title: string
+  amount: string
+  currency: string
+  cancelled_at: string
+  provider: string
+}
+
 const STATUS_CONFIG: Record<MemberStatus, { label: string; cls: string }> = {
   active:    { label: 'Active',    cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
   trial:     { label: 'Trial',     cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
@@ -166,6 +178,7 @@ function MemberProfileModal({
   onAddNote,
   onClose,
   onSave,
+  onSaveCancellation,
 }: {
   selected: SelectedMember
   notes: SpcMemberNote[]
@@ -175,6 +188,7 @@ function MemberProfileModal({
   onAddNote: () => void
   onClose: () => void
   onSave: (updated: SpcMember) => void
+  onSaveCancellation: (updated: SpcCancellation) => void
 }) {
   const supabase = useMemo(() => createClient(), [])
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
@@ -183,14 +197,23 @@ function MemberProfileModal({
   const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
 
   const [isEditing, setIsEditing] = useState(false)
+  const [isCancelEditing, setIsCancelEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState<MemberEditForm>({
     name: '', email: '', phone: '', plan: 'monthly',
     provider: 'Stripe', next_payment_date: '', joined_at: '', status: 'active',
   })
+  const [cancelForm, setCancelForm] = useState<CancelEditForm>({
+    name: '', email: '', customer_phone: '', cancel_type: 'paid_cancel',
+    offer_title: '', amount: '', currency: 'USD', cancelled_at: '', provider: '',
+  })
 
   function setField<K extends keyof MemberEditForm>(key: K, value: MemberEditForm[K]) {
     setEditForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function setCancelField<K extends keyof CancelEditForm>(key: K, value: CancelEditForm[K]) {
+    setCancelForm((prev) => ({ ...prev, [key]: value }))
   }
 
   function startEdit() {
@@ -209,6 +232,23 @@ function MemberProfileModal({
     setIsEditing(true)
   }
 
+  function startEditCancellation() {
+    if (selected.kind !== 'cancellation') return
+    const c = selected.data
+    setCancelForm({
+      name: c.name ?? '',
+      email: c.email ?? '',
+      customer_phone: c.customer_phone ?? '',
+      cancel_type: c.cancel_type ?? 'paid_cancel',
+      offer_title: c.offer_title ?? '',
+      amount: c.amount?.toString() ?? '',
+      currency: c.currency ?? 'USD',
+      cancelled_at: c.cancelled_at?.slice(0, 10) ?? '',
+      provider: c.provider ?? c.source ?? '',
+    })
+    setIsCancelEditing(true)
+  }
+
   async function handleSave() {
     if (selected.kind !== 'member') return
     setSaving(true)
@@ -217,7 +257,6 @@ function MemberProfileModal({
       .update({
         name: editForm.name,
         email: editForm.email,
-        phone: editForm.phone || null,
         plan: editForm.plan,
         provider: editForm.provider,
         next_payment_date: editForm.next_payment_date || null,
@@ -237,20 +276,56 @@ function MemberProfileModal({
     }
   }
 
+  async function handleSaveCancellation() {
+    if (selected.kind !== 'cancellation') return
+    setSaving(true)
+    const { data, error } = await supabase
+      .from('spc_cancellations')
+      .update({
+        name: cancelForm.name || null,
+        email: cancelForm.email || null,
+        customer_phone: cancelForm.customer_phone || null,
+        cancel_type: cancelForm.cancel_type,
+        offer_title: cancelForm.offer_title || null,
+        amount: parseFloat(cancelForm.amount) || 0,
+        currency: cancelForm.currency || null,
+        cancelled_at: cancelForm.cancelled_at || null,
+        provider: cancelForm.provider || null,
+      })
+      .eq('id', selected.data.id)
+      .select()
+      .single()
+    setSaving(false)
+    if (error) {
+      toast.error(`Failed to save: ${error.message}`)
+    } else {
+      toast.success('Cancellation updated successfully')
+      onSaveCancellation(data as SpcCancellation)
+      setIsCancelEditing(false)
+    }
+  }
+
   function handleCancel() {
     setIsEditing(false)
+    setIsCancelEditing(false)
   }
 
   // ── Derived display values (optimistic during edit) ──
-  const displayName     = (isEditing ? editForm.name     : selected.data.name)     ?? ''
-  const displayEmail    = (isEditing ? editForm.email    : selected.data.email)    ?? ''
-  const displayPhone    = isEditing ? editForm.phone    : (selected.kind === 'member' ? (selected.data.phone ?? null) : (selected.data.customer_phone ?? null))
-  const displayPlan     = (isEditing ? editForm.plan     : selected.data.plan)     ?? null
+  const displayName     = isEditing ? editForm.name : isCancelEditing ? cancelForm.name : (selected.data.name ?? '')
+  const displayEmail    = isEditing ? editForm.email : isCancelEditing ? cancelForm.email : (selected.data.email ?? '')
+  const displayPhone    = isEditing
+    ? editForm.phone
+    : isCancelEditing
+      ? cancelForm.customer_phone
+      : (selected.kind === 'member' ? (selected.data.phone ?? null) : (selected.data.customer_phone ?? null))
+  const displayPlan     = (isEditing ? editForm.plan : selected.data.plan) ?? null
   const displayProvider = isEditing
     ? editForm.provider
-    : (selected.kind === 'member'
-        ? selected.data.provider
-        : (selected.data.provider ?? selected.data.source ?? '—'))
+    : isCancelEditing
+      ? cancelForm.provider
+      : (selected.kind === 'member'
+          ? selected.data.provider
+          : (selected.data.provider ?? selected.data.source ?? '—'))
 
   // Status badge — optimistic when editing
   let statusLabel = ''
@@ -260,7 +335,7 @@ function MemberProfileModal({
     const cfg = STATUS_CONFIG[key] ?? STATUS_CONFIG.active
     statusLabel = cfg.label; statusCls = cfg.cls
   } else {
-    const ct = selected.data.cancel_type
+    const ct = isCancelEditing ? cancelForm.cancel_type : selected.data.cancel_type
     if (ct === 'paid_cancel') {
       statusLabel = 'Cancelled'; statusCls = STATUS_CONFIG.cancelled.cls
     } else if (ct === 'pending_cancel') {
@@ -320,11 +395,20 @@ function MemberProfileModal({
             </span>
           </div>
         </div>
-        {/* Quick actions — edit only available for spc_members */}
+        {/* Quick actions */}
         <div className="flex items-center gap-1 shrink-0">
           {selected.kind === 'member' && !isEditing && (
             <button
               onClick={startEdit}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
+          {selected.kind === 'cancellation' && !isCancelEditing && (
+            <button
+              onClick={startEditCancellation}
               className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               title="Edit"
             >
@@ -342,9 +426,9 @@ function MemberProfileModal({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        {/* ── LEFT: Key Info (view) or Edit Form ── */}
+        {/* ── LEFT: Key Info (view), Member Edit, or Cancellation Edit ── */}
         <div>
-          {!isEditing ? (
+          {!isEditing && !isCancelEditing ? (
             <>
               <p className={sectionLabel}>Key Info</p>
               <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2.5">
@@ -403,8 +487,108 @@ function MemberProfileModal({
                 )}
               </div>
             </>
+          ) : isCancelEditing ? (
+            /* ── CANCELLATION EDIT FORM ── */
+            <>
+              <p className={sectionLabel}>Edit Cancellation</p>
+
+              {/* Cancel type */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
+                  Cancel Type
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    ['paid_cancel',    'Cancelled',       STATUS_CONFIG.cancelled.cls],
+                    ['pending_cancel', 'Pending Cancel',  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'],
+                    ['trial_cancel',   'Trial Cancelled', STATUS_CONFIG.expired.cls],
+                  ] as [CancelEditForm['cancel_type'], string, string][]).map(([key, label, cls]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setCancelField('cancel_type', key)}
+                      className={cn(
+                        'py-1.5 px-2 rounded-lg text-xs font-semibold border-2 transition-all',
+                        cancelForm.cancel_type === key
+                          ? cn('border-current', cls)
+                          : 'border-transparent bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Full name</label>
+                  <input type="text" value={cancelForm.name} onChange={(e) => setCancelField('name', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Email</label>
+                  <input type="email" value={cancelForm.email} onChange={(e) => setCancelField('email', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Phone</label>
+                  <input type="text" value={cancelForm.customer_phone} onChange={(e) => setCancelField('customer_phone', e.target.value)} placeholder="+" className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Offer / Product</label>
+                  <input type="text" value={cancelForm.offer_title} onChange={(e) => setCancelField('offer_title', e.target.value)} className={inputCls} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Amount</label>
+                    <input type="number" step="0.01" value={cancelForm.amount} onChange={(e) => setCancelField('amount', e.target.value)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Currency</label>
+                    <input type="text" value={cancelForm.currency} onChange={(e) => setCancelField('currency', e.target.value)} className={inputCls} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Cancelled at</label>
+                    <input type="date" value={cancelForm.cancelled_at} onChange={(e) => setCancelField('cancelled_at', e.target.value)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Provider</label>
+                    <input type="text" value={cancelForm.provider} onChange={(e) => setCancelField('provider', e.target.value)} className={inputCls} />
+                  </div>
+                </div>
+                {selected.kind === 'cancellation' && selected.data.source && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Source</label>
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                      {selected.data.source}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Save / Cancel */}
+              <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCancellation}
+                  disabled={saving}
+                  className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
+                  style={{ backgroundColor: '#185FA5' }}
+                >
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </>
           ) : (
-            /* ── EDIT FORM ── */
+            /* ── MEMBER EDIT FORM ── */
             <>
               <p className={sectionLabel}>Edit Member</p>
 
@@ -1881,6 +2065,10 @@ export default function SpcPage() {
           onSave={(updated) => {
             setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
             setSelectedMember({ kind: 'member', data: updated })
+          }}
+          onSaveCancellation={(updated) => {
+            setCancellations((prev) => prev.map((c) => c.id === updated.id ? updated : c))
+            setSelectedMember({ kind: 'cancellation', data: updated })
           }}
         />
       )}
