@@ -113,6 +113,66 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Auto-sync SPC member on new sale ──────────────────────────────────────
+    if (canonical === 'Secure Parent Collective' && buyer_email) {
+      const costNum = parseFloat(cost) || 0
+      const spcProvider = source === 'Kajabi' ? 'Kajabi' : 'Stripe'
+
+      if (costNum === 0) {
+        // Free-trial transaction → ensure member exists with trial status
+        const { data: existing } = await supabase
+          .from('spc_members')
+          .select('id, status')
+          .eq('email', buyer_email)
+          .maybeSingle()
+
+        if (!existing) {
+          await supabase.from('spc_members').insert({
+            name: buyer_fullname || 'Unknown',
+            email: buyer_email,
+            phone: buyer_phone ?? null,
+            status: 'trial',
+            plan: 'monthly',
+            amount: 0,
+            provider: spcProvider,
+            joined_at: date,
+          })
+        } else if (existing.status !== 'cancelled') {
+          await supabase.from('spc_members').update({ status: 'trial' }).eq('id', existing.id)
+        }
+      } else {
+        // Paid transaction → activate only if not in cancellations
+        const { data: inCancellations } = await supabase
+          .from('spc_cancellations')
+          .select('id')
+          .eq('email', buyer_email)
+          .maybeSingle()
+
+        if (!inCancellations) {
+          const { data: existing } = await supabase
+            .from('spc_members')
+            .select('id, status')
+            .eq('email', buyer_email)
+            .maybeSingle()
+
+          if (!existing) {
+            await supabase.from('spc_members').insert({
+              name: buyer_fullname || 'Unknown',
+              email: buyer_email,
+              phone: buyer_phone ?? null,
+              status: 'active',
+              plan: costNum >= 400 ? 'annual' : 'monthly',
+              amount: costNum,
+              provider: spcProvider,
+              joined_at: date,
+            })
+          } else if (existing.status === 'trial') {
+            await supabase.from('spc_members').update({ status: 'active' }).eq('id', existing.id)
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Transaction recorded',

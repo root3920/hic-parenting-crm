@@ -163,6 +163,26 @@ export async function POST(req: NextRequest) {
       if (insertError) {
         return NextResponse.json({ error: insertError.message }, { status: 500 })
       }
+
+      // ── Sync spc_members status for newly cancelled emails ─────────────────
+      const cancelledEmails = newRecords
+        .map((r) => r.email as string | null)
+        .filter((e): e is string => !!e)
+
+      if (cancelledEmails.length > 0) {
+        const { data: membersToUpdate } = await supabaseAdmin
+          .from('spc_members')
+          .select('id')
+          .in('email', cancelledEmails)
+          .in('status', ['active', 'trial'])
+
+        if (membersToUpdate && membersToUpdate.length > 0) {
+          await supabaseAdmin
+            .from('spc_members')
+            .update({ status: 'cancelled' })
+            .in('id', membersToUpdate.map((m: { id: string }) => m.id))
+        }
+      }
     }
 
     return NextResponse.json({ imported: newRecords.length, skipped, errors })

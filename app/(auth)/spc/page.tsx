@@ -19,7 +19,7 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, Clock, Mail, MessageSquare, Pencil, Phone, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, Calendar, Clock, ExternalLink, Mail, MessageSquare, Pencil, Phone, Trash2, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -37,6 +37,8 @@ import {
   Legend,
 } from 'recharts'
 import { useProfile } from '@/hooks/useProfile'
+import { getCanonicalProduct } from '@/lib/products'
+import type { Transaction } from '@/types'
 import { toast } from 'sonner'
 
 export const dynamic = 'force-dynamic'
@@ -207,6 +209,25 @@ function MemberProfileModal({
     name: '', email: '', customer_phone: '', cancel_type: 'paid_cancel',
     offer_title: '', amount: '', currency: 'USD', cancelled_at: '', provider: '',
   })
+  const [memberTransactions, setMemberTransactions] = useState<Transaction[]>([])
+
+  const memberEmail = selected.kind === 'member' ? (selected.data.email ?? null) : null
+
+  useEffect(() => {
+    if (!memberEmail) { setMemberTransactions([]); return }
+    supabase
+      .from('transactions')
+      .select('*')
+      .eq('buyer_email', memberEmail)
+      .order('date', { ascending: false })
+      .then(({ data }) => {
+        setMemberTransactions(
+          (data ?? []).filter(
+            (tx: Transaction) => getCanonicalProduct(tx.offer_title ?? '') === 'Secure Parent Collective'
+          )
+        )
+      })
+  }, [memberEmail, supabase])
 
   function setField<K extends keyof MemberEditForm>(key: K, value: MemberEditForm[K]) {
     setEditForm((prev) => ({ ...prev, [key]: value }))
@@ -504,6 +525,78 @@ function MemberProfileModal({
                   </div>
                 )}
               </div>
+
+              {/* ── Transactions ── */}
+              {selected.kind === 'member' && (
+                <div className="mt-4">
+                  <p className={sectionLabel}>Transactions</p>
+                  {memberTransactions.length === 0 ? (
+                    <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-center">
+                      <p className="text-xs text-zinc-400">No SPC transactions found</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {memberTransactions.map((tx) => {
+                          const st = tx.status ?? 'completed'
+                          const stCls =
+                            st === 'refunded' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                            st === 'failed'   ? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' :
+                            'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                          const stLabel = st.charAt(0).toUpperCase() + st.slice(1)
+                          return (
+                            <div key={tx.id} className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3">
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-tight flex-1 min-w-0 truncate">
+                                  {tx.offer_title}
+                                </span>
+                                <span className="text-xs font-semibold text-green-700 dark:text-green-400 whitespace-nowrap">
+                                  ${Number(tx.cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className={cn('inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold', stCls)}>
+                                    {stLabel}
+                                  </span>
+                                  <span className="text-xs text-zinc-400 flex items-center gap-0.5">
+                                    <Calendar className="h-3 w-3" />{formatDate(tx.date)}
+                                  </span>
+                                </div>
+                                {selected.data.email && (
+                                  <a
+                                    href={`/sales?email=${encodeURIComponent(selected.data.email)}`}
+                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
+                                  >
+                                    Sales <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {/* Summary */}
+                      {(() => {
+                        const completed = memberTransactions.filter((t) => t.status !== 'refunded' && t.status !== 'failed')
+                        const totalPaid = completed.reduce((s, t) => s + Number(t.cost), 0)
+                        return (
+                          <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className={rowLabel}>Total Paid</span>
+                              <span className="text-xs font-semibold text-green-700 dark:text-green-400">{formatCurrency(totalPaid)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className={rowLabel}>Payments</span>
+                              <span className={rowValue}>{completed.length}</span>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
             </>
           ) : isCancelEditing ? (
             /* ── CANCELLATION EDIT FORM ── */
