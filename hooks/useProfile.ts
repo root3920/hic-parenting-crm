@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 
-export type UserRole = 'admin' | 'closer' | 'setter'
+export type UserRole = 'admin' | 'closer' | 'setter' | 'csm_spc' | 'csm_ht'
 
 export interface Profile {
   id: string

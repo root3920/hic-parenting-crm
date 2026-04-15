@@ -1,25 +1,29 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-type UserRole = 'admin' | 'closer' | 'setter'
+type UserRole = 'admin' | 'closer' | 'setter' | 'csm_spc' | 'csm_ht'
 
 const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/dashboard':          ['admin'],
   '/sales':              ['admin'],
   '/llamadas':           ['admin', 'closer'],
-  '/spc':                ['admin'],
-  '/equipo/csm':         ['admin'],
+  '/spc':                ['admin', 'csm_spc'],
+  '/students':           ['admin', 'csm_ht'],
+  '/equipo/csm':         ['admin', 'csm_ht'],
+  '/equipo/spc':         ['admin', 'csm_spc'],
   '/equipo/setter':      ['admin', 'setter'],
   '/equipo/closer':      ['admin', 'closer'],
   '/equipo/profiles':    ['admin'],
   '/goals':              ['admin'],
-  '/settings':           ['admin', 'closer', 'setter'],
+  '/settings':           ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'],
 }
 
 const ROLE_HOME: Record<UserRole, string> = {
-  admin:  '/dashboard',
-  closer: '/llamadas',
-  setter: '/equipo/setter',
+  admin:   '/dashboard',
+  closer:  '/llamadas',
+  setter:  '/equipo/setter',
+  csm_spc: '/spc',
+  csm_ht:  '/students',
 }
 
 export async function middleware(request: NextRequest) {

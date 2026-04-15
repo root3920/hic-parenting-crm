@@ -36,7 +36,7 @@ type PasswordForm = z.infer<typeof passwordSchema>
 
 // ─── Team management types ────────────────────────────────────────────────────
 
-type Role = 'admin' | 'closer' | 'setter'
+type Role = 'admin' | 'closer' | 'setter' | 'csm_spc' | 'csm_ht'
 
 interface TeamProfile {
   id: string
@@ -55,11 +55,19 @@ interface InviteForm {
   setter_name: string
 }
 
-const ROLE_LABELS: Record<Role, string> = { admin: 'Admin', closer: 'Closer', setter: 'Setter' }
+const ROLE_LABELS: Record<Role, string> = {
+  admin:   'Admin',
+  closer:  'Closer',
+  setter:  'Setter',
+  csm_spc: 'Client Success SPC',
+  csm_ht:  'Client Success HT',
+}
 const ROLE_COLORS: Record<Role, string> = {
-  admin:  'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-  closer: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  setter: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  admin:   'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+  closer:  'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  setter:  'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  csm_spc: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  csm_ht:  'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
 }
 const CLOSER_NAMES = ['Marcela HIC Parenting', 'Cali Luna']
 const SETTER_NAMES = ['Valentina Llano', 'Marcela Collier']
@@ -432,6 +440,8 @@ export default function SettingsPage() {
                   <option value="admin">Admin</option>
                   <option value="closer">Closer</option>
                   <option value="setter">Setter</option>
+                  <option value="csm_spc">Client Success SPC</option>
+                  <option value="csm_ht">Client Success HT</option>
                 </select>
               </div>
 

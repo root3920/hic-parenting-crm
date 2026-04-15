@@ -31,9 +31,10 @@ const ALL_NAV_ITEMS = [
   { href: '/dashboard',    label: 'Dashboard',   icon: LayoutDashboard, roles: ['admin'] as UserRole[] },
   { href: '/sales',        label: 'Sales',        icon: DollarSign,      roles: ['admin'] as UserRole[] },
   { href: '/llamadas',     label: 'Calls',        icon: Phone,           roles: ['admin', 'closer'] as UserRole[] },
-  { href: '/spc',          label: 'SPC Members',  icon: Users,           roles: ['admin'] as UserRole[] },
-  { href: '/students',     label: 'Students',     icon: UsersRound,      roles: ['admin'] as UserRole[] },
-  { href: '/equipo/csm',   label: 'Team',         icon: UsersRound,      roles: ['admin'] as UserRole[] },
+  { href: '/spc',          label: 'SPC Members',  icon: Users,           roles: ['admin', 'csm_spc'] as UserRole[] },
+  { href: '/students',     label: 'Students',     icon: UsersRound,      roles: ['admin', 'csm_ht'] as UserRole[] },
+  { href: '/equipo/csm',   label: 'Team',         icon: UsersRound,      roles: ['admin', 'csm_ht'] as UserRole[] },
+  { href: '/equipo/spc',   label: 'Team',         icon: UsersRound,      roles: ['csm_spc'] as UserRole[] },
   { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },
 ]
 
@@ -44,7 +45,14 @@ const ALL_QUICK_ACTIONS = [
     label: 'Daily CSM Report',
     sub: 'Client Success HT',
     icon: FileText,
-    roles: ['admin'] as UserRole[],
+    roles: ['admin', 'csm_ht'] as UserRole[],
+  },
+  {
+    href: '/equipo/spc/nuevo',
+    label: 'Daily SPC Report',
+    sub: 'Client Success SPC',
+    icon: FileText,
+    roles: ['admin', 'csm_spc'] as UserRole[],
   },
   {
     href: '/equipo/setter/nuevo',
