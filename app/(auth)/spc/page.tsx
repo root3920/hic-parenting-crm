@@ -119,6 +119,21 @@ function formatDateTime(d: string | null) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+function calcNextPayment(txList: Transaction[] | undefined, plan: 'monthly' | 'annual' | null | undefined): string {
+  if (!txList || txList.length === 0) return '—'
+  const completed = txList.filter((t) => (t.status ?? 'completed') === 'completed')
+  if (completed.length === 0) return '—'
+  // txList is sorted descending — first completed entry is most recent
+  const latest = completed[0]
+  const d = new Date(latest.date + 'T12:00:00')
+  if (plan === 'annual') {
+    d.setFullYear(d.getFullYear() + 1)
+  } else {
+    d.setMonth(d.getMonth() + 1)
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 function SpcModal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -181,6 +196,7 @@ function MemberProfileModal({
   onClose,
   onSave,
   onSaveCancellation,
+  memberTransactions,
 }: {
   selected: SelectedMember
   notes: SpcMemberNote[]
@@ -191,6 +207,7 @@ function MemberProfileModal({
   onClose: () => void
   onSave: (updated: SpcMember) => void
   onSaveCancellation: (updated: SpcCancellation) => void
+  memberTransactions: Transaction[]
 }) {
   const supabase = useMemo(() => createClient(), [])
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
@@ -209,25 +226,6 @@ function MemberProfileModal({
     name: '', email: '', customer_phone: '', cancel_type: 'paid_cancel',
     offer_title: '', amount: '', currency: 'USD', cancelled_at: '', provider: '',
   })
-  const [memberTransactions, setMemberTransactions] = useState<Transaction[]>([])
-
-  const memberEmail = selected.kind === 'member' ? (selected.data.email ?? null) : null
-
-  useEffect(() => {
-    if (!memberEmail) { setMemberTransactions([]); return }
-    supabase
-      .from('transactions')
-      .select('*')
-      .eq('buyer_email', memberEmail)
-      .order('date', { ascending: false })
-      .then(({ data }) => {
-        setMemberTransactions(
-          (data ?? []).filter(
-            (tx: Transaction) => getCanonicalProduct(tx.offer_title ?? '') === 'Secure Parent Collective'
-          )
-        )
-      })
-  }, [memberEmail, supabase])
 
   function setField<K extends keyof MemberEditForm>(key: K, value: MemberEditForm[K]) {
     setEditForm((prev) => ({ ...prev, [key]: value }))
@@ -480,7 +478,7 @@ function MemberProfileModal({
                 {selected.kind === 'member' && selected.data.status === 'active' && (
                   <div className="flex items-center justify-between">
                     <span className={rowLabel}>Next Payment</span>
-                    <span className={rowValue}>{formatDate(selected.data.next_payment_date)}</span>
+                    <span className={rowValue}>{calcNextPayment(memberTransactions, selected.data.plan)}</span>
                   </div>
                 )}
                 {selected.kind === 'cancellation' && (
@@ -857,6 +855,7 @@ export default function SpcPage() {
   const supabase = useMemo(() => createClient(), [])
   const [members, setMembers] = useState<SpcMember[]>([])
   const [cancellations, setCancellations] = useState<SpcCancellation[]>([])
+  const [spcTransactions, setSpcTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('growth')
 
@@ -912,19 +911,38 @@ export default function SpcPage() {
 
   useEffect(() => {
     async function fetchData() {
-      const [membersResult, cancelsResult] = await Promise.all([
+      const [membersResult, cancelsResult, txResult] = await Promise.all([
         supabase.from('spc_members').select('*').order('joined_at', { ascending: false }),
+        supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false }),
         supabase
-          .from('spc_cancellations')
+          .from('transactions')
           .select('*')
-          .order('cancelled_at', { ascending: false }),
+          .ilike('offer_title', '%Secure Parent%')
+          .order('date', { ascending: false }),
       ])
       setMembers(membersResult.data ?? [])
       setCancellations(cancelsResult.data ?? [])
+      setSpcTransactions(
+        (txResult.data ?? []).filter(
+          (tx: Transaction) => getCanonicalProduct(tx.offer_title ?? '') === 'Secure Parent Collective'
+        )
+      )
       setLoading(false)
     }
     fetchData()
   }, [])
+
+  // ── Transactions grouped by member email ─────────────────────────────────
+  const transactionsByEmail = useMemo(() => {
+    const map: Record<string, Transaction[]> = {}
+    for (const tx of spcTransactions) {
+      const email = (tx.buyer_email ?? '').toLowerCase()
+      if (!email) continue
+      if (!map[email]) map[email] = []
+      map[email].push(tx) // already ordered desc from the query
+    }
+    return map
+  }, [spcTransactions])
 
   // ── Date anchors ─────────────────────────────────────────────────────────
   const now = new Date()
@@ -1624,7 +1642,7 @@ export default function SpcPage() {
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
-                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.next_payment_date ? formatDate(m.next_payment_date) : '—'}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{calcNextPayment(transactionsByEmail[(m.email ?? '').toLowerCase()], m.plan)}</TableCell>
                         </AnimatedTableRow>
                       ))}
                     </TableBody>
@@ -2173,6 +2191,11 @@ export default function SpcPage() {
           onNoteChange={setNoteText}
           onAddNote={handleAddNote}
           onClose={() => setSelectedMember(null)}
+          memberTransactions={
+            selectedMember.kind === 'member'
+              ? (transactionsByEmail[(selectedMember.data.email ?? '').toLowerCase()] ?? [])
+              : []
+          }
           onSave={(updated) => {
             if (!updated) return
             setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
