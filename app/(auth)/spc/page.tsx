@@ -351,7 +351,7 @@ function MemberProfileModal({
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Member since</span>
                   <span className={rowValue}>
-                    {selected.kind === 'member' ? formatDate(selected.data.joined_at) : formatDate(selected.data.subscribed_at)}
+                    {selected.kind === 'member' ? formatDate(selected.data.joined_at) : (selected.data.subscribed_at ? formatDate(selected.data.subscribed_at) : '—')}
                   </span>
                 </div>
                 {selected.kind === 'member' && selected.data.status === 'active' && (
@@ -363,7 +363,7 @@ function MemberProfileModal({
                 {selected.kind === 'cancellation' && (
                   <div className="flex items-center justify-between">
                     <span className={rowLabel}>Cancelled</span>
-                    <span className={rowValue}>{formatDate(selected.data.cancelled_at)}</span>
+                    <span className={rowValue}>{selected.data.cancelled_at ? formatDate(selected.data.cancelled_at) : '—'}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
