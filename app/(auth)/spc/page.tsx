@@ -252,56 +252,74 @@ function MemberProfileModal({
   async function handleSave() {
     if (selected.kind !== 'member') return
     setSaving(true)
-    const { data, error } = await supabase
-      .from('spc_members')
-      .update({
-        name: editForm.name,
-        email: editForm.email,
-        plan: editForm.plan,
-        provider: editForm.provider,
-        next_payment_date: editForm.next_payment_date || null,
-        joined_at: editForm.joined_at || null,
-        status: editForm.status,
-      })
-      .eq('id', selected.data.id)
-      .select()
-      .single()
-    setSaving(false)
-    if (error) {
-      toast.error(`Failed to save: ${error.message}`)
-    } else {
+    try {
+      const { data, error } = await supabase
+        .from('spc_members')
+        .update({
+          name: editForm.name,
+          email: editForm.email,
+          plan: editForm.plan,
+          provider: editForm.provider,
+          next_payment_date: editForm.next_payment_date || null,
+          joined_at: editForm.joined_at || null,
+          status: editForm.status,
+        })
+        .eq('id', selected.data.id)
+        .select()
+        .single()
+      if (error) {
+        toast.error(`Failed to save: ${error.message}`)
+        return
+      }
+      if (!data) {
+        toast.error('Save failed: no data returned. Check table permissions.')
+        return
+      }
       toast.success('Member updated successfully')
       onSave(data as SpcMember)
       setIsEditing(false)
+    } catch (err) {
+      toast.error(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSaving(false)
     }
   }
 
   async function handleSaveCancellation() {
     if (selected.kind !== 'cancellation') return
     setSaving(true)
-    const { data, error } = await supabase
-      .from('spc_cancellations')
-      .update({
-        name: cancelForm.name || null,
-        email: cancelForm.email || null,
-        customer_phone: cancelForm.customer_phone || null,
-        cancel_type: cancelForm.cancel_type,
-        offer_title: cancelForm.offer_title || null,
-        amount: parseFloat(cancelForm.amount) || 0,
-        currency: cancelForm.currency || null,
-        cancelled_at: cancelForm.cancelled_at || null,
-        provider: cancelForm.provider || null,
-      })
-      .eq('id', selected.data.id)
-      .select()
-      .single()
-    setSaving(false)
-    if (error) {
-      toast.error(`Failed to save: ${error.message}`)
-    } else {
+    try {
+      const { data, error } = await supabase
+        .from('spc_cancellations')
+        .update({
+          name: cancelForm.name || null,
+          email: cancelForm.email || null,
+          customer_phone: cancelForm.customer_phone || null,
+          cancel_type: cancelForm.cancel_type,
+          offer_title: cancelForm.offer_title || null,
+          amount: parseFloat(cancelForm.amount) || 0,
+          currency: cancelForm.currency || null,
+          cancelled_at: cancelForm.cancelled_at || null,
+          provider: cancelForm.provider || null,
+        })
+        .eq('id', selected.data.id)
+        .select()
+        .single()
+      if (error) {
+        toast.error(`Failed to save: ${error.message}`)
+        return
+      }
+      if (!data) {
+        toast.error('Save failed: no data returned. Check table permissions.')
+        return
+      }
       toast.success('Cancellation updated successfully')
       onSaveCancellation(data as SpcCancellation)
       setIsCancelEditing(false)
+    } catch (err) {
+      toast.error(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2063,10 +2081,12 @@ export default function SpcPage() {
           onAddNote={handleAddNote}
           onClose={() => setSelectedMember(null)}
           onSave={(updated) => {
+            if (!updated) return
             setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
             setSelectedMember({ kind: 'member', data: updated })
           }}
           onSaveCancellation={(updated) => {
+            if (!updated) return
             setCancellations((prev) => prev.map((c) => c.id === updated.id ? updated : c))
             setSelectedMember({ kind: 'cancellation', data: updated })
           }}
