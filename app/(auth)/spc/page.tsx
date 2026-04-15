@@ -54,15 +54,22 @@ const BASELINE = {
 
 interface SpcCancellation {
   id: string
-  name: string
-  email: string
-  source: string
-  cancelled_at: string
-  subscribed_at: string
+  name: string | null
+  email: string | null
+  source: string | null
+  cancelled_at: string | null
+  subscribed_at: string | null
   amount: number
-  plan: 'monthly' | 'annual'
-  cancel_type: 'paid_cancel' | 'pending_cancel' | 'trial_cancel'
+  plan: 'monthly' | 'annual' | null
+  cancel_type: 'paid_cancel' | 'pending_cancel' | 'trial_cancel' | null
   created_at: string
+  // columns added via CSV import
+  subscription_id: string | null
+  customer_phone: string | null
+  interval: string | null
+  offer_title: string | null
+  provider: string | null
+  currency: string | null
 }
 
 interface SpcMemberNote {
@@ -84,10 +91,12 @@ const chartVariants = {
   visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
 }
 
-function getInitials(name: string) {
+function getInitials(name: string | null | undefined) {
+  if (!name) return '?'
   return name
     .split(' ')
     .map((w) => w[0])
+    .filter(Boolean)
     .slice(0, 2)
     .join('')
     .toUpperCase()
@@ -233,11 +242,15 @@ function MemberProfileModal({
   }
 
   // ── Derived display values (optimistic during edit) ──
-  const displayName     = isEditing ? editForm.name     : selected.data.name
-  const displayEmail    = isEditing ? editForm.email    : selected.data.email
-  const displayPhone    = isEditing ? editForm.phone    : (selected.kind === 'member' ? selected.data.phone : null)
-  const displayPlan     = isEditing ? editForm.plan     : selected.data.plan
-  const displayProvider = isEditing ? editForm.provider : (selected.kind === 'member' ? selected.data.provider : selected.data.source)
+  const displayName     = (isEditing ? editForm.name     : selected.data.name)     ?? ''
+  const displayEmail    = (isEditing ? editForm.email    : selected.data.email)    ?? ''
+  const displayPhone    = isEditing ? editForm.phone    : (selected.kind === 'member' ? (selected.data.phone ?? null) : (selected.data.customer_phone ?? null))
+  const displayPlan     = (isEditing ? editForm.plan     : selected.data.plan)     ?? null
+  const displayProvider = isEditing
+    ? editForm.provider
+    : (selected.kind === 'member'
+        ? selected.data.provider
+        : (selected.data.provider ?? selected.data.source ?? '—'))
 
   // Status badge — optimistic when editing
   let statusLabel = ''
@@ -247,13 +260,15 @@ function MemberProfileModal({
     const cfg = STATUS_CONFIG[key] ?? STATUS_CONFIG.active
     statusLabel = cfg.label; statusCls = cfg.cls
   } else {
-    if (selected.data.cancel_type === 'paid_cancel') {
+    const ct = selected.data.cancel_type
+    if (ct === 'paid_cancel') {
       statusLabel = 'Cancelled'; statusCls = STATUS_CONFIG.cancelled.cls
-    } else if (selected.data.cancel_type === 'pending_cancel') {
+    } else if (ct === 'pending_cancel') {
       statusLabel = 'Pending Cancel'
       statusCls = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
     } else {
-      statusLabel = 'Trial Cancelled'; statusCls = STATUS_CONFIG.expired.cls
+      statusLabel = ct === 'trial_cancel' ? 'Trial Cancelled' : 'Cancelled'
+      statusCls = STATUS_CONFIG.expired.cls
     }
   }
 
@@ -354,12 +369,12 @@ function MemberProfileModal({
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Plan</span>
                   <span className={rowValue}>
-                    {selected.data.plan === 'annual' ? 'Annual' : 'Monthly'} · {formatCurrency(selected.data.amount)}
+                    {displayPlan === 'annual' ? 'Annual' : displayPlan === 'monthly' ? 'Monthly' : '—'} · {formatCurrency(selected.data.amount)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Payment Method</span>
-                  <span className={rowValue}>{selected.kind === 'member' ? selected.data.provider : selected.data.source}</span>
+                  <span className={rowValue}>{displayProvider}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Days Left</span>
