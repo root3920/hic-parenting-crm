@@ -1530,8 +1530,8 @@ export default function SpcPage() {
                             {formatCurrency(m.amount)}
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
-                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{formatDate(m.joined_at)}</TableCell>
-                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{formatDate(m.next_payment_date)}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.next_payment_date ? formatDate(m.next_payment_date) : '—'}</TableCell>
                         </AnimatedTableRow>
                       ))}
                     </TableBody>

@@ -20,19 +20,29 @@ function localDate(dateStr: string): Date {
   return new Date(y, m - 1, d)
 }
 
-export function formatDate(dateStr: string): string {
-  return localDate(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+export function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  try {
+    return localDate(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  } catch {
+    return '—'
+  }
 }
 
-export function formatShortDate(dateStr: string): string {
-  return localDate(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  })
+export function formatShortDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  try {
+    return localDate(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch {
+    return '—'
+  }
 }
 
 export function getMonthRange() {
