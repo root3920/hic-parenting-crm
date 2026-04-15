@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Plus, X, Trash2, RotateCcw, ChevronRight, Copy, CheckCircle2, Download } from 'lucide-react'
+import { Search, Plus, Upload, X, Trash2, RotateCcw, ChevronRight, Copy, CheckCircle2, Download } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
@@ -201,6 +201,15 @@ export default function SalesPage() {
   const [recoveryTab, setRecoveryTab] = useState<'all' | 'week' | 'month'>('all')
   const [confirmRecover, setConfirmRecover] = useState<Transaction | null>(null)
   const [recoverLoading, setRecoverLoading] = useState(false)
+
+  // ── CSV upload state ──────────────────────────────────────────────────────
+  const [csvModalOpen, setCsvModalOpen] = useState(false)
+  const [csvSource, setCsvSource] = useState<'kajabi' | 'ghl'>('kajabi')
+  const [csvContent, setCsvContent] = useState('')
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvPreviewRows, setCsvPreviewRows] = useState<string[][]>([])
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[]; error?: string } | null>(null)
 
   const { from: fromDate, to: toDate } = useMemo(() => {
     if (dateMode === 'custom') {
@@ -496,6 +505,70 @@ export default function SalesPage() {
     toast.success(`${tx.buyer_name} marked as recovered`)
   }
 
+  // ── CSV helpers ───────────────────────────────────────────────────────────
+  function parseCSVPreview(text: string, maxRows: number): { headers: string[]; rows: string[][] } {
+    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n')
+    if (lines.length === 0) return { headers: [], rows: [] }
+    function parseRow(line: string): string[] {
+      const fields: string[] = []
+      let current = ''
+      let inQuotes = false
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+          else inQuotes = !inQuotes
+        } else if (ch === ',' && !inQuotes) { fields.push(current); current = '' }
+        else current += ch
+      }
+      fields.push(current)
+      return fields
+    }
+    const headers = parseRow(lines[0])
+    const rows = lines.slice(1, maxRows + 1).filter((l) => l.trim()).map(parseRow)
+    return { headers, rows }
+  }
+
+  function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportResult(null)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      setCsvContent(text)
+      const { headers, rows } = parseCSVPreview(text, 5)
+      setCsvHeaders(headers)
+      setCsvPreviewRows(rows)
+    }
+    reader.readAsText(file)
+  }
+
+  async function handleImport() {
+    if (!csvContent) return
+    setImporting(true)
+    const res = await fetch('/api/sales/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csv: csvContent, source: csvSource }),
+    })
+    const data = await res.json()
+    setImporting(false)
+    setImportResult(data)
+    if (res.ok && data.imported > 0) {
+      setRefreshKey((k) => k + 1)
+    }
+  }
+
+  function resetCsvModal() {
+    setCsvModalOpen(false)
+    setCsvSource('kajabi')
+    setCsvContent('')
+    setCsvHeaders([])
+    setCsvPreviewRows([])
+    setImportResult(null)
+  }
+
   const confirmMeta = confirm
     ? confirm.type === 'delete'
       ? {
@@ -561,6 +634,13 @@ export default function SalesPage() {
               </>
             )}
 
+            <button
+              onClick={() => setCsvModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Upload CSV
+            </button>
             <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
               Add Sale
@@ -907,6 +987,137 @@ export default function SalesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── CSV Import Modal ── */}
+      {csvModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={resetCsvModal} />
+          <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Import Failed / Refunded Transactions</h2>
+              <button
+                onClick={resetCsvModal}
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Source selection */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">Template source</label>
+              <div className="flex gap-2">
+                {(['kajabi', 'ghl'] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setCsvSource(s); setCsvContent(''); setCsvHeaders([]); setCsvPreviewRows([]); setImportResult(null) }}
+                    className={cn(
+                      'px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all',
+                      csvSource === s
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                        : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
+                    )}
+                  >
+                    {s === 'kajabi' ? 'Kajabi' : 'GHL'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* File input */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">CSV file</label>
+              <input
+                key={csvSource}
+                type="file"
+                accept=".csv"
+                onChange={handleCsvFile}
+                className="block w-full text-sm text-zinc-600 dark:text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-100 dark:file:bg-zinc-800 file:text-zinc-700 dark:file:text-zinc-300 hover:file:bg-zinc-200 dark:hover:file:bg-zinc-700 cursor-pointer"
+              />
+            </div>
+
+            {/* Preview table */}
+            {csvHeaders.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">
+                  Preview — first {csvPreviewRows.length} rows
+                </p>
+                <div className="overflow-x-auto border border-zinc-200 dark:border-zinc-700 rounded-xl">
+                  <table className="w-full text-xs">
+                    <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+                      <tr>
+                        {csvHeaders.map((h) => (
+                          <th key={h} className="text-left py-2 px-3 font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreviewRows.map((row, i) => (
+                        <tr key={i} className="border-t border-zinc-100 dark:border-zinc-800">
+                          {row.map((cell, j) => (
+                            <td key={j} className="py-2 px-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap max-w-[10rem] truncate">
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-zinc-400 mt-1">{csvHeaders.length} columns detected</p>
+              </div>
+            )}
+
+            {/* Import result */}
+            {importResult && (
+              <div className={cn(
+                'mb-4 rounded-xl px-4 py-3 text-sm',
+                importResult.error
+                  ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                  : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+              )}>
+                {importResult.error ? (
+                  <p>Error: {importResult.error}</p>
+                ) : (
+                  <>
+                    <p className="font-semibold">
+                      {importResult.imported} records imported
+                      {importResult.skipped > 0 && `, ${importResult.skipped} skipped (already exist)`}
+                    </p>
+                    {importResult.errors?.length > 0 && (
+                      <ul className="mt-1.5 text-xs space-y-0.5 text-zinc-500 dark:text-zinc-400">
+                        {importResult.errors.map((e, i) => <li key={i}>• {e}</li>)}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                onClick={resetCsvModal}
+                className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                {importResult ? 'Close' : 'Cancel'}
+              </button>
+              {!importResult && (
+                <button
+                  onClick={handleImport}
+                  disabled={!csvContent || importing}
+                  className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: '#185FA5' }}
+                >
+                  {importing ? 'Importing…' : 'Import'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation dialog */}
       {confirm && confirmMeta && (
