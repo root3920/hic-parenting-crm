@@ -65,12 +65,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Guarantee a non-null unique ID — prevents multiple nulls from conflicting
-    const transaction_id = raw_transaction_id || `fallback-${buyer_email}-${offer_tittle}-${Date.now()}`
+    // ALWAYS insert a new transaction — never update past ones.
+    // Same buyer_email can have multiple products / multiple transactions.
+    // If transaction_id is missing OR collides, generate a unique fallback so the row is never dropped.
+    const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    let transaction_id = raw_transaction_id || `fallback-${buyer_email}-${uniqueSuffix}`
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from('transactions')
-      .upsert({
+      .insert({
         date,
         offer_title: offer_tittle,
         cost: parseFloat(cost) || 0,
@@ -82,15 +85,33 @@ export async function POST(req: NextRequest) {
         source,
         payment_source,
         status: 'completed',
-      }, { onConflict: 'transaction_id', ignoreDuplicates: true })
+      })
 
+    // If the unique constraint hits (same transaction_id arriving twice),
+    // retry once with a guaranteed-unique id so the new transaction is still recorded.
     if (error?.code === '23505') {
-      console.log('Duplicate transaction ignored:', transaction_id)
-      return NextResponse.json({ success: true, skipped: true }, { status: 200 })
+      console.log('transaction_id collision, retrying with unique fallback. Original:', transaction_id)
+      transaction_id = `dup-${transaction_id}-${uniqueSuffix}`
+      const retry = await supabase
+        .from('transactions')
+        .insert({
+          date,
+          offer_title: offer_tittle,
+          cost: parseFloat(cost) || 0,
+          buyer_name: buyer_fullname,
+          buyer_email,
+          buyer_phone,
+          currency: currency || 'USD',
+          transaction_id,
+          source,
+          payment_source,
+          status: 'completed',
+        })
+      error = retry.error
     }
 
     if (error) {
-      console.error('Supabase upsert error:', JSON.stringify(error))
+      console.error('Supabase insert error:', JSON.stringify(error))
       return NextResponse.json({ success: false, error: error.message }, { status: 200 })
     }
 
