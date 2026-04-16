@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         console.error('Supabase refund error:', JSON.stringify(error))
-        return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+        return NextResponse.json({ success: false, error: error.message }, { status: 200 })
       }
 
       return NextResponse.json({ success: true, action: 'refunded' }, { status: 200 })
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     // Guarantee a non-null unique ID — prevents multiple nulls from conflicting
     const transaction_id = raw_transaction_id || `fallback-${buyer_email}-${offer_tittle}-${Date.now()}`
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('transactions')
       .upsert({
         date,
@@ -83,18 +83,15 @@ export async function POST(req: NextRequest) {
         payment_source,
         status: 'completed',
       }, { onConflict: 'transaction_id', ignoreDuplicates: true })
-      .select()
-      .single()
 
-    // Duplicate row — upsert was a no-op, return 200 so Zapier doesn't retry
-    if (error?.code === '23505' || (!data && !error)) {
+    if (error?.code === '23505') {
       console.log('Duplicate transaction ignored:', transaction_id)
-      return NextResponse.json({ success: true, message: 'Duplicate transaction ignored' }, { status: 200 })
+      return NextResponse.json({ success: true, skipped: true }, { status: 200 })
     }
 
     if (error) {
       console.error('Supabase upsert error:', JSON.stringify(error))
-      return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+      return NextResponse.json({ success: false, error: error.message }, { status: 200 })
     }
 
     // Auto-create PWU student on new sale if not already enrolled
@@ -182,17 +179,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Transaction recorded',
-      id: data.id
-    }, { status: 200 })
+    return NextResponse.json({ success: true }, { status: 200 })
 
   } catch (err: any) {
     console.error('Webhook catch error:', err?.message, err?.stack)
-    return NextResponse.json({
-      error: 'Internal server error',
-      details: err?.message
-    }, { status: 500 })
+    return NextResponse.json({ success: false, error: err?.message ?? 'Internal server error' }, { status: 200 })
   }
 }
