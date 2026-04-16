@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const {
       date, offer_tittle, cost, buyer_fullname,
       buyer_email, buyer_phone, currency,
-      transaction_id, source, payment_source
+      transaction_id: raw_transaction_id, source, payment_source
     } = body
 
     if (!date || !offer_tittle || cost === undefined) {
@@ -64,6 +64,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Guarantee a non-null unique ID — prevents multiple nulls from conflicting
+    const transaction_id = raw_transaction_id || `fallback-${buyer_email}-${offer_tittle}-${Date.now()}`
 
     const { data, error } = await supabase
       .from('transactions')
@@ -83,14 +86,15 @@ export async function POST(req: NextRequest) {
       .select()
       .single()
 
+    // Duplicate row — upsert was a no-op, return 200 so Zapier doesn't retry
+    if (error?.code === '23505' || (!data && !error)) {
+      console.log('Duplicate transaction ignored:', transaction_id)
+      return NextResponse.json({ success: true, message: 'Duplicate transaction ignored' }, { status: 200 })
+    }
+
     if (error) {
       console.error('Supabase upsert error:', JSON.stringify(error))
       return NextResponse.json({ error: error.message, details: error }, { status: 500 })
-    }
-
-    // Duplicate skipped — return 200 so Zapier doesn't retry
-    if (!data) {
-      return NextResponse.json({ success: true, message: 'Duplicate transaction ignored' }, { status: 200 })
     }
 
     // Auto-create PWU student on new sale if not already enrolled
