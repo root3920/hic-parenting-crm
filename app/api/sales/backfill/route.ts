@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     const missing = rows.filter((r) => !existingSet.has(key(r.date, r.buyer_email, r.offer_title)))
 
     if (missing.length === 0) {
-      return NextResponse.json({ inserted: 0, skipped: rows.length, alreadyPresent: [...existingSet] })
+      return NextResponse.json({ inserted: 0, skipped: rows.length, alreadyPresent: Array.from(existingSet) })
     }
 
     const toInsert = missing.map((r) => ({
