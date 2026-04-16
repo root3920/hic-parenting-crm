@@ -57,27 +57,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ inserted: 0, skipped: rows.length, alreadyPresent: Array.from(existingSet) })
     }
 
-    const toInsert = missing.map((r) => ({
-      date: r.date,
-      offer_title: r.offer_title,
-      cost: typeof r.cost === 'string' ? parseFloat(r.cost) || 0 : r.cost,
-      buyer_name: r.buyer_name,
-      buyer_email: r.buyer_email,
-      buyer_phone: r.buyer_phone ?? null,
-      currency: r.currency || 'USD',
-      transaction_id: r.transaction_id,
-      source: r.source,
-      payment_source: r.payment_source ?? null,
-      status: 'completed',
-    }))
+    // Insert one-by-one; retry with unique suffix on transaction_id collision.
+    // (GHL "transaction_id" is actually the offer id, so collisions are common.)
+    const insertedRows: { date: string; buyer_email: string; offer_title: string }[] = []
+    const failed: { row: InRow; error: string }[] = []
 
-    const { error: insErr } = await supabase.from('transactions').insert(toInsert)
-    if (insErr) {
-      return NextResponse.json({ error: `insert failed: ${insErr.message}` }, { status: 500 })
+    for (const r of missing) {
+      const cost = typeof r.cost === 'string' ? parseFloat(r.cost) || 0 : r.cost
+      const base = {
+        date: r.date,
+        offer_title: r.offer_title,
+        cost,
+        buyer_name: r.buyer_name,
+        buyer_email: r.buyer_email,
+        buyer_phone: r.buyer_phone ?? null,
+        currency: r.currency || 'USD',
+        source: r.source,
+        payment_source: r.payment_source ?? null,
+        status: 'completed',
+      }
+
+      let txId = r.transaction_id
+      let { error } = await supabase.from('transactions').insert({ ...base, transaction_id: txId })
+
+      if (error?.code === '23505') {
+        const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+        txId = `${r.transaction_id}-${r.buyer_email}-${suffix}`
+        const retry = await supabase.from('transactions').insert({ ...base, transaction_id: txId })
+        error = retry.error
+      }
+
+      if (error) {
+        failed.push({ row: r, error: error.message })
+      } else {
+        insertedRows.push({ date: r.date, buyer_email: r.buyer_email, offer_title: r.offer_title })
+      }
     }
 
     // Auto-sync side-effects (PWU students + SPC members) for each inserted row
-    for (const r of missing) {
+    const insertedKeys = new Set(insertedRows.map((r) => `${r.date}|${r.buyer_email}|${r.offer_title}`))
+    const successfullyInserted = missing.filter((r) =>
+      insertedKeys.has(`${r.date}|${r.buyer_email}|${r.offer_title}`)
+    )
+    for (const r of successfullyInserted) {
       const canonical = getCanonicalProduct(r.offer_title)
       const costNum = typeof r.cost === 'string' ? parseFloat(r.cost) || 0 : r.cost
 
@@ -157,13 +179,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      inserted: toInsert.length,
-      skipped: rows.length - toInsert.length,
-      insertedRows: toInsert.map((t) => ({
-        date: t.date,
-        buyer_email: t.buyer_email,
-        offer_title: t.offer_title,
-      })),
+      inserted: insertedRows.length,
+      alreadyPresent: rows.length - missing.length,
+      failed: failed.length,
+      failures: failed,
+      insertedRows,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Internal error' }, { status: 500 })
