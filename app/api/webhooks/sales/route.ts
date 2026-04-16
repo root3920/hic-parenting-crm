@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('transactions')
-      .insert({
+      .upsert({
         date,
         offer_title: offer_tittle,
         cost: parseFloat(cost) || 0,
@@ -79,13 +79,18 @@ export async function POST(req: NextRequest) {
         source,
         payment_source,
         status: 'completed',
-      })
+      }, { onConflict: 'transaction_id', ignoreDuplicates: true })
       .select()
       .single()
 
     if (error) {
-      console.error('Supabase insert error:', JSON.stringify(error))
+      console.error('Supabase upsert error:', JSON.stringify(error))
       return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+    }
+
+    // Duplicate skipped — return 200 so Zapier doesn't retry
+    if (!data) {
+      return NextResponse.json({ success: true, message: 'Duplicate transaction ignored' }, { status: 200 })
     }
 
     // Auto-create PWU student on new sale if not already enrolled
