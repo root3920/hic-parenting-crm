@@ -57,6 +57,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/invite') ||
+    pathname === '/api/sales/backfill' ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
   ) {
     return NextResponse.next()
