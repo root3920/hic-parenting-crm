@@ -12,6 +12,7 @@ import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
 const POST_TYPES = ['Educational', 'Inspirational', 'Community spotlight', 'Announcement', 'Question / Poll', 'Other']
+const REP_OPTIONS = ['Select rep...']
 
 function today() {
   return new Date().toISOString().split('T')[0]
