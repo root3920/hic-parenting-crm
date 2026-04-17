@@ -117,10 +117,14 @@ function daysActive(subscribedAt: string, cancelledAt: string): number {
 }
 
 function isPaidCancel(c: SpcCancellation) {
-  return c.paid_cancel === true || (c.paid_cancel == null && c.cancel_type === 'paid_cancel')
+  if (c.paid_cancel === true) return true
+  if (c.trial_cancel === true) return false
+  return c.cancel_type === 'paid_cancel'
 }
 function isTrialCancel(c: SpcCancellation) {
-  return c.trial_cancel === true || (c.trial_cancel == null && c.cancel_type === 'trial_cancel')
+  if (c.trial_cancel === true) return true
+  if (c.paid_cancel === true) return false
+  return c.cancel_type === 'trial_cancel'
 }
 
 function formatDateTime(d: string | null) {
@@ -1033,8 +1037,10 @@ export default function SpcPage() {
   // ── Cancellation metrics ─────────────────────────────────────────────────
   const paidCancels = cancellations.filter(isPaidCancel)
   const trialCancels = cancellations.filter(isTrialCancel)
-  const pendingCancels = cancellations.filter((c) => c.cancel_type === 'pending_cancel')
-  const thisMonthCancels = paidCancels.filter(
+  const pendingCancels = cancellations.filter((c) => !isPaidCancel(c) && !isTrialCancel(c))
+  // Non-trial cancellations = paid + pending (CSV imports without type info)
+  const nonTrialCancels = cancellations.filter((c) => !isTrialCancel(c))
+  const thisMonthCancels = nonTrialCancels.filter(
     (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= firstOfMonth
   )
 
@@ -1042,7 +1048,7 @@ export default function SpcPage() {
     .filter((c) => (c.cancelled_at?.slice(0, 10) ?? '') >= sixtyDaysAgo)
     .reduce((s, c) => s + (c.plan === 'annual' ? c.amount / 12 : c.amount), 0)
 
-  const cancels30d = paidCancels.filter(
+  const cancels30d = nonTrialCancels.filter(
     (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= thirtyDaysAgo
   ).length
   const churnRate =
@@ -1936,10 +1942,10 @@ export default function SpcPage() {
                                 <TableCell className="font-medium text-sm">{c.name}</TableCell>
                                 <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.email}</TableCell>
                                 <TableCell>
-                                  {isPaidCancel(c) ? (
+                                  {isTrialCancel(c) ? (
+                                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Trial</span>
+                                  ) : isPaidCancel(c) ? (
                                     <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Paid</span>
-                                  ) : isTrialCancel(c) ? (
-                                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">Trial</span>
                                   ) : (
                                     <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Pending</span>
                                   )}
