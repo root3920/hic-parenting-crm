@@ -72,6 +72,8 @@ interface SpcCancellation {
   offer_title: string | null
   provider: string | null
   currency: string | null
+  paid_cancel: boolean | null
+  trial_cancel: boolean | null
 }
 
 interface SpcMemberNote {
@@ -112,6 +114,13 @@ function daysActive(subscribedAt: string, cancelledAt: string): number {
         (1000 * 60 * 60 * 24)
     )
   )
+}
+
+function isPaidCancel(c: SpcCancellation) {
+  return c.paid_cancel === true || (c.paid_cancel == null && c.cancel_type === 'paid_cancel')
+}
+function isTrialCancel(c: SpcCancellation) {
+  return c.trial_cancel === true || (c.trial_cancel == null && c.cancel_type === 'trial_cancel')
 }
 
 function formatDateTime(d: string | null) {
@@ -293,6 +302,27 @@ function MemberProfileModal({
       if (!data) {
         toast.error('Save failed: no data returned. Check table permissions.')
         return
+      }
+      const previousStatus = selected.data.status as string
+      if (editForm.status === 'cancelled' && previousStatus !== 'cancelled') {
+        const today = new Date().toISOString().split('T')[0]
+        const isPaid = previousStatus === 'active'
+        const isTrial = previousStatus === 'trial'
+        await supabase.from('spc_cancellations').insert({
+          name: editForm.name || null,
+          email: editForm.email || null,
+          customer_phone: editForm.phone || null,
+          amount: selected.data.amount,
+          currency: 'USD',
+          interval: editForm.plan,
+          plan: editForm.plan,
+          cancel_type: isPaid ? 'paid_cancel' : isTrial ? 'trial_cancel' : 'paid_cancel',
+          cancelled_at: today,
+          source: 'manual',
+          subscription_id: `manual-${selected.data.id}`,
+          paid_cancel: isPaid,
+          trial_cancel: isTrial,
+        })
       }
       toast.success('Member updated successfully')
       onSave(data as SpcMember)
@@ -869,6 +899,9 @@ export default function SpcPage() {
   // ── CSV upload state ──────────────────────────────────────────────────────
   const [csvModalOpen, setCsvModalOpen] = useState(false)
   const [csvSource, setCsvSource] = useState<'kajabi' | 'ghl'>('kajabi')
+  const [csvMode, setCsvMode] = useState<'cancellations' | 'members'>('cancellations')
+  const [cancelPage, setCancelPage] = useState(0)
+  const CANCEL_PAGE_SIZE = 50
   const [csvContent, setCsvContent] = useState('')
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvPreviewRows, setCsvPreviewRows] = useState<string[][]>([])
@@ -998,9 +1031,9 @@ export default function SpcPage() {
   })
 
   // ── Cancellation metrics ─────────────────────────────────────────────────
-  const paidCancels = cancellations.filter((c) => c.cancel_type === 'paid_cancel')
+  const paidCancels = cancellations.filter(isPaidCancel)
+  const trialCancels = cancellations.filter(isTrialCancel)
   const pendingCancels = cancellations.filter((c) => c.cancel_type === 'pending_cancel')
-  const trialCancels = cancellations.filter((c) => c.cancel_type === 'trial_cancel')
   const thisMonthCancels = paidCancels.filter(
     (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= firstOfMonth
   )
@@ -1134,23 +1167,26 @@ export default function SpcPage() {
     const res = await fetch('/api/spc/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ csv: csvContent, source: csvSource }),
+      body: JSON.stringify({ csv: csvContent, source: csvSource, mode: csvMode }),
     })
     const data = await res.json()
     setImporting(false)
     setImportResult(data)
     if (res.ok && data.imported > 0) {
-      const result = await supabase
-        .from('spc_cancellations')
-        .select('*')
-        .order('cancelled_at', { ascending: false })
-      setCancellations(result.data ?? [])
+      if (csvMode === 'members') {
+        const result = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+        setMembers(result.data ?? [])
+      } else {
+        const result = await supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false })
+        setCancellations(result.data ?? [])
+      }
     }
   }
 
   function resetCsvModal() {
     setCsvModalOpen(false)
     setCsvSource('kajabi')
+    setCsvMode('cancellations')
     setCsvContent('')
     setCsvHeaders([])
     setCsvPreviewRows([])
@@ -1162,7 +1198,7 @@ export default function SpcPage() {
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
-    { key: 'cancellations', label: `Cancellations${!loading ? ` (${paidCancels.length + pendingCancels.length})` : ''}` },
+    { key: 'cancellations', label: `Cancellations${!loading ? ` (${cancellations.length})` : ''}` },
   ]
 
   return (
@@ -1759,16 +1795,16 @@ export default function SpcPage() {
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                    Pending cancellation
+                    Trial cancellations
                   </p>
                   {loading ? (
                     <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ) : (
                     <>
                       <p className="text-2xl font-semibold text-amber-600 dark:text-amber-400">
-                        {pendingCancels.length}
+                        {trialCancels.length}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">still have active access</p>
+                      <p className="text-xs text-zinc-500 mt-1">never converted to paid</p>
                     </>
                   )}
                 </CardContent>
@@ -1847,202 +1883,112 @@ export default function SpcPage() {
               </CardContent>
             </Card>
 
-            {/* SECTION A: Cancelaciones pagadas */}
-            <Card className="border-red-200 dark:border-red-900/40">
+            {/* Unified cancellations list with pagination */}
+            <Card>
               <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 shrink-0" />
-                  <CardTitle className="text-sm font-semibold">Paid cancellations</CardTitle>
-                  <span className="ml-auto text-xs text-red-600 dark:text-red-400 font-medium">{paidCancels.length} records</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CardTitle className="text-sm font-semibold">All Cancellations</CardTitle>
+                  <span className="ml-auto text-xs text-zinc-400">{cancellations.length} total records</span>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
                 {loading ? (
                   <div className="p-6 space-y-2">
-                    {[...Array(3)].map((_, i) => (
+                    {[...Array(5)].map((_, i) => (
                       <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                     ))}
                   </div>
-                ) : paidCancels.length === 0 ? (
-                  <EmptyState title="No paid cancellations" description="No paid subscriptions have been cancelled." />
+                ) : cancellations.length === 0 ? (
+                  <EmptyState title="No cancellations" description="Import cancellations using the Upload CSV button." />
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Name</TableHead>
-                          <TableHead className="hidden md:table-cell">Email</TableHead>
-                          <TableHead>Plan</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="hidden md:table-cell">Platform</TableHead>
-                          <TableHead className="hidden lg:table-cell">Subscribed since</TableHead>
-                          <TableHead className="hidden sm:table-cell">Cancelled</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">Days active</TableHead>
-                        </AnimatedTableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paidCancels.map((c, i) => (
-                          <AnimatedTableRow
-                            key={c.id}
-                            variants={rowVariants}
-                            initial="hidden"
-                            animate="visible"
-                            custom={i}
-                            className={cn(
-                              i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
-                              'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
-                            )}
-                            onClick={() => openModal({ kind: 'cancellation', data: c })}
-                          >
-                            <TableCell className="font-medium text-sm">{c.name}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.email}</TableCell>
-                            <TableCell>
-                              <StatusPill label={c.plan === 'annual' ? 'Annual' : 'Monthly'} variant={c.plan === 'annual' ? 'success' : 'info'} />
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(c.amount)}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.source}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">{c.subscribed_at ? formatDate(c.subscribed_at) : '—'}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">{c.cancelled_at ? formatDate(c.cancelled_at) : '—'}</TableCell>
-                            <TableCell className="text-right text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
-                              {c.subscribed_at && c.cancelled_at ? `${daysActive(c.subscribed_at, c.cancelled_at)}d` : '—'}
-                            </TableCell>
+                  <>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                            <TableHead>Name</TableHead>
+                            <TableHead className="hidden md:table-cell">Email</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Plan</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="hidden md:table-cell">Platform</TableHead>
+                            <TableHead className="hidden lg:table-cell">Subscribed</TableHead>
+                            <TableHead className="hidden sm:table-cell">Cancelled</TableHead>
+                            <TableHead className="text-right hidden sm:table-cell">Days</TableHead>
                           </AnimatedTableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* SECTION B: Cancelaciones pendientes */}
-            <Card className="border-amber-200 dark:border-amber-900/40">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
-                  <CardTitle className="text-sm font-semibold">Pending cancellations</CardTitle>
-                  <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                    ⚠️ Retention opportunity
-                  </span>
-                  <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">{pendingCancels.length} records</span>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loading ? (
-                  <div className="p-6 space-y-2">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
-                    ))}
-                  </div>
-                ) : pendingCancels.length === 0 ? (
-                  <EmptyState title="No pending cancellations" description="No members have requested cancellation." />
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Name</TableHead>
-                          <TableHead className="hidden md:table-cell">Email</TableHead>
-                          <TableHead>Plan</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="hidden md:table-cell">Platform</TableHead>
-                          <TableHead className="hidden lg:table-cell">Subscribed since</TableHead>
-                          <TableHead className="hidden sm:table-cell">Access until</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">Days active</TableHead>
-                        </AnimatedTableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {pendingCancels.map((c, i) => (
-                          <AnimatedTableRow
-                            key={c.id}
-                            variants={rowVariants}
-                            initial="hidden"
-                            animate="visible"
-                            custom={i}
-                            className={cn(
-                              i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
-                              'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
-                            )}
-                            onClick={() => openModal({ kind: 'cancellation', data: c })}
+                        </TableHeader>
+                        <TableBody>
+                          {cancellations
+                            .slice(cancelPage * CANCEL_PAGE_SIZE, (cancelPage + 1) * CANCEL_PAGE_SIZE)
+                            .map((c, i) => (
+                              <AnimatedTableRow
+                                key={c.id}
+                                variants={rowVariants}
+                                initial="hidden"
+                                animate="visible"
+                                custom={i}
+                                className={cn(
+                                  i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
+                                  'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
+                                )}
+                                onClick={() => openModal({ kind: 'cancellation', data: c })}
+                              >
+                                <TableCell className="font-medium text-sm">{c.name}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.email}</TableCell>
+                                <TableCell>
+                                  {isPaidCancel(c) ? (
+                                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Paid</span>
+                                  ) : isTrialCancel(c) ? (
+                                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">Trial</span>
+                                  ) : (
+                                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Pending</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {c.plan && (
+                                    <StatusPill label={c.plan === 'annual' ? 'Annual' : 'Monthly'} variant={c.plan === 'annual' ? 'success' : 'info'} />
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(c.amount)}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.source}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">{c.subscribed_at ? formatDate(c.subscribed_at) : '—'}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">{c.cancelled_at ? formatDate(c.cancelled_at) : '—'}</TableCell>
+                                <TableCell className="text-right text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
+                                  {c.subscribed_at && c.cancelled_at ? `${daysActive(c.subscribed_at, c.cancelled_at)}d` : '—'}
+                                </TableCell>
+                              </AnimatedTableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {/* Pagination */}
+                    {cancellations.length > CANCEL_PAGE_SIZE && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
+                        <p className="text-xs text-zinc-400">
+                          {cancelPage * CANCEL_PAGE_SIZE + 1}–{Math.min((cancelPage + 1) * CANCEL_PAGE_SIZE, cancellations.length)} of {cancellations.length}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setCancelPage((p) => Math.max(0, p - 1))}
+                            disabled={cancelPage === 0}
+                            className="px-2.5 py-1 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 disabled:opacity-30 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                           >
-                            <TableCell className="font-medium text-sm">{c.name}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.email}</TableCell>
-                            <TableCell>
-                              <StatusPill label={c.plan === 'annual' ? 'Annual' : 'Monthly'} variant={c.plan === 'annual' ? 'success' : 'info'} />
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(c.amount)}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.source}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">{c.subscribed_at ? formatDate(c.subscribed_at) : '—'}</TableCell>
-                            <TableCell className="text-xs text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap hidden sm:table-cell">
-                              {c.cancelled_at ? formatDate(c.cancelled_at) : '—'}
-                            </TableCell>
-                            <TableCell className="text-right text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
-                              {c.subscribed_at && c.cancelled_at ? `${daysActive(c.subscribed_at, c.cancelled_at)}d` : '—'}
-                            </TableCell>
-                          </AnimatedTableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* SECTION C: Trials cancelados */}
-            <Card className="border-zinc-200 dark:border-zinc-700">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-zinc-400 shrink-0" />
-                  <CardTitle className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">Cancelled trials</CardTitle>
-                  <span className="ml-1 text-xs text-zinc-400 italic">Never made a payment · do not affect churn</span>
-                  <span className="ml-auto text-xs text-zinc-400 font-medium">{trialCancels.length} records</span>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loading ? (
-                  <div className="p-6 space-y-2">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
-                    ))}
-                  </div>
-                ) : trialCancels.length === 0 ? (
-                  <EmptyState title="No cancelled trials" description="Cancelled trials will appear here." />
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Name</TableHead>
-                          <TableHead className="hidden md:table-cell">Email</TableHead>
-                          <TableHead className="hidden md:table-cell">Platform</TableHead>
-                          <TableHead className="hidden sm:table-cell">Trial start</TableHead>
-                          <TableHead className="hidden sm:table-cell">Cancelled</TableHead>
-                        </AnimatedTableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {trialCancels.map((c, i) => (
-                          <AnimatedTableRow
-                            key={c.id}
-                            variants={rowVariants}
-                            initial="hidden"
-                            animate="visible"
-                            custom={i}
-                            className={cn(
-                              i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
-                              'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
-                            )}
-                            onClick={() => openModal({ kind: 'cancellation', data: c })}
+                            Previous
+                          </button>
+                          <span className="text-xs text-zinc-500">
+                            Page {cancelPage + 1} of {Math.ceil(cancellations.length / CANCEL_PAGE_SIZE)}
+                          </span>
+                          <button
+                            onClick={() => setCancelPage((p) => Math.min(Math.ceil(cancellations.length / CANCEL_PAGE_SIZE) - 1, p + 1))}
+                            disabled={cancelPage >= Math.ceil(cancellations.length / CANCEL_PAGE_SIZE) - 1}
+                            className="px-2.5 py-1 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 disabled:opacity-30 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                           >
-                            <TableCell className="font-medium text-sm text-zinc-500 dark:text-zinc-400">{c.name}</TableCell>
-                            <TableCell className="text-xs text-zinc-400 hidden md:table-cell">{c.email}</TableCell>
-                            <TableCell className="text-xs text-zinc-400 hidden md:table-cell">{c.source}</TableCell>
-                            <TableCell className="text-xs text-zinc-400 whitespace-nowrap hidden sm:table-cell">{c.subscribed_at ? formatDate(c.subscribed_at) : '—'}</TableCell>
-                            <TableCell className="text-xs text-zinc-400 whitespace-nowrap hidden sm:table-cell">{c.cancelled_at ? formatDate(c.cancelled_at) : '—'}</TableCell>
-                          </AnimatedTableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -2057,7 +2003,7 @@ export default function SpcPage() {
           <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700 p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Import Cancellations from CSV</h2>
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Import from CSV</h2>
               <button
                 onClick={resetCsvModal}
                 className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -2066,9 +2012,30 @@ export default function SpcPage() {
               </button>
             </div>
 
+            {/* Mode selection */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">Import type</label>
+              <div className="flex gap-2">
+                {(['cancellations', 'members'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => { setCsvMode(m); setCsvContent(''); setCsvHeaders([]); setCsvPreviewRows([]); setImportResult(null) }}
+                    className={cn(
+                      'px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all',
+                      csvMode === m
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                        : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
+                    )}
+                  >
+                    {m === 'cancellations' ? 'Cancellations' : 'Active Members'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Source selection */}
             <div className="mb-4">
-              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">Template source</label>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">Source</label>
               <div className="flex gap-2">
                 {(['kajabi', 'ghl'] as const).map((s) => (
                   <button
@@ -2091,7 +2058,7 @@ export default function SpcPage() {
             <div className="mb-4">
               <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">CSV file</label>
               <input
-                key={csvSource}
+                key={csvSource + csvMode}
                 type="file"
                 accept=".csv"
                 onChange={handleCsvFile}
@@ -2200,6 +2167,10 @@ export default function SpcPage() {
             if (!updated) return
             setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
             setSelectedMember({ kind: 'member', data: updated })
+            if (updated.status === 'cancelled') {
+              supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false })
+                .then(({ data }) => { if (data) setCancellations(data) })
+            }
           }}
           onSaveCancellation={(updated) => {
             if (!updated) return

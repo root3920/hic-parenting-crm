@@ -75,7 +75,7 @@ function mapInterval(interval: string): 'monthly' | 'annual' {
 
 export async function POST(req: NextRequest) {
   try {
-    const { csv, source } = (await req.json()) as { csv: string; source: 'kajabi' | 'ghl' }
+    const { csv, source, mode = 'cancellations' } = (await req.json()) as { csv: string; source: 'kajabi' | 'ghl'; mode?: 'cancellations' | 'members' }
 
     if (!csv || !source) {
       return NextResponse.json({ error: 'Missing csv or source' }, { status: 400 })
@@ -85,6 +85,67 @@ export async function POST(req: NextRequest) {
     const errors: string[] = []
     const records: Record<string, unknown>[] = []
 
+    if (mode === 'members') {
+      for (const row of rows) {
+        if (source === 'kajabi') {
+          const status = row['Status']?.trim()
+          if (status !== 'active' && status !== 'Pending Cancellation') continue
+          records.push({
+            name:      row['Customer Name']?.trim() || null,
+            email:     row['Customer Email']?.trim() || null,
+            amount:    parseAmount(row['Amount'] ?? '0'),
+            plan:      mapInterval(row['Interval'] ?? ''),
+            provider:  row['Provider']?.trim() || 'Kajabi',
+            joined_at: row['Created At']?.trim() || null,
+            status:    'active',
+          })
+        } else {
+          // GHL
+          const status = row['Status']?.trim().toLowerCase()
+          if (status !== 'active' && status !== 'trialing') continue
+          records.push({
+            name:      row['Customer name']?.trim() || null,
+            email:     row['Customer email']?.trim() || null,
+            amount:    parseAmount(row['Total amount'] ?? '0'),
+            plan:      'monthly',
+            provider:  row['Payment provider']?.trim() || 'GHL',
+            joined_at: row['Subscription start']?.trim() || null,
+            status:    status === 'trialing' ? 'trial' : 'active',
+          })
+        }
+      }
+
+      if (records.length === 0) {
+        return NextResponse.json({ imported: 0, updated: 0, skipped: 0, errors })
+      }
+
+      const emails = records.map(r => r.email as string).filter(Boolean)
+      const { data: existing } = await supabaseAdmin.from('spc_members').select('email').in('email', emails)
+      const existingEmails = new Set((existing ?? []).map((e: { email: string }) => e.email))
+      const toInsert = records.filter(r => !existingEmails.has(r.email as string))
+      const toUpdate = records.filter(r => existingEmails.has(r.email as string))
+
+      if (toInsert.length > 0) {
+        const { error: insertError } = await supabaseAdmin.from('spc_members').insert(toInsert)
+        if (insertError) {
+          return NextResponse.json({ error: insertError.message }, { status: 500 })
+        }
+      }
+
+      for (const record of toUpdate) {
+        const { error: updateError } = await supabaseAdmin
+          .from('spc_members')
+          .update(record)
+          .eq('email', record.email as string)
+        if (updateError) {
+          errors.push(`Failed to update ${record.email}: ${updateError.message}`)
+        }
+      }
+
+      return NextResponse.json({ imported: toInsert.length, updated: toUpdate.length, skipped: 0, errors })
+    }
+
+    // mode === 'cancellations' (default)
     for (const row of rows) {
       if (source === 'kajabi') {
         const mapped = mapKajabiStatus(row['Status'] ?? '')
