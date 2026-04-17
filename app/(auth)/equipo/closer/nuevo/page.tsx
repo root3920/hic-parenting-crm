@@ -15,8 +15,6 @@ import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_CLOSERS = ['Cali Luna', 'Marcela HIC Parenting']
-
 function today() {
   return new Date().toISOString().split('T')[0]
 }
@@ -74,7 +72,7 @@ const CALL_TYPE_STYLES: Record<string, string> = {
 
 const initialState: FormState = {
   date: today(),
-  closer_name: DEFAULT_CLOSERS[0],
+  closer_name: '',
   total_meetings: '', showed_meetings: '', cancelled_meetings: '',
   no_show_meetings: '', rescheduled_meetings: '', followup_meetings: '',
   total_offers: '', offers_proposed: '', won_deals: '', lost_deals: '',
@@ -274,7 +272,7 @@ export default function NuevoReporteCloserPage() {
   const { timezone } = useUserTimezone()
   const [form, setForm] = useState<FormState>(initialState)
   const [submitting, setSubmitting] = useState(false)
-  const [closerOptions, setCloserOptions] = useState<string[]>(DEFAULT_CLOSERS)
+  const [closerOptions, setCloserOptions] = useState<string[]>([])
   const { profile } = useProfile()
 
   // Pre-fill closer name from profile when available
@@ -289,16 +287,21 @@ export default function NuevoReporteCloserPage() {
   const [callsLoading, setCallsLoading] = useState(false)
   const [callReports, setCallReports] = useState<Record<string, CallReport>>({})
 
-  // Load closer options from DB
+  // Load closer options from profiles table
   useEffect(() => {
     supabase
-      .from('closer_daily_reports')
-      .select('closer_name')
+      .from('profiles')
+      .select('closer_name, full_name, email')
+      .eq('role', 'closer')
       .then(({ data }) => {
         if (data) {
-          const dbNames = data.map((r: { closer_name: string }) => r.closer_name)
-          const merged = Array.from(new Set([...DEFAULT_CLOSERS, ...dbNames])).sort()
-          setCloserOptions(merged)
+          const names = data
+            .map((p: { closer_name: string | null; full_name: string | null; email: string | null }) =>
+              p.closer_name || p.full_name || p.email || ''
+            )
+            .filter(Boolean)
+            .sort()
+          setCloserOptions(names)
         }
       })
   }, [supabase])
@@ -462,6 +465,7 @@ export default function NuevoReporteCloserPage() {
                   onChange={(e) => set('closer_name', e.target.value)}
                   className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                 >
+                  <option value="">Select closer...</option>
                   {closerOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>

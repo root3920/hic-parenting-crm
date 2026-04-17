@@ -12,7 +12,6 @@ import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
 const POST_TYPES = ['Educational', 'Inspirational', 'Community spotlight', 'Announcement', 'Question / Poll', 'Other']
-const REP_OPTIONS = ['Select rep...']
 
 function today() {
   return new Date().toISOString().split('T')[0]
@@ -137,6 +136,27 @@ export default function NuevoReporteSpcPage() {
   const supabase = useMemo(() => createClient(), [])
   const [form, setForm] = useState<FormState>(initialState)
   const [submitting, setSubmitting] = useState(false)
+  const [repOptions, setRepOptions] = useState<string[]>([])
+  const { profile } = useProfile()
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('role', 'csm_spc')
+      .then(({ data }) => {
+        if (data) {
+          const names = data.map((p: { full_name: string | null; email: string | null }) => p.full_name || p.email || '').filter(Boolean)
+          setRepOptions(names)
+        }
+      })
+  }, [supabase])
+
+  useEffect(() => {
+    if (profile?.full_name && profile.role === 'csm_spc') {
+      setForm((prev) => ({ ...prev, rep_name: profile.full_name! }))
+    }
+  }, [profile])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -218,7 +238,8 @@ export default function NuevoReporteSpcPage() {
                   onChange={(e) => set('rep_name', e.target.value)}
                   className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                 >
-                  {REP_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  <option value="">Select rep...</option>
+                  {repOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>

@@ -14,8 +14,6 @@ import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_SETTERS = ['Valentina Llano']
-
 const DISQUAL_REASONS = ['Financial', 'Tire kicker', 'Not the decision maker', 'Bad attitude', 'No fit', 'Other']
 const HIGHS_OPTIONS = ['Call proposal', 'Lead filter', 'Empathy', 'Follow-up', 'Objection handling', 'Response speed', 'Close']
 const LOWS_OPTIONS = ['Tire kickers', 'Late follow-up', 'Qualification', 'Time management', 'Communication', 'Low outbound']
@@ -59,7 +57,7 @@ interface FormState {
 
 const initialState: FormState = {
   date: today(),
-  setter_name: DEFAULT_SETTERS[0],
+  setter_name: '',
   hours_worked: '8',
   total_convos: '', followups: '', inbound: '', outbound: '', no_reply: '', new_leads: '',
   calls_proposed: '', calls_booked: '', calls_no_reply: '', calls_followup: '',
@@ -137,7 +135,7 @@ export default function NuevoReporteSetterPage() {
   const supabase = useMemo(() => createClient(), [])
   const [form, setForm] = useState<FormState>(initialState)
   const [submitting, setSubmitting] = useState(false)
-  const [setterOptions, setSetterOptions] = useState<string[]>(DEFAULT_SETTERS)
+  const [setterOptions, setSetterOptions] = useState<string[]>([])
   const { profile } = useProfile()
 
   // Pre-fill setter name from profile when available
@@ -147,16 +145,20 @@ export default function NuevoReporteSetterPage() {
     }
   }, [profile])
 
-  // Fetch distinct setter names from DB and merge with defaults
+  // Fetch setters from profiles table
   useEffect(() => {
     supabase
-      .from('setter_daily_reports')
-      .select('setter_name')
+      .from('profiles')
+      .select('setter_name, full_name, email')
+      .eq('role', 'setter')
       .then(({ data }) => {
         if (data) {
-          const dbNames = data.map((r: { setter_name: string }) => r.setter_name)
-          const merged = Array.from(new Set([...DEFAULT_SETTERS, ...dbNames]))
-          setSetterOptions(merged)
+          const names = data
+            .map((p: { setter_name: string | null; full_name: string | null; email: string | null }) =>
+              p.setter_name || p.full_name || p.email || ''
+            )
+            .filter(Boolean)
+          setSetterOptions(names)
         }
       })
   }, [supabase])
@@ -271,6 +273,7 @@ export default function NuevoReporteSetterPage() {
                   onChange={(e) => set('setter_name', e.target.value)}
                   className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                 >
+                  <option value="">Select setter...</option>
                   {setterOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>

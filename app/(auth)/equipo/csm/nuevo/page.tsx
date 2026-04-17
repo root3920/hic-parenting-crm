@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -12,8 +12,6 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
-
-const CSM_OPTIONS = ['Ana Sofía', 'Otro CSM']
 
 const CANCEL_REASONS = ['Financial', 'Lack of time', 'No results seen', 'Unmet expectations', 'Platform', 'Personal', 'Other']
 const FRICCIONES = ['Implementation', 'Time', 'Emotional', 'Content', 'Platform']
@@ -70,7 +68,7 @@ interface FormState {
 
 const initialState: FormState = {
   date: today(),
-  csm_name: 'Ana Sofía',
+  csm_name: '',
   r_solicitudes: '', r_saved: '', r_churn: '', r_pausas: '',
   r_cancel_reasons: [], r_notas: '',
   s_checkins: '', s_riesgo: '', s_wins: '', s_dudas: '',
@@ -167,6 +165,23 @@ export default function NuevoReporteCsmPage() {
   const supabase = useMemo(() => createClient(), [])
   const [form, setForm] = useState<FormState>(initialState)
   const [submitting, setSubmitting] = useState(false)
+  const [csmOptions, setCsmOptions] = useState<string[]>([])
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('role', 'csm_ht')
+      .then(({ data }) => {
+        if (data) {
+          const names = data.map((p: { full_name: string | null; email: string | null }) => p.full_name || p.email || '').filter(Boolean)
+          setCsmOptions(names)
+          if (names.length > 0 && !form.csm_name) {
+            setForm((prev) => ({ ...prev, csm_name: names[0] }))
+          }
+        }
+      })
+  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -280,7 +295,8 @@ export default function NuevoReporteCsmPage() {
                   onChange={(e) => set('csm_name', e.target.value)}
                   className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                 >
-                  {CSM_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  <option value="">Select CSM...</option>
+                  {csmOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
             </div>
