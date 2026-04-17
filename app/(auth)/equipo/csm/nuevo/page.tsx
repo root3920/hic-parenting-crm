@@ -168,20 +168,20 @@ export default function NuevoReporteCsmPage() {
   const [csmOptions, setCsmOptions] = useState<string[]>([])
 
   useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('full_name, email')
-      .eq('role', 'csm_ht')
-      .then(({ data }) => {
-        if (data) {
-          const names = data.map((p: { full_name: string | null; email: string | null }) => p.full_name || p.email || '').filter(Boolean)
+    fetch('/api/profiles?role=csm_ht')
+      .then((r) => r.json())
+      .then(({ profiles }) => {
+        if (profiles) {
+          const names = (profiles as { full_name: string | null; email: string | null }[])
+            .map((p) => p.full_name || p.email || '')
+            .filter(Boolean)
           setCsmOptions(names)
-          if (names.length > 0 && !form.csm_name) {
-            setForm((prev) => ({ ...prev, csm_name: names[0] }))
+          if (names.length > 0) {
+            setForm((prev) => ({ ...prev, csm_name: prev.csm_name || names[0] }))
           }
         }
       })
-  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))

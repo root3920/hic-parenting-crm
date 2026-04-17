@@ -287,24 +287,20 @@ export default function NuevoReporteCloserPage() {
   const [callsLoading, setCallsLoading] = useState(false)
   const [callReports, setCallReports] = useState<Record<string, CallReport>>({})
 
-  // Load closer options from profiles table
+  // Load closer options from profiles table (via API to bypass RLS)
   useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('closer_name, full_name, email')
-      .eq('role', 'closer')
-      .then(({ data }) => {
-        if (data) {
-          const names = data
-            .map((p: { closer_name: string | null; full_name: string | null; email: string | null }) =>
-              p.closer_name || p.full_name || p.email || ''
-            )
+    fetch('/api/profiles?role=closer')
+      .then((r) => r.json())
+      .then(({ profiles }) => {
+        if (profiles) {
+          const names = (profiles as { closer_name: string | null; full_name: string | null; email: string | null }[])
+            .map((p) => p.closer_name || p.full_name || p.email || '')
             .filter(Boolean)
             .sort()
           setCloserOptions(names)
         }
       })
-  }, [supabase])
+  }, [])
 
   // Fetch calls for selected date + closer
   useEffect(() => {

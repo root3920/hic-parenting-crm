@@ -145,23 +145,19 @@ export default function NuevoReporteSetterPage() {
     }
   }, [profile])
 
-  // Fetch setters from profiles table
+  // Fetch setters from profiles table (via API to bypass RLS)
   useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('setter_name, full_name, email')
-      .eq('role', 'setter')
-      .then(({ data }) => {
-        if (data) {
-          const names = data
-            .map((p: { setter_name: string | null; full_name: string | null; email: string | null }) =>
-              p.setter_name || p.full_name || p.email || ''
-            )
+    fetch('/api/profiles?role=setter')
+      .then((r) => r.json())
+      .then(({ profiles }) => {
+        if (profiles) {
+          const names = (profiles as { setter_name: string | null; full_name: string | null; email: string | null }[])
+            .map((p) => p.setter_name || p.full_name || p.email || '')
             .filter(Boolean)
           setSetterOptions(names)
         }
       })
-  }, [supabase])
+  }, [])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))

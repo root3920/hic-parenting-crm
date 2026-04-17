@@ -140,17 +140,17 @@ export default function NuevoReporteSpcPage() {
   const { profile } = useProfile()
 
   useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('full_name, email')
-      .eq('role', 'csm_spc')
-      .then(({ data }) => {
-        if (data) {
-          const names = data.map((p: { full_name: string | null; email: string | null }) => p.full_name || p.email || '').filter(Boolean)
+    fetch('/api/profiles?role=csm_spc')
+      .then((r) => r.json())
+      .then(({ profiles }) => {
+        if (profiles) {
+          const names = (profiles as { full_name: string | null; email: string | null }[])
+            .map((p) => p.full_name || p.email || '')
+            .filter(Boolean)
           setRepOptions(names)
         }
       })
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     if (profile?.full_name && profile.role === 'csm_spc') {
