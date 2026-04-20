@@ -112,6 +112,55 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string; s
   )
 }
 
+function MainKpiCard({
+  label, value, unit, sub, meta, alert,
+}: {
+  label: string
+  value: number
+  unit?: string
+  sub?: string
+  meta: number
+  alert: number
+}) {
+  const pct = Math.min(100, Math.round((value / meta) * 100))
+  const isGood    = value >= meta
+  const isWarning = !isGood && value >= alert
+  // colors
+  const barColor  = isGood ? 'bg-green-500' : isWarning ? 'bg-orange-400' : 'bg-red-500'
+  const textColor = isGood ? 'text-green-600 dark:text-green-400' : isWarning ? 'text-orange-500 dark:text-orange-400' : 'text-red-600 dark:text-red-400'
+  const badgeColor = isGood
+    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+    : isWarning
+    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+  const statusLabel = isGood ? 'Meta lograda' : isWarning ? 'Por mejorar' : 'Alerta'
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 flex flex-col gap-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 leading-tight">{label}</p>
+      <div className="flex items-end justify-between gap-2">
+        <p className={cn('text-2xl font-bold leading-none', textColor)}>
+          {value}{unit ?? ''}
+        </p>
+        <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0', badgeColor)}>
+          {statusLabel}
+        </span>
+      </div>
+      {/* Progress bar */}
+      <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all duration-500', barColor)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-zinc-400 dark:text-zinc-500">
+        <span>{sub}</span>
+        <span>Meta: {meta}{unit ?? ''}</span>
+      </div>
+    </div>
+  )
+}
+
 function ScorePill({ score }: { score: number }) {
   const { label, cls } = scoreBadge(score)
   return (
@@ -348,35 +397,44 @@ export default function SpcPerfDashboard() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">KPIs Principales</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-              <KpiCard
+              <MainKpiCard
                 label="% Engagement Semanal"
-                value={kpis ? `${kpis.avgEngSemanal}%` : '—'}
+                value={kpis?.avgEngSemanal ?? 0}
+                unit="%"
                 sub="activos / total miembros"
-                color="text-blue-600 dark:text-blue-400"
+                meta={25}
+                alert={15}
               />
-              <KpiCard
-                label="Mensajes diarios"
-                value={kpis ? String(kpis.avgMessages) : '—'}
+              <MainKpiCard
+                label="Mensajes Diarios"
+                value={kpis?.avgMessages ?? 0}
                 sub="promedio del período"
-                color="text-sky-600 dark:text-sky-400"
+                meta={20}
+                alert={10}
               />
-              <KpiCard
-                label="% Reactivación inactivos"
-                value={kpis ? `${kpis.avgReact}%` : '—'}
+              <MainKpiCard
+                label="% Reactivación Inactivos"
+                value={kpis?.avgReact ?? 0}
+                unit="%"
                 sub="check-ins respondidos"
-                color="text-green-600 dark:text-green-400"
+                meta={20}
+                alert={10}
               />
-              <KpiCard
+              <MainKpiCard
                 label="% Conv. Trial"
-                value={kpis ? `${kpis.avgConv}%` : '—'}
+                value={kpis?.avgConv ?? 0}
+                unit="%"
                 sub="trials convertidos"
-                color="text-amber-600 dark:text-amber-400"
+                meta={60}
+                alert={40}
               />
-              <KpiCard
-                label="% Retención cancelaciones"
-                value={kpis ? `${kpis.avgRet}%` : '—'}
+              <MainKpiCard
+                label="% Retención Cancelaciones"
+                value={kpis?.avgRet ?? 0}
+                unit="%"
                 sub="miembros retenidos"
-                color="text-red-600 dark:text-red-400"
+                meta={15}
+                alert={8}
               />
             </div>
 
