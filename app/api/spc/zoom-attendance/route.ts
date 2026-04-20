@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
     console.log(`[zoom-attendance] matched=${matched} unmatched=${unmatched} — recalculating scores inline`)
 
     // Recalculate scores inline — no HTTP fetch, directly calls shared logic
-    const { updated: scoresUpdated } = await recalculateAllScores()
+    const { processed: scoresUpdated } = await recalculateAllScores()
 
     return NextResponse.json({
       class_date:     classDate,
