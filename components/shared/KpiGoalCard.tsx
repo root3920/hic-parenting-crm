@@ -11,9 +11,10 @@ interface KpiGoalCardProps {
   unit: string
   goal: GoalConfig
   isLoading?: boolean
+  decimals?: number
 }
 
-export function KpiGoalCard({ label, description, value, unit, goal, isLoading }: KpiGoalCardProps) {
+export function KpiGoalCard({ label, description, value, unit, goal, isLoading, decimals = 1 }: KpiGoalCardProps) {
   const hasValue = !isNaN(value)
   const status: GoalStatus = hasValue ? getGoalStatus(value, goal) : 'alert'
   const colors = getStatusColors(status)
@@ -29,7 +30,7 @@ export function KpiGoalCard({ label, description, value, unit, goal, isLoading }
       : `Meta: ≥ ${goal.target}${goal.unit}`
 
   const displayValue = hasValue
-    ? `${value.toFixed(unit === '%' ? 1 : 1)}${unit}`
+    ? `${value.toFixed(decimals)}${unit}`
     : '—'
 
   return (

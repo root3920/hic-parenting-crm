@@ -249,14 +249,14 @@ export default function CloserDashboardPage() {
     const showedUp = callsFiltered.filter(c => c.status === 'Showed Up').length
     const noShows = callsFiltered.filter(c => c.status === 'No show').length
     const cancelled = callsFiltered.filter(c => c.status === 'Cancelled').length
-    const showRate = safeDiv(showedUp, totalMeetings) * 100
+    const showRate = safeDiv(showedUp, showedUp + noShows) * 100
     const callsPerWeek = safeDiv(totalMeetings, rangeDays / 7)
     return { totalMeetings, showedUp, noShows, cancelled, showRate, callsPerWeek }
   }, [callsFiltered, rangeDays])
 
   // ── Dynamic goal for showed calls ──
   const showedCallsGoal = useMemo((): GoalConfig => {
-    const weeks = rangeDays / 7
+    const weeks = Math.max(1, rangeDays / 7)
     return {
       target: Math.round(weeks * 6),
       targetMax: Math.round(weeks * 10),
@@ -448,6 +448,7 @@ export default function CloserDashboardPage() {
                 value={callKPIs.showedUp}
                 unit=""
                 goal={showedCallsGoal}
+                decimals={0}
               />
             </div>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on actual calls</p>
