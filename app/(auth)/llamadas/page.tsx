@@ -12,7 +12,7 @@ import { UpcomingCallCard } from '@/components/llamadas/UpcomingCallCard'
 import {
   Calendar, CheckCircle, XCircle, UserX, RefreshCw,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
-  Eye, ExternalLink, Search, Loader2, Check, Pencil,
+  Eye, ExternalLink, Search, Loader2, Check, Pencil, Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -198,6 +198,8 @@ export default function LlamadasPage() {
     callId: string
     field: 'closer_name' | 'setter_name'
   } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Call | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   // Debounce search
   useEffect(() => {
@@ -326,6 +328,21 @@ export default function LlamadasPage() {
     setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus } : c))
     setDetailCall(prev => prev?.id === callId ? { ...prev, status: newStatus } : prev)
     toast.success(`Status updated to ${newStatus}`)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
+    const { error } = await supabase.from('calls').delete().eq('id', deleteTarget.id)
+    setDeleteLoading(false)
+    if (error) {
+      toast.error('Failed to delete call')
+      return
+    }
+    setCalls(prev => prev.filter(c => c.id !== deleteTarget.id))
+    setUpcomingCalls(prev => prev.filter(c => c.id !== deleteTarget.id))
+    setDeleteTarget(null)
+    toast.success('Call deleted')
   }
 
   // ── Analytics: donut data ──
@@ -716,6 +733,13 @@ export default function LlamadasPage() {
                                         <ExternalLink className="h-3.5 w-3.5" />
                                       </span>
                                     )}
+                                    <button
+                                      onClick={() => setDeleteTarget(call)}
+                                      className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                      title="Delete call"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
                                   </div>
                                 </td>
                               </tr>
@@ -832,6 +856,36 @@ export default function LlamadasPage() {
           </>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
+          <div className="relative bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-sm animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Delete this call?</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-5">
+              Are you sure you want to delete the call with{' '}
+              <strong className="text-zinc-700 dark:text-zinc-300">{deleteTarget.full_name}</strong>?
+              {' '}This action cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-3 py-1.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="px-3 py-1.5 text-xs rounded-md font-medium bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-60"
+              >
+                {deleteLoading ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detail modal */}
       <CallDetailModal
