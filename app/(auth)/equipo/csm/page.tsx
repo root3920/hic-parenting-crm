@@ -413,7 +413,7 @@ export default function HtCsmDashboardPage() {
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} unit="%" />
                       <Tooltip
-                        formatter={(v) => [`${v}%`]}
+                        formatter={(v) => [`${Number(v ?? 0).toFixed(1)}%`]}
                         contentStyle={{ fontSize: 11 }}
                       />
                       <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
@@ -456,7 +456,7 @@ export default function HtCsmDashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} unit="%" />
-                      <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ fontSize: 11 }} />
+                      <Tooltip formatter={(v) => [`${Number(v ?? 0).toFixed(1)}%`]} contentStyle={{ fontSize: 11 }} />
                       <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
                       <Bar dataKey="show"  name="Show"  fill="#F59E0B" radius={[3, 3, 0, 0]} maxBarSize={24} />
                       <Bar dataKey="close" name="Close" fill="#1D9E75" radius={[3, 3, 0, 0]} maxBarSize={24} />
