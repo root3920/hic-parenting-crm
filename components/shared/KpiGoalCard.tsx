@@ -18,8 +18,9 @@ export function KpiGoalCard({ label, description, value, unit, goal, isLoading }
   const status: GoalStatus = hasValue ? getGoalStatus(value, goal) : 'alert'
   const colors = getStatusColors(status)
 
+  const fillBasis = goal.targetMax ?? goal.target
   const fillPct = hasValue
-    ? Math.min((value / goal.target) * 100, 100)
+    ? Math.min((value / fillBasis) * 100, 100)
     : 0
 
   const metaLabel =

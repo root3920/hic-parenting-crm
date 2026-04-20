@@ -12,7 +12,7 @@ import { formatDate } from '@/lib/utils'
 import { CloserDailyReport } from '@/types'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { GOALS } from '@/lib/goals'
+import { GOALS, GoalConfig } from '@/lib/goals'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, Cell,
@@ -254,6 +254,19 @@ export default function CloserDashboardPage() {
     return { totalMeetings, showedUp, noShows, cancelled, showRate, callsPerWeek }
   }, [callsFiltered, rangeDays])
 
+  // ── Dynamic goal for showed calls ──
+  const showedCallsGoal = useMemo((): GoalConfig => {
+    const weeks = rangeDays / 7
+    return {
+      target: Math.round(weeks * 6),
+      targetMax: Math.round(weeks * 10),
+      alert: Math.round(weeks * 3),
+      unit: '',
+      label: 'Showed Calls',
+      description: 'Total "Showed Up" calls in selected period',
+    }
+  }, [rangeDays])
+
   // ── KPIs from closer_daily_reports ──
   const reportKPIs = useMemo(() => {
     const offersProposed = s(filtered, 'offers_proposed')
@@ -430,11 +443,11 @@ export default function CloserDashboardPage() {
               <VolumeCard label="No Shows" value={callKPIs.noShows} sub="missed calls" />
               <VolumeCard label="Cancelled" value={callKPIs.cancelled} sub="of total scheduled" />
               <KpiGoalCard
-                label={GOALS.closing.callsPerWeek.label}
-                description={GOALS.closing.callsPerWeek.description}
-                value={callKPIs.callsPerWeek}
+                label="Showed Calls"
+                description='Total "Showed Up" calls in selected period'
+                value={callKPIs.showedUp}
                 unit=""
-                goal={GOALS.closing.callsPerWeek}
+                goal={showedCallsGoal}
               />
             </div>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on actual calls</p>
