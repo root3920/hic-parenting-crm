@@ -23,14 +23,13 @@ function paymentConsistencyScore(
 ): number {
   if (paymentDates.length === 0) return 0
 
-  // Count consecutive months (no gap > 45 days)
   let consecutive = 1
   for (let i = 1; i < paymentDates.length; i++) {
     const prev = new Date(paymentDates[i - 1]).getTime()
     const curr = new Date(paymentDates[i]).getTime()
     const gap  = (curr - prev) / (1000 * 60 * 60 * 24)
     if (gap <= 45) consecutive++
-    else consecutive = 1 // reset on gap
+    else consecutive = 1
   }
 
   let score = 0
@@ -38,7 +37,6 @@ function paymentConsistencyScore(
   else if (consecutive === 2) score = 15
   else if (consecutive === 1) score = 5
 
-  // Deduct 10pts if most recent payment is overdue
   const lastDate = paymentDates[paymentDates.length - 1]
   const daysSinceLast = (Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24)
   const overdueThreshold = plan === 'annual' ? 370 : 35
@@ -51,45 +49,53 @@ function paymentConsistencyScore(
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json().catch(() => ({}))) as { emails?: string[] }
-    const filterEmails = body.emails ?? []
-
-    // Fetch members (filtered if emails provided)
-    let membersQuery = supabaseAdmin
+    // Fetch ALL active+trial members — always recalculate everyone for accuracy
+    const { data: members, error: membersError } = await supabaseAdmin
       .from('spc_members')
       .select('id, email, plan, whatsapp_active')
       .in('status', ['active', 'trial'])
 
-    if (filterEmails.length > 0) {
-      membersQuery = membersQuery.in('email', filterEmails)
+    if (membersError) {
+      console.error('[recalculate-scores] Members fetch error:', membersError.message)
+      return NextResponse.json({ error: membersError.message }, { status: 500 })
+    }
+    if (!members || members.length === 0) {
+      console.log('[recalculate-scores] No active/trial members found')
+      return NextResponse.json({ updated: 0 })
     }
 
-    const { data: members, error: membersError } = await membersQuery
-    if (membersError) return NextResponse.json({ error: membersError.message }, { status: 500 })
-    if (!members || members.length === 0) return NextResponse.json({ updated: 0 })
+    console.log(`[recalculate-scores] Processing ${members.length} members`)
 
-    const emails = members.map((m: { email: string }) => m.email.toLowerCase())
+    // Lowercase all member emails for consistent matching
+    const emailsLower = members.map((m: { email: string }) => m.email.toLowerCase())
 
-    // Fetch attendance counts per email
-    const { data: attendanceRows } = await supabaseAdmin
+    // ── Attendance: fetch all rows for these members ──
+    const { data: attendanceRows, error: attError } = await supabaseAdmin
       .from('spc_class_attendance')
       .select('member_email')
-      .in('member_email', emails)
+      .in('member_email', emailsLower)
 
+    if (attError) console.error('[recalculate-scores] Attendance fetch error:', attError.message)
+
+    console.log(`[recalculate-scores] Attendance rows found: ${(attendanceRows ?? []).length}`)
+
+    // Count distinct classes per email (each row = 1 class attended)
     const attendanceByEmail: Record<string, number> = {}
     for (const row of (attendanceRows ?? [])) {
       const e = row.member_email.toLowerCase()
       attendanceByEmail[e] = (attendanceByEmail[e] ?? 0) + 1
     }
+    console.log('[recalculate-scores] Attendance by email:', JSON.stringify(attendanceByEmail))
 
-    // Fetch completed SPC transactions per email
-    const { data: txRows } = await supabaseAdmin
+    // ── Transactions: completed SPC payments ──
+    const { data: txRows, error: txError } = await supabaseAdmin
       .from('transactions')
       .select('buyer_email, date')
-      .in('buyer_email', emails)
       .ilike('offer_title', '%Secure Parent%')
       .eq('status', 'completed')
       .order('date', { ascending: true })
+
+    if (txError) console.error('[recalculate-scores] TX fetch error:', txError.message)
 
     const txByEmail: Record<string, string[]> = {}
     for (const tx of (txRows ?? [])) {
@@ -99,38 +105,39 @@ export async function POST(req: NextRequest) {
       txByEmail[e].push(tx.date)
     }
 
-    // Calculate and update scores
-    const updates: { id: string; lead_score: number }[] = []
-
+    // ── Calculate scores and UPDATE (not upsert — avoids NOT NULL violations) ──
+    let successCount = 0
     for (const member of members) {
       const email = member.email.toLowerCase()
 
       const classCount = attendanceByEmail[email] ?? 0
       const attScore   = attendanceScore(classCount)
-
       const waScore    = member.whatsapp_active ? 20 : 0
-
       const plan       = (member.plan as 'monthly' | 'annual') ?? 'monthly'
-      const payDates   = txByEmail[email] ?? []
-      const payScore   = paymentConsistencyScore(payDates, plan)
+      const payScore   = paymentConsistencyScore(txByEmail[email] ?? [], plan)
+      const total      = Math.min(100, attScore + waScore + payScore)
 
-      const total = Math.min(100, attScore + waScore + payScore)
-      updates.push({ id: member.id, lead_score: total })
+      console.log(`[recalculate-scores] ${email}: classes=${classCount} att=${attScore} wa=${waScore} pay=${payScore} → total=${total}`)
+
+      // UPDATE only lead_score — never upsert (upsert requires all NOT NULL fields)
+      const { error: updateError } = await supabaseAdmin
+        .from('spc_members')
+        .update({ lead_score: total })
+        .eq('id', member.id)
+
+      if (updateError) {
+        console.error(`[recalculate-scores] Update failed for ${member.id} (${email}):`, updateError.message)
+      } else {
+        successCount++
+      }
     }
 
-    // Batch update in chunks of 50
-    const CHUNK = 50
-    for (let i = 0; i < updates.length; i += CHUNK) {
-      const chunk = updates.slice(i, i + CHUNK)
-      await supabaseAdmin.from('spc_members').upsert(
-        chunk.map(({ id, lead_score }) => ({ id, lead_score })),
-        { onConflict: 'id' }
-      )
-    }
+    console.log(`[recalculate-scores] Done. Updated ${successCount}/${members.length} members.`)
+    return NextResponse.json({ updated: successCount })
 
-    return NextResponse.json({ updated: updates.length })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[recalculate-scores] Unexpected error:', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

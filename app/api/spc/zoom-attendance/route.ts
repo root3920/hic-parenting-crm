@@ -119,14 +119,16 @@ export async function POST(req: NextRequest) {
     const matched   = emails.filter((e) => memberEmailSet.has(e)).length
     const unmatched = emails.length - matched
 
-    // Trigger score recalculation for matched members
-    if (matched > 0) {
-      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/spc/recalculate-scores`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails: Array.from(memberEmailSet) }),
-      }).catch(() => {/* non-critical */})
-    }
+    // Trigger score recalculation for all members
+    // Derive base URL from the incoming request — reliable in all environments
+    const baseUrl = new URL(req.url).origin
+    const recalcRes = await fetch(`${baseUrl}/api/spc/recalculate-scores`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const recalcData = await recalcRes.json().catch(() => ({}))
+    console.log('[zoom-attendance] Score recalculation result:', JSON.stringify(recalcData))
 
     return NextResponse.json({
       class_date: classDate,

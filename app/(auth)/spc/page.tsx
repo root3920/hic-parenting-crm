@@ -1063,6 +1063,23 @@ export default function SpcPage() {
   const [zoomCsvContent, setZoomCsvContent] = useState('')
   const [zoomFileName, setZoomFileName] = useState('')
   const [zoomImporting, setZoomImporting] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
+
+  async function handleRecalculateScores() {
+    setRecalculating(true)
+    try {
+      const res = await fetch('/api/spc/recalculate-scores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      const data = await res.json()
+      if (data.error) { toast.error(`Score recalc failed: ${data.error}`); return }
+      toast.success(`Scores updated for ${data.updated} members`)
+      const membersRes = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+      if (membersRes.data) setMembers(membersRes.data)
+    } catch {
+      toast.error('Score recalculation failed')
+    } finally {
+      setRecalculating(false)
+    }
+  }
   const [zoomResult, setZoomResult] = useState<{ class_date?: string; total?: number; matched?: number; unmatched?: number; error?: string } | null>(null)
 
   // ── Member attendance (loaded per modal open) ─────────────────────────────
@@ -1476,6 +1493,13 @@ export default function SpcPage() {
             })}
           </nav>
           <div className="pb-2 shrink-0 flex items-center gap-2">
+            <button
+              onClick={handleRecalculateScores}
+              disabled={recalculating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+            >
+              {recalculating ? 'Recalculating…' : '↻ Recalculate Scores'}
+            </button>
             <button
               onClick={() => { setZoomModalOpen(true); setZoomCsvContent(''); setZoomFileName(''); setZoomResult(null) }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 bg-violet-600"
