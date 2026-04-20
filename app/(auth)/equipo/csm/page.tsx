@@ -413,7 +413,7 @@ export default function HtCsmDashboardPage() {
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} unit="%" />
                       <Tooltip
-                        formatter={(v: number, name: string) => [`${v}%`, name]}
+                        formatter={(v) => [`${v}%`]}
                         contentStyle={{ fontSize: 11 }}
                       />
                       <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
