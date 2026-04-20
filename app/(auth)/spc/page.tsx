@@ -1329,6 +1329,23 @@ export default function SpcPage() {
     .filter((c) => (c.cancelled_at?.slice(0, 10) ?? '') >= sixtyDaysAgo)
     .reduce((s, c) => s + (c.plan === 'annual' ? c.amount / 12 : c.amount), 0)
 
+  // Trial churn rate
+  const currentTrialCount = members.filter((m) => m.status === 'trial').length
+  const totalTrialsEver = currentTrialCount + trialCancels.length +
+    members.filter((m) => m.status === 'active' && (m.trial_end_date != null || (m.trial_days ?? 0) > 0)).length
+  const trialChurnRate = totalTrialsEver > 0
+    ? parseFloat(((trialCancels.length / totalTrialsEver) * 100).toFixed(1))
+    : 0
+
+  // Trial → paid conversion rate
+  const convertedTrials = members.filter(
+    (m) => m.status === 'active' && (m.trial_end_date != null || (m.trial_days ?? 0) > 0)
+  ).length
+  const trialConversionDenominator = convertedTrials + trialCancels.length
+  const trialConversionRate = trialConversionDenominator > 0
+    ? parseFloat(((convertedTrials / trialConversionDenominator) * 100).toFixed(1))
+    : 0
+
   const cancels30d = nonTrialCancels.filter(
     (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= thirtyDaysAgo
   ).length
@@ -2129,7 +2146,7 @@ export default function SpcPage() {
         {activeTab === 'cancellations' && (
           <div className="space-y-6">
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
@@ -2197,6 +2214,50 @@ export default function SpcPage() {
                         {churnRate}%
                       </p>
                       <p className="text-xs text-zinc-500 mt-1">paid cancellations only</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Trial Churn Rate
+                  </p>
+                  {loading ? (
+                    <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <p className={`text-2xl font-semibold ${
+                        trialChurnRate < 30 ? 'text-green-600 dark:text-green-400'
+                        : trialChurnRate <= 50 ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {trialChurnRate}%
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">trials that cancelled without paying</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Trial → Paid Conversion
+                  </p>
+                  {loading ? (
+                    <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <p className={`text-2xl font-semibold ${
+                        trialConversionRate >= 60 ? 'text-green-600 dark:text-green-400'
+                        : trialConversionRate >= 40 ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {trialConversionDenominator > 0 ? `${trialConversionRate}%` : '—'}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">trials that became paying members</p>
                     </>
                   )}
                 </CardContent>
