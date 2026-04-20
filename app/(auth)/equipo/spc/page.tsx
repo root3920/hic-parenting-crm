@@ -249,22 +249,26 @@ export default function SpcPerfDashboard() {
   const kpis = useMemo(() => {
     if (allMetrics.length === 0) return null
     const scores       = allMetrics.map(({ m }) => m.score)
-    const pctEng       = allMetrics.map(({ m }) => m.pctEngagement)
+    const pctEngSem    = allMetrics.map(({ r }) => safe(r.active_members_count, r.total_members_count))
+    const messages     = allMetrics.map(({ r }) => r.avg_daily_messages)
     const pctReact     = allMetrics.map(({ m }) => m.pctReactivacion)
     const pctConv      = allMetrics.map(({ m }) => m.pctConvTrial)
     const pctRet       = allMetrics.map(({ m }) => m.pctRetencion)
+    const pctEng       = allMetrics.map(({ m }) => m.pctEngagement)
     const pctResp      = allMetrics.map(({ m }) => m.pctRespuesta)
     const refs         = allMetrics.map(({ r }) => r.referrals_generated)
     const energy       = allMetrics.map(({ r }) => r.community_energy)
     return {
-      avgScore:    avg(scores),
-      avgEng:      avg(pctEng),
-      avgReact:    avg(pctReact),
-      avgConv:     avg(pctConv),
-      avgRet:      avg(pctRet),
-      avgResp:     avg(pctResp),
-      totalRefs:   refs.reduce((s, v) => s + v, 0),
-      avgEnergy:   (energy.reduce((s, v) => s + v, 0) / energy.length).toFixed(1),
+      avgScore:       avg(scores),
+      avgEngSemanal:  avg(pctEngSem),
+      avgMessages:    Math.round(messages.reduce((s, v) => s + v, 0) / messages.length),
+      avgReact:       avg(pctReact),
+      avgConv:        avg(pctConv),
+      avgRet:         avg(pctRet),
+      avgEng:         avg(pctEng),
+      avgResp:        avg(pctResp),
+      totalRefs:      refs.reduce((s, v) => s + v, 0),
+      avgEnergy:      (energy.reduce((s, v) => s + v, 0) / energy.length).toFixed(1),
     }
   }, [allMetrics])
 
@@ -339,41 +343,53 @@ export default function SpcPerfDashboard() {
           />
         ) : (
           <>
-            {/* ── KPI Row 1 ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            {/* ── KPIs Principales (5) ── */}
+            <div className="mb-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">KPIs Principales</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
               <KpiCard
-                label="Score final promedio"
-                value={kpis ? String(kpis.avgScore) : '—'}
-                sub={kpis ? scoreBadge(kpis.avgScore).label : undefined}
-                color={kpis ? scoreColor(kpis.avgScore) : undefined}
-              />
-              <KpiCard
-                label="% Engagement promedio"
-                value={kpis ? `${kpis.avgEng}%` : '—'}
-                sub="participación activa"
+                label="% Engagement Semanal"
+                value={kpis ? `${kpis.avgEngSemanal}%` : '—'}
+                sub="activos / total miembros"
                 color="text-blue-600 dark:text-blue-400"
               />
               <KpiCard
-                label="% Reactivación promedio"
+                label="Mensajes diarios"
+                value={kpis ? String(kpis.avgMessages) : '—'}
+                sub="promedio del período"
+                color="text-sky-600 dark:text-sky-400"
+              />
+              <KpiCard
+                label="% Reactivación inactivos"
                 value={kpis ? `${kpis.avgReact}%` : '—'}
                 sub="check-ins respondidos"
                 color="text-green-600 dark:text-green-400"
               />
               <KpiCard
-                label="% Conv. Trial promedio"
+                label="% Conv. Trial"
                 value={kpis ? `${kpis.avgConv}%` : '—'}
                 sub="trials convertidos"
                 color="text-amber-600 dark:text-amber-400"
               />
-            </div>
-
-            {/* ── KPI Row 2 ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <KpiCard
                 label="% Retención cancelaciones"
                 value={kpis ? `${kpis.avgRet}%` : '—'}
                 sub="miembros retenidos"
                 color="text-red-600 dark:text-red-400"
+              />
+            </div>
+
+            {/* ── KPIs Secundarios ── */}
+            <div className="mb-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Métricas secundarias</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <KpiCard
+                label="Score final promedio"
+                value={kpis ? String(kpis.avgScore) : '—'}
+                sub={kpis ? scoreBadge(kpis.avgScore).label : undefined}
+                color={kpis ? scoreColor(kpis.avgScore) : undefined}
               />
               <KpiCard
                 label="% Respuesta <24h"
