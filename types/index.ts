@@ -61,7 +61,7 @@ export interface SpcMember {
   status: 'active' | 'trial' | 'cancelled' | 'expired'
   provider: 'Kajabi' | 'Stripe' | 'PayPal'
   joined_at: string
-  next_payment_date: string
+  next_payment_date: string | null
   trial_end_date: string | null
   trial_days: number | null
   created_at: string

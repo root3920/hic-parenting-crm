@@ -149,6 +149,23 @@ function calcNextPayment(
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function calcNextPaymentISO(
+  txList: Transaction[] | undefined,
+  plan: 'monthly' | 'annual',
+  fallbackDate?: string | null,
+): string {
+  const completed = (txList ?? []).filter((t) => (t.status ?? 'completed') === 'completed')
+  const anchorStr = completed.length > 0 ? completed[0].date : fallbackDate
+  if (!anchorStr) return ''
+  const d = new Date(anchorStr + 'T12:00:00')
+  if (plan === 'annual') {
+    d.setFullYear(d.getFullYear() + 1)
+  } else {
+    d.setMonth(d.getMonth() + 1)
+  }
+  return d.toISOString().slice(0, 10)
+}
+
 function formatRelativeTime(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime()
   const hours = diffMs / (1000 * 60 * 60)
@@ -225,6 +242,7 @@ interface MemberEditForm {
   provider: 'Kajabi' | 'Stripe' | 'PayPal'
   joined_at: string
   status: MemberStatus
+  next_payment_date: string
 }
 
 interface CancelEditForm {
@@ -297,7 +315,7 @@ function MemberProfileModal({
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState<MemberEditForm>({
     name: '', email: '', phone: '', plan: 'monthly',
-    provider: 'Stripe', joined_at: '', status: 'active',
+    provider: 'Stripe', joined_at: '', status: 'active', next_payment_date: '',
   })
   const [cancelForm, setCancelForm] = useState<CancelEditForm>({
     name: '', email: '', customer_phone: '', cancel_type: 'paid_cancel',
@@ -315,6 +333,7 @@ function MemberProfileModal({
   function startEdit() {
     if (selected.kind !== 'member') return
     const m = selected.data
+    const autoDate = calcNextPaymentISO(memberTransactions, m.plan, m.joined_at)
     setEditForm({
       name: m.name,
       email: m.email,
@@ -323,6 +342,7 @@ function MemberProfileModal({
       provider: m.provider,
       joined_at: m.joined_at ?? '',
       status: (m.status as MemberStatus) ?? 'active',
+      next_payment_date: m.next_payment_date ?? autoDate,
     })
     setIsEditing(true)
   }
@@ -357,6 +377,7 @@ function MemberProfileModal({
           provider: editForm.provider,
           joined_at: editForm.joined_at || null,
           status: editForm.status,
+          next_payment_date: editForm.next_payment_date || null,
         })
         .eq('id', selected.data.id)
         .select()
@@ -584,7 +605,11 @@ function MemberProfileModal({
                 {selected.kind === 'member' && selected.data.status === 'active' && (
                   <div className="flex items-center justify-between">
                     <span className={rowLabel}>Next Payment</span>
-                    <span className={rowValue}>{calcNextPayment(memberTransactions, selected.data.plan)}</span>
+                    <span className={rowValue}>
+                      {selected.data.next_payment_date
+                        ? formatDate(selected.data.next_payment_date)
+                        : calcNextPayment(memberTransactions, selected.data.plan)}
+                    </span>
                   </div>
                 )}
                 {selected.kind === 'cancellation' && (
@@ -865,6 +890,11 @@ function MemberProfileModal({
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Member since</label>
                   <input type="date" value={editForm.joined_at} onChange={(e) => setField('joined_at', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Next Payment</label>
+                  <input type="date" value={editForm.next_payment_date} onChange={(e) => setField('next_payment_date', e.target.value)} className={inputCls} />
+                  <p className="text-[10px] text-zinc-400 mt-1">Auto-calculated from last payment. Override manually if needed.</p>
                 </div>
               </div>
 
