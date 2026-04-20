@@ -116,26 +116,44 @@ const CELL_BG: Record<'good' | 'warn' | 'alert', string> = {
 // ── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, value, sub, status, goal,
+  label, value, sub, status, goal, barPct,
 }: {
   label: string
   value: string
   sub?: string
   status: 'good' | 'warn' | 'alert'
   goal?: string
+  barPct: number   // 0–100, how full to render the bar
 }) {
+  const barColor  = status === 'good' ? 'bg-green-500' : status === 'warn' ? 'bg-orange-400' : 'bg-red-500'
+  const textColor = RATE_COLORS[status]
+  const badgeColor = status === 'good'
+    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+    : status === 'warn'
+    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+  const statusLabel = status === 'good' ? 'On track' : status === 'warn' ? 'At risk' : 'Below target'
+
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <span className={cn('w-2 h-2 rounded-full shrink-0', STATUS_DOT[status])} />
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 leading-none">{label}</p>
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 flex flex-col gap-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 leading-tight">{label}</p>
+      <div className="flex items-end justify-between gap-2">
+        <p className={cn('text-2xl font-bold leading-none', textColor)}>{value}</p>
+        <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0', badgeColor)}>
+          {statusLabel}
+        </span>
       </div>
-      <p className={cn('text-2xl font-bold', RATE_COLORS[status])}>{value}</p>
-      {goal && <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{goal}</p>}
-      {status === 'alert' && (
-        <p className="text-[10px] font-medium text-red-500 dark:text-red-400 mt-0.5">Below target</p>
-      )}
-      {sub && <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{sub}</p>}
+      {/* Progress bar */}
+      <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all duration-500', barColor)}
+          style={{ width: `${Math.min(100, Math.max(0, barPct))}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-zinc-400 dark:text-zinc-500">
+        <span>{sub}</span>
+        {goal && <span>{goal}</span>}
+      </div>
     </div>
   )
 }
@@ -697,30 +715,35 @@ export default function HtCsmDashboardPage() {
                 label="Outreach Rate"
                 value={fmtPct(kpis.outreachRate)}
                 goal="Goal: ≥ 50%"
+                barPct={isNaN(kpis.outreachRate) ? 0 : (kpis.outreachRate / 50) * 100}
                 status={rateStatus(kpis.outreachRate, 50, 40)}
               />
               <KpiCard
                 label="Response Rate"
                 value={fmtPct(kpis.responseRate)}
                 goal="Goal: ≥ 35%"
+                barPct={isNaN(kpis.responseRate) ? 0 : (kpis.responseRate / 35) * 100}
                 status={rateStatus(kpis.responseRate, 35, 25)}
               />
               <KpiCard
                 label="Pitch Rate"
                 value={fmtPct(kpis.pitchRate)}
                 goal="Goal: ≥ 45%"
+                barPct={isNaN(kpis.pitchRate) ? 0 : (kpis.pitchRate / 45) * 100}
                 status={rateStatus(kpis.pitchRate, 45, 30)}
               />
               <KpiCard
                 label="Show Rate"
                 value={fmtPct(kpis.showRate)}
                 goal="Goal: ≥ 65%"
+                barPct={isNaN(kpis.showRate) ? 0 : (kpis.showRate / 65) * 100}
                 status={rateStatus(kpis.showRate, 65, 50)}
               />
               <KpiCard
                 label="Close Rate"
                 value={fmtPct(kpis.closeRate)}
                 goal="Goal: 30–40%"
+                barPct={isNaN(kpis.closeRate) ? 0 : (kpis.closeRate / 40) * 100}
                 status={closeRateStatus(kpis.closeRate)}
               />
               <KpiCard
@@ -728,18 +751,21 @@ export default function HtCsmDashboardPage() {
                 value={String(kpis.sumCalls)}
                 goal="Goal: 4–6 calls"
                 sub="sum of daily calls"
+                barPct={(kpis.sumCalls / 6) * 100}
                 status={callsStatus(kpis.sumCalls)}
               />
               <KpiCard
                 label="Avg Score"
                 value={isNaN(kpis.avgScore) ? '—' : `${kpis.avgScore.toFixed(1)} / 10`}
                 sub="self-assessment"
+                barPct={isNaN(kpis.avgScore) ? 0 : (kpis.avgScore / 10) * 100}
                 status={rateStatus(kpis.avgScore * 10, 70, 50)}
               />
               <KpiCard
                 label="Total Enrollments"
                 value={String(kpis.totalClosed)}
                 sub="closed in period"
+                barPct={Math.min(100, kpis.totalClosed * 20)}
                 status={kpis.totalClosed > 0 ? 'good' : 'warn'}
               />
             </div>
