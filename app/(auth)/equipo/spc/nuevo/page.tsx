@@ -11,115 +11,133 @@ import { cn } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
-const POST_TYPES = ['Educational', 'Inspirational', 'Community spotlight', 'Announcement', 'Question / Poll', 'Other']
 
-function today() {
+function todayStr() {
   return new Date().toISOString().split('T')[0]
 }
 
 interface FormState {
   date: string
   rep_name: string
-  hours_worked: string
-  // Community
-  community_size: string
+  // auto-filled
+  active_members_count: number
+  total_members_count: number
+  // engagement
+  members_participated: string
+  avg_daily_messages: string
+  conversation_quality: number
+  // activación
   new_members: string
-  members_welcomed: string
-  members_introduced: string
-  questions_answered: string
-  wins_shared: string
-  // Content & Activity
-  published_post: boolean
-  post_type: string
-  sent_class_reminder: boolean
-  // Retention
-  inactive_identified: string
-  checkin_messages_sent: string
-  parent_frustration: boolean
-  parent_frustration_notes: string
-  referral_mentioned: boolean
-  referrals_count: string
-  // End of day
-  highs: string
-  lows: string
-  performance: string
+  welcome_sent: string
+  new_members_introduced: string
+  checkins_sent: string
+  checkins_responded: string
+  // retención
+  trials_expiring_today: string
+  trials_converted: string
+  trials_contacted: string
+  cancellation_requests: string
+  cancellations_retained: string
+  // operación
+  questions_total: string
+  questions_answered_24h: string
+  referrals_generated: string
+  // insights
+  insights: string
+  top_action: string
+  community_energy: number
 }
 
-const initialState: FormState = {
-  date: today(),
+const initial: FormState = {
+  date: todayStr(),
   rep_name: '',
-  hours_worked: '',
-  community_size: '', new_members: '', members_welcomed: '',
-  members_introduced: '', questions_answered: '', wins_shared: '',
-  published_post: false, post_type: '', sent_class_reminder: false,
-  inactive_identified: '', checkin_messages_sent: '',
-  parent_frustration: false, parent_frustration_notes: '',
-  referral_mentioned: false, referrals_count: '',
-  highs: '', lows: '', performance: '7',
+  active_members_count: 0,
+  total_members_count: 0,
+  members_participated: '',
+  avg_daily_messages: '',
+  conversation_quality: 3,
+  new_members: '',
+  welcome_sent: '',
+  new_members_introduced: '',
+  checkins_sent: '',
+  checkins_responded: '',
+  trials_expiring_today: '',
+  trials_converted: '',
+  trials_contacted: '',
+  cancellation_requests: '',
+  cancellations_retained: '',
+  questions_total: '',
+  questions_answered_24h: '',
+  referrals_generated: '',
+  insights: '',
+  top_action: '',
+  community_energy: 3,
 }
 
 function n(v: string) { return parseInt(v) || 0 }
 
-function SectionHeader({ color, label, sub }: { color: string; label: string; sub: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-4">
-      <span className={cn('inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide', color)}>
-        {label}
-      </span>
-      <span className="text-xs text-zinc-400 dark:text-zinc-500">{sub}</span>
-    </div>
-  )
-}
+// ── Shared UI components ──────────────────────────────────────────────────────
+
+const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">{children}</label>
 }
 
-function NumberInput({ value, onChange, placeholder = '0' }: {
-  value: string; onChange: (v: string) => void; placeholder?: string
-}) {
+function NumberInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <input
       type="number" min={0} value={value}
       onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+      placeholder="0"
+      className={inputCls}
     />
   )
 }
 
-function TextArea({ value, onChange, placeholder }: {
-  value: string; onChange: (v: string) => void; placeholder?: string
+function ReadonlyField({ value, label }: { value: number; label: string }) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 font-medium">
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function ScalePicker({ value, onChange, lowLabel, highLabel }: {
+  value: number
+  onChange: (v: number) => void
+  lowLabel?: string
+  highLabel?: string
 }) {
   return (
-    <textarea
-      value={value} onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder} rows={3}
-      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-none"
-    />
-  )
-}
-
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors',
-        checked
-          ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-600'
-          : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600'
+    <div className="space-y-1.5">
+      <div className="flex gap-1.5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            className={cn(
+              'flex-1 py-2.5 rounded-lg text-sm font-bold border-2 transition-all',
+              value === n
+                ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                : 'border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600 hover:text-zinc-600'
+            )}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      {(lowLabel || highLabel) && (
+        <div className="flex justify-between text-xs text-zinc-400">
+          <span>{lowLabel}</span>
+          <span>{highLabel}</span>
+        </div>
       )}
-    >
-      <span className={cn(
-        'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
-        checked ? 'border-blue-500 bg-blue-500' : 'border-zinc-300 dark:border-zinc-600'
-      )}>
-        {checked && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-      </span>
-      {label}
-    </button>
+    </div>
   )
 }
 
@@ -131,14 +149,39 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   )
 }
 
-export default function NuevoReporteSpcPage() {
+function SectionHeader({ label, weight, color }: { label: string; weight: string; color: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <span className={cn('inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide', color)}>
+        {label}
+      </span>
+      <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500">{weight}</span>
+    </div>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function NuevoSpcPerfPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
-  const [form, setForm] = useState<FormState>(initialState)
+  const { profile } = useProfile()
+  const [form, setForm] = useState<FormState>(initial)
   const [submitting, setSubmitting] = useState(false)
   const [repOptions, setRepOptions] = useState<string[]>([])
-  const { profile } = useProfile()
 
+  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  // Auto-fill rep name from profile
+  useEffect(() => {
+    if (profile?.full_name && profile.role === 'csm_spc') {
+      set('rep_name', profile.full_name)
+    }
+  }, [profile])
+
+  // Fetch rep options
   useEffect(() => {
     fetch('/api/profiles?role=csm_spc')
       .then((r) => r.json())
@@ -152,51 +195,56 @@ export default function NuevoReporteSpcPage() {
       })
   }, [])
 
+  // Auto-fill member counts from spc_members
   useEffect(() => {
-    if (profile?.full_name && profile.role === 'csm_spc') {
-      setForm((prev) => ({ ...prev, rep_name: profile.full_name! }))
+    async function fetchCounts() {
+      const [activeRes, totalRes] = await Promise.all([
+        supabase.from('spc_members').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('spc_members').select('id', { count: 'exact', head: true }).in('status', ['active', 'trial']),
+      ])
+      set('active_members_count', activeRes.count ?? 0)
+      set('total_members_count', totalRes.count ?? 0)
     }
-  }, [profile])
-
-  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }))
-  }
+    fetchCounts()
+  }, [supabase])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.date || !form.rep_name) {
-      toast.error('Date and rep name are required')
+      toast.error('Fecha y rep son obligatorios')
       return
     }
     setSubmitting(true)
-    const { error } = await supabase.from('spc_csm_reports').insert({
-      date: form.date,
-      rep_name: form.rep_name,
-      hours_worked: parseFloat(form.hours_worked) || 0,
-      community_size: n(form.community_size),
-      new_members: n(form.new_members),
-      members_welcomed: n(form.members_welcomed),
-      members_introduced: n(form.members_introduced),
-      questions_answered: n(form.questions_answered),
-      wins_shared: n(form.wins_shared),
-      published_post: form.published_post,
-      post_type: form.published_post ? (form.post_type || null) : null,
-      sent_class_reminder: form.sent_class_reminder,
-      inactive_identified: n(form.inactive_identified),
-      checkin_messages_sent: n(form.checkin_messages_sent),
-      parent_frustration: form.parent_frustration,
-      parent_frustration_notes: form.parent_frustration ? (form.parent_frustration_notes || null) : null,
-      referral_mentioned: form.referral_mentioned,
-      referrals_count: form.referral_mentioned ? n(form.referrals_count) : 0,
-      highs: form.highs || null,
-      lows: form.lows || null,
-      performance: n(form.performance) || 5,
+    const { error } = await supabase.from('spc_performance_reports').insert({
+      date:                    form.date,
+      rep_name:                form.rep_name,
+      active_members_count:    form.active_members_count,
+      total_members_count:     form.total_members_count,
+      members_participated:    n(form.members_participated),
+      avg_daily_messages:      n(form.avg_daily_messages),
+      conversation_quality:    form.conversation_quality,
+      new_members:             n(form.new_members),
+      welcome_sent:            n(form.welcome_sent),
+      new_members_introduced:  n(form.new_members_introduced),
+      checkins_sent:           n(form.checkins_sent),
+      checkins_responded:      n(form.checkins_responded),
+      trials_expiring_today:   n(form.trials_expiring_today),
+      trials_converted:        n(form.trials_converted),
+      trials_contacted:        n(form.trials_contacted),
+      cancellation_requests:   n(form.cancellation_requests),
+      cancellations_retained:  n(form.cancellations_retained),
+      questions_total:         n(form.questions_total),
+      questions_answered_24h:  n(form.questions_answered_24h),
+      referrals_generated:     n(form.referrals_generated),
+      insights:                form.insights || null,
+      top_action:              form.top_action || null,
+      community_energy:        form.community_energy,
     })
     setSubmitting(false)
     if (error) {
-      toast.error(`Error saving: ${error.message}`)
+      toast.error(`Error al guardar: ${error.message}`)
     } else {
-      toast.success('Report saved successfully')
+      toast.success('Reporte guardado')
       router.push('/equipo/spc')
     }
   }
@@ -210,170 +258,195 @@ export default function NuevoReporteSpcPage() {
             className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Back to SPC Dashboard
+            Volver al dashboard SPC
           </Link>
         </div>
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Daily Closeout — Client Success SPC</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Community management daily activity log</p>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Reporte diario — Client Success SPC</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Registro de actividad de gestión comunitaria</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-0">
 
-          {/* Basic Info */}
+          {/* ── Sección 1: Información general ── */}
           <SectionCard>
-            <div className="grid grid-cols-3 gap-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-4">Información general</p>
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <FieldLabel>Date</FieldLabel>
-                <input
-                  type="date" value={form.date}
-                  onChange={(e) => set('date', e.target.value)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
-                />
-              </div>
-              <div>
-                <FieldLabel>SPC Rep</FieldLabel>
+                <FieldLabel>Rep SPC</FieldLabel>
                 <select
                   value={form.rep_name}
                   onChange={(e) => set('rep_name', e.target.value)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className={inputCls}
                 >
-                  <option value="">Select rep...</option>
+                  <option value="">Seleccionar rep…</option>
                   {repOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>
-                <FieldLabel>Hours worked</FieldLabel>
+                <FieldLabel>Fecha</FieldLabel>
                 <input
-                  type="number" min={0} step={0.5} value={form.hours_worked}
-                  onChange={(e) => set('hours_worked', e.target.value)}
-                  placeholder="0"
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => set('date', e.target.value)}
+                  className={inputCls}
                 />
               </div>
             </div>
-          </SectionCard>
-
-          {/* Community Metrics */}
-          <SectionCard>
-            <SectionHeader
-              color="bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"
-              label="🟢 COMMUNITY METRICS"
-              sub="Membership & engagement"
-            />
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FieldLabel>Community size</FieldLabel><NumberInput value={form.community_size} onChange={(v) => set('community_size', v)} /></div>
-              <div><FieldLabel>New members</FieldLabel><NumberInput value={form.new_members} onChange={(v) => set('new_members', v)} /></div>
-              <div><FieldLabel>Members welcomed</FieldLabel><NumberInput value={form.members_welcomed} onChange={(v) => set('members_welcomed', v)} /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><FieldLabel>Members introduced</FieldLabel><NumberInput value={form.members_introduced} onChange={(v) => set('members_introduced', v)} /></div>
-              <div><FieldLabel>Questions answered</FieldLabel><NumberInput value={form.questions_answered} onChange={(v) => set('questions_answered', v)} /></div>
-              <div><FieldLabel>Wins shared</FieldLabel><NumberInput value={form.wins_shared} onChange={(v) => set('wins_shared', v)} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadonlyField value={form.active_members_count} label="Miembros activos (auto)" />
+              <ReadonlyField value={form.total_members_count} label="Total miembros activos + trials (auto)" />
             </div>
           </SectionCard>
 
-          {/* Content & Activity */}
+          {/* ── Sección 2: Engagement ── */}
           <SectionCard>
             <SectionHeader
+              label="Engagement"
+              weight="Peso: 40%"
               color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-              label="🔵 CONTENT & ACTIVITY"
-              sub="Daily publishing"
             />
-            <div className="flex flex-wrap gap-3 mb-4">
-              <Toggle
-                checked={form.published_post}
-                onChange={(v) => set('published_post', v)}
-                label="Published a post today"
-              />
-              <Toggle
-                checked={form.sent_class_reminder}
-                onChange={(v) => set('sent_class_reminder', v)}
-                label="Sent class reminder"
-              />
-            </div>
-            {form.published_post && (
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <FieldLabel>Post type</FieldLabel>
-                <select
-                  value={form.post_type}
-                  onChange={(e) => set('post_type', e.target.value)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
-                >
-                  <option value="">Select type...</option>
-                  {POST_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <FieldLabel>Miembros que participaron activamente</FieldLabel>
+                <NumberInput value={form.members_participated} onChange={(v) => set('members_participated', v)} />
               </div>
-            )}
-          </SectionCard>
-
-          {/* Retention */}
-          <SectionCard>
-            <SectionHeader
-              color="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-              label="🔴 RETENTION"
-              sub="At-risk members & check-ins"
-            />
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div><FieldLabel>Inactive members identified</FieldLabel><NumberInput value={form.inactive_identified} onChange={(v) => set('inactive_identified', v)} /></div>
-              <div><FieldLabel>Check-in messages sent</FieldLabel><NumberInput value={form.checkin_messages_sent} onChange={(v) => set('checkin_messages_sent', v)} /></div>
-            </div>
-            <div className="flex flex-wrap gap-3 mb-4">
-              <Toggle
-                checked={form.parent_frustration}
-                onChange={(v) => set('parent_frustration', v)}
-                label="Parent frustration expressed"
-              />
-              <Toggle
-                checked={form.referral_mentioned}
-                onChange={(v) => set('referral_mentioned', v)}
-                label="Referral mentioned"
-              />
-            </div>
-            {form.parent_frustration && (
-              <div className="mb-3">
-                <FieldLabel>Frustration notes</FieldLabel>
-                <TextArea
-                  value={form.parent_frustration_notes}
-                  onChange={(v) => set('parent_frustration_notes', v)}
-                  placeholder="Describe the situation..."
-                />
-              </div>
-            )}
-            {form.referral_mentioned && (
               <div>
-                <FieldLabel>Referrals count</FieldLabel>
-                <NumberInput value={form.referrals_count} onChange={(v) => set('referrals_count', v)} />
+                <FieldLabel>Promedio de mensajes diarios</FieldLabel>
+                <NumberInput value={form.avg_daily_messages} onChange={(v) => set('avg_daily_messages', v)} />
               </div>
-            )}
-          </SectionCard>
-
-          {/* End of Day */}
-          <SectionCard>
-            <SectionHeader
-              color="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-              label="🟢 END OF DAY"
-              sub="Reflection & self-assessment"
-            />
-            <div className="mb-3">
-              <FieldLabel>Highs</FieldLabel>
-              <TextArea value={form.highs} onChange={(v) => set('highs', v)} placeholder="What went well today?" />
-            </div>
-            <div className="mb-4">
-              <FieldLabel>Lows</FieldLabel>
-              <TextArea value={form.lows} onChange={(v) => set('lows', v)} placeholder="What was challenging?" />
             </div>
             <div>
-              <FieldLabel>Performance score (1–10)</FieldLabel>
-              <div className="flex items-center gap-3 mt-1">
-                <input
-                  type="range" min={1} max={10}
-                  value={form.performance}
-                  onChange={(e) => set('performance', e.target.value)}
-                  className="flex-1 accent-blue-600"
-                />
-                <span className="text-lg font-bold text-zinc-900 dark:text-zinc-100 w-8 text-center">{form.performance}</span>
+              <FieldLabel>¿La conversación fue orgánica o impulsada?</FieldLabel>
+              <ScalePicker
+                value={form.conversation_quality}
+                onChange={(v) => set('conversation_quality', v)}
+                lowLabel="1 = Totalmente impulsada"
+                highLabel="5 = Totalmente orgánica"
+              />
+            </div>
+          </SectionCard>
+
+          {/* ── Sección 3: Activación ── */}
+          <SectionCard>
+            <SectionHeader
+              label="Activación"
+              weight="Peso: 20%"
+              color="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+            />
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div>
+                <FieldLabel>Nuevos miembros hoy</FieldLabel>
+                <NumberInput value={form.new_members} onChange={(v) => set('new_members', v)} />
               </div>
+              <div>
+                <FieldLabel>Bienvenidas personalizadas enviadas</FieldLabel>
+                <NumberInput value={form.welcome_sent} onChange={(v) => set('welcome_sent', v)} />
+              </div>
+              <div>
+                <FieldLabel>Nuevos miembros que se presentaron</FieldLabel>
+                <NumberInput value={form.new_members_introduced} onChange={(v) => set('new_members_introduced', v)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Check-ins a miembros inactivos +7 días</FieldLabel>
+                <NumberInput value={form.checkins_sent} onChange={(v) => set('checkins_sent', v)} />
+              </div>
+              <div>
+                <FieldLabel>Check-ins que generaron respuesta</FieldLabel>
+                <NumberInput value={form.checkins_responded} onChange={(v) => set('checkins_responded', v)} />
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ── Sección 4: Retención y conversión ── */}
+          <SectionCard>
+            <SectionHeader
+              label="Retención y conversión"
+              weight="Peso: 30%"
+              color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+            />
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div>
+                <FieldLabel>Trials que vencían hoy</FieldLabel>
+                <NumberInput value={form.trials_expiring_today} onChange={(v) => set('trials_expiring_today', v)} />
+              </div>
+              <div>
+                <FieldLabel>Trials convertidos a activos</FieldLabel>
+                <NumberInput value={form.trials_converted} onChange={(v) => set('trials_converted', v)} />
+              </div>
+              <div>
+                <FieldLabel>Trials contactados el día de vencimiento</FieldLabel>
+                <NumberInput value={form.trials_contacted} onChange={(v) => set('trials_contacted', v)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Solicitudes de cancelación hoy</FieldLabel>
+                <NumberInput value={form.cancellation_requests} onChange={(v) => set('cancellation_requests', v)} />
+              </div>
+              <div>
+                <FieldLabel>Miembros retenidos (evitaron cancelar)</FieldLabel>
+                <NumberInput value={form.cancellations_retained} onChange={(v) => set('cancellations_retained', v)} />
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ── Sección 5: Operación ── */}
+          <SectionCard>
+            <SectionHeader
+              label="Operación"
+              weight="Peso: 10%"
+              color="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <FieldLabel>Preguntas en la comunidad</FieldLabel>
+                <NumberInput value={form.questions_total} onChange={(v) => set('questions_total', v)} />
+              </div>
+              <div>
+                <FieldLabel>Respondidas en menos de 24h</FieldLabel>
+                <NumberInput value={form.questions_answered_24h} onChange={(v) => set('questions_answered_24h', v)} />
+              </div>
+              <div>
+                <FieldLabel>Referencias generadas</FieldLabel>
+                <NumberInput value={form.referrals_generated} onChange={(v) => set('referrals_generated', v)} />
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ── Sección 6: Insights cualitativos ── */}
+          <SectionCard>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-4">Insights cualitativos</p>
+            <div className="mb-4">
+              <FieldLabel>3 insights clave del día</FieldLabel>
+              <textarea
+                value={form.insights}
+                onChange={(e) => set('insights', e.target.value)}
+                placeholder="¿Qué observaste hoy en la comunidad?"
+                rows={3}
+                className={`${inputCls} resize-none`}
+              />
+            </div>
+            <div className="mb-4">
+              <FieldLabel>¿Qué acción tuvo más impacto hoy?</FieldLabel>
+              <textarea
+                value={form.top_action}
+                onChange={(e) => set('top_action', e.target.value)}
+                placeholder="Describe la acción más impactante…"
+                rows={2}
+                className={`${inputCls} resize-none`}
+              />
+            </div>
+            <div>
+              <FieldLabel>Nivel de energía de la comunidad (1–5)</FieldLabel>
+              <ScalePicker
+                value={form.community_energy}
+                onChange={(v) => set('community_energy', v)}
+                lowLabel="1 = Muy baja"
+                highLabel="5 = Muy alta"
+              />
             </div>
           </SectionCard>
 
@@ -381,10 +454,10 @@ export default function NuevoReporteSpcPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-              style={{ backgroundColor: '#1D9E75' }}
+              className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60 hover:opacity-90"
+              style={{ backgroundColor: '#185FA5' }}
             >
-              {submitting ? 'Saving...' : 'Save daily closeout'}
+              {submitting ? 'Guardando…' : 'Guardar reporte'}
             </button>
           </div>
         </form>

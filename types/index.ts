@@ -207,6 +207,34 @@ export interface StudentPaymentPlan {
   created_at: string
 }
 
+export interface SpcPerfReport {
+  id: string
+  date: string
+  rep_name: string
+  active_members_count: number
+  total_members_count: number
+  members_participated: number
+  avg_daily_messages: number
+  conversation_quality: number
+  new_members: number
+  welcome_sent: number
+  new_members_introduced: number
+  checkins_sent: number
+  checkins_responded: number
+  trials_expiring_today: number
+  trials_converted: number
+  trials_contacted: number
+  cancellation_requests: number
+  cancellations_retained: number
+  questions_total: number
+  questions_answered_24h: number
+  referrals_generated: number
+  insights: string | null
+  top_action: string | null
+  community_energy: number
+  created_at: string
+}
+
 export interface SpcReport {
   id: string
   date: string
