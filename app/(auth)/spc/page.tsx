@@ -10,7 +10,7 @@ import { RevenueBarChart } from '@/components/charts/RevenueBarChart'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { StatusPill } from '@/components/shared/StatusPill'
 import { formatCurrency, formatDate, daysUntil } from '@/lib/utils'
-import { SpcMember } from '@/types'
+import { SpcMember, SpcClassAttendance } from '@/types'
 import {
   Table,
   TableBody,
@@ -171,6 +171,14 @@ function isPaymentOverdue(dateStr: string, plan: 'monthly' | 'annual'): boolean 
   return plan === 'annual' ? days > 370 : days > 35
 }
 
+function leadScoreConfig(score: number | null | undefined): { dot: string; pill: string; label: string } {
+  if (!score || score === 0) return { dot: 'bg-zinc-300 dark:bg-zinc-600', pill: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400', label: 'No data' }
+  if (score >= 90) return { dot: 'bg-emerald-500', pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', label: 'Highly engaged' }
+  if (score >= 75) return { dot: 'bg-blue-500', pill: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', label: 'Engaged' }
+  if (score >= 60) return { dot: 'bg-amber-400', pill: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', label: 'At risk' }
+  return { dot: 'bg-red-500', pill: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300', label: 'Low engagement' }
+}
+
 function LastNoteCell({ lastNoteAt, onClick }: { lastNoteAt?: string; onClick: (e: React.MouseEvent) => void }) {
   if (!lastNoteAt) {
     return <span className="text-xs text-zinc-400 italic">No notes</span>
@@ -249,7 +257,9 @@ function MemberProfileModal({
   onSave,
   onSaveCancellation,
   memberTransactions,
+  memberAttendance,
   highlightNotes,
+  onMemberUpdate,
 }: {
   selected: SelectedMember
   notes: SpcMemberNote[]
@@ -261,7 +271,9 @@ function MemberProfileModal({
   onSave: (updated: SpcMember) => void
   onSaveCancellation: (updated: SpcCancellation) => void
   memberTransactions: Transaction[]
+  memberAttendance: SpcClassAttendance[]
   highlightNotes?: boolean
+  onMemberUpdate: (updated: SpcMember) => void
 }) {
   const supabase = useMemo(() => createClient(), [])
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
@@ -514,6 +526,16 @@ function MemberProfileModal({
             <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
               {displayProvider}
             </span>
+            {selected.kind === 'member' && (() => {
+              const score = selected.data.lead_score
+              const cfg = leadScoreConfig(score)
+              return (
+                <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold', cfg.pill)}>
+                  <span className={cn('w-1.5 h-1.5 rounded-full', cfg.dot)} />
+                  Score {score ?? 0}
+                </span>
+              )
+            })()}
           </div>
         </div>
         {/* Quick actions */}
@@ -925,7 +947,97 @@ function MemberProfileModal({
           </div>
         </div>
       </div>
+
+      {/* ── Attendance + WhatsApp (members only) ── */}
+      {selected.kind === 'member' && (
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-zinc-100 dark:border-zinc-800 pt-5">
+          {/* Attendance */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">
+              Class Attendance ({memberAttendance.length} {memberAttendance.length === 1 ? 'class' : 'classes'})
+            </p>
+            {memberAttendance.length === 0 ? (
+              <p className="text-xs text-zinc-400 italic">No ha asistido a ninguna clase</p>
+            ) : (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {memberAttendance.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between text-xs bg-zinc-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2">
+                    <span className="text-zinc-700 dark:text-zinc-300 font-medium">{formatDate(a.class_date)}</span>
+                    <span className="text-zinc-400">{a.duration_minutes} min</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* WhatsApp toggle */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">WhatsApp Community</p>
+            <WhatsAppToggle
+              member={selected.data}
+              onUpdate={onMemberUpdate}
+            />
+          </div>
+        </div>
+      )}
     </SpcModal>
+  )
+}
+
+function WhatsAppToggle({ member, onUpdate }: { member: SpcMember; onUpdate: (updated: SpcMember) => void }) {
+  const supabase = useMemo(() => createClient(), [])
+  const [toggling, setToggling] = useState(false)
+  const isActive = member.whatsapp_active ?? false
+
+  async function handleToggle() {
+    setToggling(true)
+    const nowIso = new Date().toISOString()
+    const { data, error } = await supabase
+      .from('spc_members')
+      .update({
+        whatsapp_active: !isActive,
+        whatsapp_joined_at: !isActive ? nowIso : member.whatsapp_joined_at,
+      })
+      .eq('id', member.id)
+      .select()
+      .single()
+    setToggling(false)
+    if (error) { toast.error('Failed to update WhatsApp status'); return }
+    onUpdate(data as SpcMember)
+    // Recalculate score for this member
+    fetch('/api/spc/recalculate-scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emails: [member.email?.toLowerCase()] }),
+    }).then(async (res) => {
+      if (res.ok) {
+        // Refresh member score from DB
+        const { data: refreshed } = await supabase.from('spc_members').select('*').eq('id', member.id).single()
+        if (refreshed) onUpdate(refreshed as SpcMember)
+      }
+    }).catch(() => {/* non-critical */})
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={handleToggle}
+        disabled={toggling}
+        className={cn(
+          'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all',
+          isActive
+            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
+            : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700',
+          toggling && 'opacity-60 cursor-not-allowed'
+        )}
+      >
+        <span className={cn('w-2 h-2 rounded-full', isActive ? 'bg-green-500' : 'bg-zinc-400')} />
+        {toggling ? 'Updating…' : isActive ? 'WhatsApp activo' : 'Sin acceso a WhatsApp'}
+      </button>
+      {isActive && member.whatsapp_joined_at && (
+        <p className="text-xs text-zinc-400">Joined: {formatDate(member.whatsapp_joined_at)}</p>
+      )}
+    </div>
   )
 }
 
@@ -945,6 +1057,52 @@ export default function SpcPage() {
   const [addingNote, setAddingNote] = useState(false)
   const [lastNoteByEmail, setLastNoteByEmail] = useState<Record<string, string>>({})
   const [highlightNotes, setHighlightNotes] = useState(false)
+
+  // ── Zoom CSV upload state ─────────────────────────────────────────────────
+  const [zoomModalOpen, setZoomModalOpen] = useState(false)
+  const [zoomCsvContent, setZoomCsvContent] = useState('')
+  const [zoomImporting, setZoomImporting] = useState(false)
+  const [zoomResult, setZoomResult] = useState<{ class_date?: string; total?: number; matched?: number; unmatched?: number; error?: string } | null>(null)
+
+  // ── Member attendance (loaded per modal open) ─────────────────────────────
+  const [memberAttendance, setMemberAttendance] = useState<SpcClassAttendance[]>([])
+
+  async function fetchAttendance(email: string) {
+    const { data } = await supabase
+      .from('spc_class_attendance')
+      .select('*')
+      .eq('member_email', email.toLowerCase())
+      .order('class_date', { ascending: false })
+    setMemberAttendance(data ?? [])
+  }
+
+  async function handleZoomImport() {
+    if (!zoomCsvContent.trim()) return
+    setZoomImporting(true)
+    setZoomResult(null)
+    try {
+      const res = await fetch('/api/spc/zoom-attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv: zoomCsvContent }),
+      })
+      const data = await res.json()
+      setZoomResult(data)
+      if (!data.error) {
+        toast.success(`Attendance uploaded: ${data.matched} matched members`)
+        // Refresh member scores
+        setMembers((prev) => prev.map((m) => m)) // trigger re-render after scores update
+        const membersRes = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+        if (membersRes.data) setMembers(membersRes.data)
+      } else {
+        toast.error(data.error)
+      }
+    } catch {
+      toast.error('Upload failed')
+    } finally {
+      setZoomImporting(false)
+    }
+  }
 
   // ── CSV upload state ──────────────────────────────────────────────────────
   const [csvModalOpen, setCsvModalOpen] = useState(false)
@@ -971,9 +1129,14 @@ export default function SpcPage() {
     setSelectedMember(member)
     setNoteText('')
     setHighlightNotes(focusNotes)
+    setMemberAttendance([])
     const email = member.data.email
-    if (email) fetchNotes(email)
-    else setNotes([])
+    if (email) {
+      fetchNotes(email)
+      if (member.kind === 'member') fetchAttendance(email)
+    } else {
+      setNotes([])
+    }
   }
 
   async function handleAddNote() {
@@ -1062,8 +1225,14 @@ export default function SpcPage() {
     .slice(0, 10)
 
   // ── Members ───────────────────────────────────────────────────────────────
-  const activeMembers = members.filter((m) => m.status === 'active')
-  const trialMembers = members.filter((m) => m.status === 'trial')
+  const activeMembers = useMemo(
+    () => [...members.filter((m) => m.status === 'active')].sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0)),
+    [members]
+  )
+  const trialMembers = useMemo(
+    () => members.filter((m) => m.status === 'trial'),
+    [members]
+  )
 
   const mrr = activeMembers.reduce(
     (s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount),
@@ -1096,11 +1265,7 @@ export default function SpcPage() {
     .filter((m) => m.trial_end_date && daysUntil(m.trial_end_date) <= 14)
     .sort((a, b) => daysUntil(a.trial_end_date!) - daysUntil(b.trial_end_date!))
 
-  const sortedTrials = [...trialMembers].sort((a, b) => {
-    const da = a.trial_end_date ? daysUntil(a.trial_end_date) : 9999
-    const db = b.trial_end_date ? daysUntil(b.trial_end_date) : 9999
-    return da - db
-  })
+  const sortedTrials = [...trialMembers].sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0))
 
   // ── Cancellation metrics ─────────────────────────────────────────────────
   const paidCancels = cancellations.filter(isPaidCancel)
@@ -1309,7 +1474,14 @@ export default function SpcPage() {
               )
             })}
           </nav>
-          <div className="pb-2 shrink-0">
+          <div className="pb-2 shrink-0 flex items-center gap-2">
+            <button
+              onClick={() => { setZoomModalOpen(true); setZoomCsvContent(''); setZoomResult(null) }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 bg-violet-600"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Upload Zoom Class
+            </button>
             <button
               onClick={() => setCsvModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
@@ -1724,6 +1896,7 @@ export default function SpcPage() {
                         <TableHead className="hidden md:table-cell">Joined</TableHead>
                         <TableHead className="hidden md:table-cell">Last Payment</TableHead>
                         <TableHead className="hidden md:table-cell">Next Payment</TableHead>
+                        <TableHead className="hidden lg:table-cell">Score</TableHead>
                         <TableHead className="hidden lg:table-cell">Last Note</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
@@ -1767,6 +1940,17 @@ export default function SpcPage() {
                             })()}
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{calcNextPayment(transactionsByEmail[(m.email ?? '').toLowerCase()], m.plan)}</TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {(() => {
+                              const cfg = leadScoreConfig(m.lead_score)
+                              return (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span className={cn('w-2 h-2 rounded-full shrink-0', cfg.dot)} />
+                                  <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{m.lead_score ?? 0}</span>
+                                </span>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
                             <LastNoteCell
                               lastNoteAt={lastNoteByEmail[(m.email ?? '').toLowerCase()]}
@@ -1828,6 +2012,7 @@ export default function SpcPage() {
                           <TableHead>Expires</TableHead>
                           <TableHead>Days Left</TableHead>
                           <TableHead className="hidden md:table-cell">Payment Method</TableHead>
+                          <TableHead className="hidden lg:table-cell">Score</TableHead>
                           <TableHead className="hidden lg:table-cell">Last Note</TableHead>
                         </AnimatedTableRow>
                       </TableHeader>
@@ -1853,6 +2038,17 @@ export default function SpcPage() {
                             </TableCell>
                             <TableCell>{trialUrgencyPill(m)}</TableCell>
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              {(() => {
+                                const cfg = leadScoreConfig(m.lead_score)
+                                return (
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <span className={cn('w-2 h-2 rounded-full shrink-0', cfg.dot)} />
+                                    <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{m.lead_score ?? 0}</span>
+                                  </span>
+                                )
+                              })()}
+                            </TableCell>
                             <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
                               <LastNoteCell
                                 lastNoteAt={lastNoteByEmail[(m.email ?? '').toLowerCase()]}
@@ -2104,6 +2300,54 @@ export default function SpcPage() {
         )}
       </div>
 
+      {/* ── Zoom Class Upload Modal ── */}
+      {zoomModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setZoomModalOpen(false)} />
+          <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-lg border border-zinc-200 dark:border-zinc-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Upload Zoom Class Attendance</h3>
+              <button onClick={() => setZoomModalOpen(false)} className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+              Paste the Zoom participant CSV exported from your Zoom account. Required columns: <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Name (original name)</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Email</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Join time</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Duration (minutes)</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Guest</span>.
+            </p>
+            <textarea
+              value={zoomCsvContent}
+              onChange={(e) => { setZoomCsvContent(e.target.value); setZoomResult(null) }}
+              placeholder="Paste Zoom CSV here…"
+              rows={8}
+              className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none font-mono mb-3"
+            />
+            {zoomResult && !zoomResult.error && (
+              <div className="mb-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 text-xs text-emerald-800 dark:text-emerald-300">
+                <p className="font-semibold mb-0.5">Uploaded — Class date: {zoomResult.class_date}</p>
+                <p>{zoomResult.total} rows · {zoomResult.matched} matched members · {zoomResult.unmatched} unmatched</p>
+              </div>
+            )}
+            {zoomResult?.error && (
+              <div className="mb-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-xs text-red-700 dark:text-red-300">
+                {zoomResult.error}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setZoomModalOpen(false)} className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                Close
+              </button>
+              <button
+                onClick={handleZoomImport}
+                disabled={!zoomCsvContent.trim() || zoomImporting}
+                className="px-4 py-2 text-xs rounded-lg bg-violet-600 text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+              >
+                {zoomImporting ? 'Uploading…' : 'Upload Attendance'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── CSV Import Modal ── */}
       {csvModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2271,7 +2515,12 @@ export default function SpcPage() {
               ? (transactionsByEmail[(selectedMember.data.email ?? '').toLowerCase()] ?? [])
               : []
           }
+          memberAttendance={memberAttendance}
           highlightNotes={highlightNotes}
+          onMemberUpdate={(updated) => {
+            setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
+            setSelectedMember({ kind: 'member', data: updated })
+          }}
           onSave={(updated) => {
             if (!updated) return
             setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))

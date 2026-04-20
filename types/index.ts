@@ -65,6 +65,19 @@ export interface SpcMember {
   trial_end_date: string | null
   trial_days: number | null
   created_at: string
+  whatsapp_active?: boolean | null
+  whatsapp_joined_at?: string | null
+  lead_score?: number | null
+}
+
+export interface SpcClassAttendance {
+  id: string
+  member_email: string
+  member_name: string | null
+  class_date: string
+  join_time: string | null
+  duration_minutes: number
+  created_at: string
 }
 
 export interface KPIData {
