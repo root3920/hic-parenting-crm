@@ -28,6 +28,7 @@ type Preset = '7d' | '30d' | '90d' | 'todo' | 'custom'
 interface CallSummary {
   id: string
   status: string
+  call_status: string | null
   start_date: string
   closer_name: string
 }
@@ -202,7 +203,7 @@ export default function CloserDashboardPage() {
         .order('date', { ascending: false }),
       supabase
         .from('calls')
-        .select('id, status, start_date, closer_name')
+        .select('id, status, call_status, start_date, closer_name')
         .gte('start_date', fromDate)
         .lte('start_date', toDate + 'T23:59:59'),
     ])
@@ -246,9 +247,23 @@ export default function CloserDashboardPage() {
 
   const callKPIs = useMemo(() => {
     const totalMeetings = callsFiltered.length
-    const showedUp = callsFiltered.filter(c => c.status === 'Showed Up').length
-    const noShows = callsFiltered.filter(c => c.status === 'No show').length
-    const cancelled = callsFiltered.filter(c => c.status === 'Cancelled').length
+
+    // Use call_status (manually marked by team) when available, fall back to status.
+    // Both fields may use different casing ('No show' vs 'No Show'), so compare lowercase.
+    const effectiveStatus = (c: CallSummary) => (c.call_status ?? c.status ?? '').toLowerCase()
+
+    const showedUp = callsFiltered.filter(c => effectiveStatus(c) === 'showed up').length
+    const noShows  = callsFiltered.filter(c => effectiveStatus(c) === 'no show').length
+    const cancelled = callsFiltered.filter(c => effectiveStatus(c) === 'cancelled').length
+
+    // Debug: log unique status combos so mismatches are visible in the console
+    if (process.env.NODE_ENV !== 'production') {
+      const uniq = Array.from(new Set(callsFiltered.map(c => `status="${c.status}" call_status="${c.call_status}"`)))
+      console.debug('[Closer] Call status values:', uniq)
+      console.debug(`[Closer] showedUp=${showedUp} noShows=${noShows} cancelled=${cancelled} total=${totalMeetings}`)
+      console.debug(`[Closer] showRate=${showedUp}/(${showedUp}+${noShows}) = ${safeDiv(showedUp, showedUp + noShows) * 100}%`)
+    }
+
     const showRate = safeDiv(showedUp, showedUp + noShows) * 100
     const callsPerWeek = safeDiv(totalMeetings, rangeDays / 7)
     return { totalMeetings, showedUp, noShows, cancelled, showRate, callsPerWeek }
