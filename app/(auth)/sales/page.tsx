@@ -352,11 +352,11 @@ export default function SalesPage() {
       (t.offer_title ?? '').toLowerCase().includes(q)
   )
 
-  // Active = non-refunded; used for all revenue calculations
-  const active = transactions.filter((t) => t.status !== 'refunded')
+  // Active = completed or recovered; failed/refunded never count toward revenue
+  const active = transactions.filter((t) => t.status === 'completed' || t.status === 'recovered')
   const refunded = transactions.filter((t) => t.status === 'refunded')
 
-  const grossRevenue = transactions.reduce((s, t) => s + (Number(t.cost) || 0), 0)
+  const grossRevenue = active.reduce((s, t) => s + (Number(t.cost) || 0), 0)
   const refundedAmount = refunded.reduce((s, t) => s + (Number(t.cost) || 0), 0)
   const totalRevenue = grossRevenue - refundedAmount
   const avgTicket = active.length > 0 ? totalRevenue / active.length : 0

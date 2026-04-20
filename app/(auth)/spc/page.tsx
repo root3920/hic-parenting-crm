@@ -132,13 +132,15 @@ function formatDateTime(d: string | null) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-function calcNextPayment(txList: Transaction[] | undefined, plan: 'monthly' | 'annual' | null | undefined): string {
-  if (!txList || txList.length === 0) return '—'
-  const completed = txList.filter((t) => (t.status ?? 'completed') === 'completed')
-  if (completed.length === 0) return '—'
-  // txList is sorted descending — first completed entry is most recent
-  const latest = completed[0]
-  const d = new Date(latest.date + 'T12:00:00')
+function calcNextPayment(
+  txList: Transaction[] | undefined,
+  plan: 'monthly' | 'annual' | null | undefined,
+  fallbackDate?: string | null,
+): string {
+  const completed = (txList ?? []).filter((t) => (t.status ?? 'completed') === 'completed')
+  const anchorStr = completed.length > 0 ? completed[0].date : fallbackDate
+  if (!anchorStr) return '—'
+  const d = new Date(anchorStr + 'T12:00:00')
   if (plan === 'annual') {
     d.setFullYear(d.getFullYear() + 1)
   } else {
@@ -175,7 +177,6 @@ interface MemberEditForm {
   phone: string
   plan: 'monthly' | 'annual'
   provider: 'Kajabi' | 'Stripe' | 'PayPal'
-  next_payment_date: string
   joined_at: string
   status: MemberStatus
 }
@@ -233,7 +234,7 @@ function MemberProfileModal({
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState<MemberEditForm>({
     name: '', email: '', phone: '', plan: 'monthly',
-    provider: 'Stripe', next_payment_date: '', joined_at: '', status: 'active',
+    provider: 'Stripe', joined_at: '', status: 'active',
   })
   const [cancelForm, setCancelForm] = useState<CancelEditForm>({
     name: '', email: '', customer_phone: '', cancel_type: 'paid_cancel',
@@ -257,7 +258,6 @@ function MemberProfileModal({
       phone: m.phone ?? '',
       plan: m.plan,
       provider: m.provider,
-      next_payment_date: m.next_payment_date ?? '',
       joined_at: m.joined_at ?? '',
       status: (m.status as MemberStatus) ?? 'active',
     })
@@ -292,7 +292,6 @@ function MemberProfileModal({
           email: editForm.email,
           plan: editForm.plan,
           provider: editForm.provider,
-          next_payment_date: editForm.next_payment_date || null,
           joined_at: editForm.joined_at || null,
           status: editForm.status,
         })
@@ -790,15 +789,9 @@ function MemberProfileModal({
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Member since</label>
-                    <input type="date" value={editForm.joined_at} onChange={(e) => setField('joined_at', e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Next Payment</label>
-                    <input type="date" value={editForm.next_payment_date} onChange={(e) => setField('next_payment_date', e.target.value)} className={inputCls} />
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Member since</label>
+                  <input type="date" value={editForm.joined_at} onChange={(e) => setField('joined_at', e.target.value)} className={inputCls} />
                 </div>
               </div>
 
