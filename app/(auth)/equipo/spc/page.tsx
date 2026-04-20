@@ -82,10 +82,10 @@ function calcMetrics(r: SpcPerfReport): Metrics {
 }
 
 function scoreBadge(score: number): { label: string; cls: string } {
-  if (score >= 90) return { label: 'Excelente', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' }
-  if (score >= 75) return { label: 'Buena', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' }
-  if (score >= 60) return { label: 'Riesgo', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
-  return { label: 'Peligro', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }
+  if (score >= 90) return { label: 'Excellent', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' }
+  if (score >= 75) return { label: 'Good', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' }
+  if (score >= 60) return { label: 'At Risk', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
+  return { label: 'Danger', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }
 }
 
 function scoreColor(score: number): string {
@@ -133,7 +133,7 @@ function MainKpiCard({
     : isWarning
     ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
     : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-  const statusLabel = isGood ? 'Meta lograda' : isWarning ? 'Por mejorar' : 'Alerta'
+  const statusLabel = isGood ? 'Goal met' : isWarning ? 'Needs improvement' : 'Alert'
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 flex flex-col gap-2">
@@ -194,49 +194,49 @@ function DetailRow({ r, m }: { r: SpcPerfReport; m: Metrics }) {
       {/* Engagement */}
       <div>
         <p className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-2">Engagement</p>
-        <Pair label="Participaron" value={r.members_participated} />
-        <Pair label="Activos totales" value={r.active_members_count} />
+        <Pair label="Participated" value={r.members_participated} />
+        <Pair label="Total active" value={r.active_members_count} />
         <Pair label="% Engagement" value={`${m.pctEngagement}%`} />
-        <Pair label="Mensajes/día" value={r.avg_daily_messages} />
-        <Pair label="Calidad conv." value={`${r.conversation_quality}/5`} />
+        <Pair label="Messages/day" value={r.avg_daily_messages} />
+        <Pair label="Conv. quality" value={`${r.conversation_quality}/5`} />
       </div>
-      {/* Activación + Retención */}
+      {/* Activation + Retention */}
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-green-600 dark:text-green-400 mb-2">Activación</p>
-        <Pair label="Nuevos" value={r.new_members} />
-        <Pair label="Bienvenidas enviadas" value={r.welcome_sent} />
-        <Pair label="Se presentaron" value={r.new_members_introduced} />
-        <Pair label="% Bienvenida" value={`${m.pctBienvenida}%`} />
-        <Pair label="Check-ins enviados" value={r.checkins_sent} />
-        <Pair label="% Reactivación" value={`${m.pctReactivacion}%`} />
+        <p className="text-xs font-bold uppercase tracking-wide text-green-600 dark:text-green-400 mb-2">Activation</p>
+        <Pair label="New members" value={r.new_members} />
+        <Pair label="Welcomes sent" value={r.welcome_sent} />
+        <Pair label="Introduced themselves" value={r.new_members_introduced} />
+        <Pair label="% Welcome" value={`${m.pctBienvenida}%`} />
+        <Pair label="Check-ins sent" value={r.checkins_sent} />
+        <Pair label="% Reactivation" value={`${m.pctReactivacion}%`} />
       </div>
-      {/* Trials + Operación */}
+      {/* Trials + Operations */}
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-2">Retención · Operación</p>
-        <Pair label="Trials venciendo" value={r.trials_expiring_today} />
-        <Pair label="Trials convertidos" value={r.trials_converted} />
-        <Pair label="% Conv. Trial" value={`${m.pctConvTrial}%`} />
-        <Pair label="Cancel. solicitadas" value={r.cancellation_requests} />
-        <Pair label="Retenidos" value={r.cancellations_retained} />
-        <Pair label="% Retención" value={`${m.pctRetencion}%`} />
-        <Pair label="Preguntas" value={r.questions_total} />
-        <Pair label="Resp. <24h" value={r.questions_answered_24h} />
-        <Pair label="% Respuesta" value={`${m.pctRespuesta}%`} />
-        <Pair label="Referencias" value={r.referrals_generated} />
-        <Pair label="Energía comunidad" value={`${r.community_energy}/5`} />
+        <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-2">Retention · Operations</p>
+        <Pair label="Trials expiring" value={r.trials_expiring_today} />
+        <Pair label="Trials converted" value={r.trials_converted} />
+        <Pair label="% Trial Conv." value={`${m.pctConvTrial}%`} />
+        <Pair label="Cancel. requests" value={r.cancellation_requests} />
+        <Pair label="Retained" value={r.cancellations_retained} />
+        <Pair label="% Retention" value={`${m.pctRetencion}%`} />
+        <Pair label="Questions" value={r.questions_total} />
+        <Pair label="Answered <24h" value={r.questions_answered_24h} />
+        <Pair label="% Response" value={`${m.pctRespuesta}%`} />
+        <Pair label="Referrals" value={r.referrals_generated} />
+        <Pair label="Community energy" value={`${r.community_energy}/5`} />
       </div>
       {/* Insights */}
       {(r.insights || r.top_action) && (
         <div className="md:col-span-3 border-t border-zinc-200 dark:border-zinc-700 pt-3">
           {r.insights && (
             <div className="mb-2">
-              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Insights clave</p>
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Key insights</p>
               <p className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">{r.insights}</p>
             </div>
           )}
           {r.top_action && (
             <div>
-              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Acción más impactante</p>
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Most impactful action</p>
               <p className="text-xs text-zinc-700 dark:text-zinc-300">{r.top_action}</p>
             </div>
           )}
@@ -339,7 +339,7 @@ export default function SpcPerfDashboard() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Client Success — SPC" description="Performance diario de gestión comunitaria">
+        <PageHeader title="Client Success — SPC" description="Daily community management performance">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
@@ -370,7 +370,7 @@ export default function SpcPerfDashboard() {
               style={{ backgroundColor: '#185FA5' }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Nuevo reporte
+              New report
             </Link>
           </div>
         </PageHeader>
@@ -386,53 +386,53 @@ export default function SpcPerfDashboard() {
           </div>
         ) : reports.length === 0 ? (
           <EmptyState
-            title="Sin reportes en este período"
-            description="Crea el primer reporte SPC para ver métricas aquí."
+            title="No reports in this period"
+            description="Create the first SPC report to see metrics here."
             icon={<Plus className="h-10 w-10" />}
           />
         ) : (
           <>
             {/* ── KPIs Principales (5) ── */}
             <div className="mb-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">KPIs Principales</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Main KPIs</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
               <MainKpiCard
-                label="% Engagement Semanal"
+                label="% Weekly Engagement"
                 value={kpis?.avgEngSemanal ?? 0}
                 unit="%"
-                sub="activos / total miembros"
+                sub="active / total members"
                 meta={25}
                 alert={15}
               />
               <MainKpiCard
-                label="Mensajes Diarios"
+                label="Daily Messages"
                 value={kpis?.avgMessages ?? 0}
-                sub="promedio del período"
+                sub="period average"
                 meta={20}
                 alert={10}
               />
               <MainKpiCard
-                label="% Reactivación Inactivos"
+                label="% Inactive Reactivation"
                 value={kpis?.avgReact ?? 0}
                 unit="%"
-                sub="check-ins respondidos"
+                sub="check-ins responded"
                 meta={20}
                 alert={10}
               />
               <MainKpiCard
-                label="% Conv. Trial"
+                label="% Trial Conversion"
                 value={kpis?.avgConv ?? 0}
                 unit="%"
-                sub="trials convertidos"
+                sub="trials converted"
                 meta={60}
                 alert={40}
               />
               <MainKpiCard
-                label="% Retención Cancelaciones"
+                label="% Cancellation Retention"
                 value={kpis?.avgRet ?? 0}
                 unit="%"
-                sub="miembros retenidos"
+                sub="members retained"
                 meta={15}
                 alert={8}
               />
@@ -440,31 +440,31 @@ export default function SpcPerfDashboard() {
 
             {/* ── KPIs Secundarios ── */}
             <div className="mb-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Métricas secundarias</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Secondary Metrics</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <KpiCard
-                label="Score final promedio"
+                label="Average Final Score"
                 value={kpis ? String(kpis.avgScore) : '—'}
                 sub={kpis ? scoreBadge(kpis.avgScore).label : undefined}
                 color={kpis ? scoreColor(kpis.avgScore) : undefined}
               />
               <KpiCard
-                label="% Respuesta <24h"
+                label="% Response <24h"
                 value={kpis ? `${kpis.avgResp}%` : '—'}
-                sub="preguntas respondidas"
+                sub="questions answered"
                 color="text-purple-600 dark:text-purple-400"
               />
               <KpiCard
-                label="Referencias totales"
+                label="Total Referrals"
                 value={kpis ? String(kpis.totalRefs) : '—'}
-                sub="en el período"
+                sub="in the period"
                 color="text-indigo-600 dark:text-indigo-400"
               />
               <KpiCard
-                label="Energía comunidad"
+                label="Community Energy"
                 value={kpis ? `${kpis.avgEnergy}/5` : '—'}
-                sub="promedio del período"
+                sub="period average"
                 color={kpis && parseFloat(kpis.avgEnergy) >= 4 ? 'text-green-600 dark:text-green-400' : parseFloat(kpis?.avgEnergy ?? '0') >= 3 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}
               />
             </div>
@@ -474,7 +474,7 @@ export default function SpcPerfDashboard() {
               {/* Score trend */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Score final</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Final Score</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={200}>
@@ -492,7 +492,7 @@ export default function SpcPerfDashboard() {
               {/* Multi-metric lines */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Engagement · Reactivación · Conv. Trial</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Engagement · Reactivation · Trial Conv.</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={200}>
@@ -503,7 +503,7 @@ export default function SpcPerfDashboard() {
                       <Tooltip formatter={(v, name) => [`${v}%`, name]} contentStyle={{ fontSize: 11 }} />
                       <Legend formatter={(v) => <span className="text-xs">{v}</span>} iconSize={8} />
                       <Line type="monotone" dataKey="engagement" name="Engagement" stroke="#185FA5" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="reactivacion" name="Reactivación" stroke="#3B6D11" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="reactivacion" name="Reactivation" stroke="#3B6D11" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="convTrial" name="Conv. Trial" stroke="#BA7517" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -513,7 +513,7 @@ export default function SpcPerfDashboard() {
               {/* Retención bar */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Retención de cancelaciones (%)</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Cancellation Retention (%)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={200}>
@@ -522,7 +522,7 @@ export default function SpcPerfDashboard() {
                       <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <Tooltip formatter={(v) => [`${v}%`, 'Retención']} contentStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="retencion" name="Retención" fill="#1D9E75" radius={[3, 3, 0, 0]} maxBarSize={36} />
+                      <Bar dataKey="retencion" name="Retention" fill="#1D9E75" radius={[3, 3, 0, 0]} maxBarSize={36} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -532,14 +532,14 @@ export default function SpcPerfDashboard() {
             {/* ── Reports table ── */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Historial de reportes</CardTitle>
+                <CardTitle className="text-sm font-semibold">Report History</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['Fecha', 'Rep', 'Score', 'Engagement', 'Reactivación', 'Conv. Trial', 'Retención', 'Energía', ''].map((h) => (
+                        {['Date', 'Rep', 'Score', 'Engagement', 'Reactivation', 'Trial Conv.', 'Retention', 'Energy', ''].map((h) => (
                           <th key={h} className="px-4 py-3 text-left font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
@@ -575,7 +575,7 @@ export default function SpcPerfDashboard() {
                                   onClick={() => setExpandedId(expanded ? null : r.id)}
                                   className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                                 >
-                                  {expanded ? 'Cerrar' : 'Ver'}
+                                  {expanded ? 'Close' : 'View'}
                                   {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                                 </button>
                               </td>
@@ -596,7 +596,7 @@ export default function SpcPerfDashboard() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
                     <p className="text-xs text-zinc-400">
-                      {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, allMetrics.length)} de {allMetrics.length}
+                      {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, allMetrics.length)} of {allMetrics.length}
                     </p>
                     <div className="flex items-center gap-1">
                       <button

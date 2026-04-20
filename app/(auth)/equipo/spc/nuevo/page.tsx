@@ -211,7 +211,7 @@ export default function NuevoSpcPerfPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.date || !form.rep_name) {
-      toast.error('Fecha y rep son obligatorios')
+      toast.error('Date and rep are required')
       return
     }
     setSubmitting(true)
@@ -242,9 +242,9 @@ export default function NuevoSpcPerfPage() {
     })
     setSubmitting(false)
     if (error) {
-      toast.error(`Error al guardar: ${error.message}`)
+      toast.error(`Error saving: ${error.message}`)
     } else {
-      toast.success('Reporte guardado')
+      toast.success('Report saved')
       router.push('/equipo/spc')
     }
   }
@@ -258,33 +258,33 @@ export default function NuevoSpcPerfPage() {
             className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Volver al dashboard SPC
+            Back to SPC dashboard
           </Link>
         </div>
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Reporte diario — Client Success SPC</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Registro de actividad de gestión comunitaria</p>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Daily Report — Client Success SPC</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Community management activity log</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-0">
 
           {/* ── Sección 1: Información general ── */}
           <SectionCard>
-            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-4">Información general</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-4">General Information</p>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <FieldLabel>Rep SPC</FieldLabel>
+                <FieldLabel>SPC Rep</FieldLabel>
                 <select
                   value={form.rep_name}
                   onChange={(e) => set('rep_name', e.target.value)}
                   className={inputCls}
                 >
-                  <option value="">Seleccionar rep…</option>
+                  <option value="">Select rep…</option>
                   {repOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>
-                <FieldLabel>Fecha</FieldLabel>
+                <FieldLabel>Date</FieldLabel>
                 <input
                   type="date"
                   value={form.date}
@@ -294,8 +294,8 @@ export default function NuevoSpcPerfPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <ReadonlyField value={form.active_members_count} label="Miembros activos (auto)" />
-              <ReadonlyField value={form.total_members_count} label="Total miembros activos + trials (auto)" />
+              <ReadonlyField value={form.active_members_count} label="Active members (auto)" />
+              <ReadonlyField value={form.total_members_count} label="Total active + trial members (auto)" />
             </div>
           </SectionCard>
 
@@ -303,26 +303,26 @@ export default function NuevoSpcPerfPage() {
           <SectionCard>
             <SectionHeader
               label="Engagement"
-              weight="Peso: 40%"
+              weight="Weight: 40%"
               color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
             />
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <FieldLabel>Miembros que participaron activamente</FieldLabel>
+                <FieldLabel>Members who actively participated</FieldLabel>
                 <NumberInput value={form.members_participated} onChange={(v) => set('members_participated', v)} />
               </div>
               <div>
-                <FieldLabel>Promedio de mensajes diarios</FieldLabel>
+                <FieldLabel>Average daily messages</FieldLabel>
                 <NumberInput value={form.avg_daily_messages} onChange={(v) => set('avg_daily_messages', v)} />
               </div>
             </div>
             <div>
-              <FieldLabel>¿La conversación fue orgánica o impulsada?</FieldLabel>
+              <FieldLabel>Was the conversation organic or driven?</FieldLabel>
               <ScalePicker
                 value={form.conversation_quality}
                 onChange={(v) => set('conversation_quality', v)}
-                lowLabel="1 = Totalmente impulsada"
-                highLabel="5 = Totalmente orgánica"
+                lowLabel="1 = Fully driven"
+                highLabel="5 = Fully organic"
               />
             </div>
           </SectionCard>
@@ -330,31 +330,31 @@ export default function NuevoSpcPerfPage() {
           {/* ── Sección 3: Activación ── */}
           <SectionCard>
             <SectionHeader
-              label="Activación"
-              weight="Peso: 20%"
+              label="Activation"
+              weight="Weight: 20%"
               color="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div>
-                <FieldLabel>Nuevos miembros hoy</FieldLabel>
+                <FieldLabel>New members today</FieldLabel>
                 <NumberInput value={form.new_members} onChange={(v) => set('new_members', v)} />
               </div>
               <div>
-                <FieldLabel>Bienvenidas personalizadas enviadas</FieldLabel>
+                <FieldLabel>Personalized welcomes sent</FieldLabel>
                 <NumberInput value={form.welcome_sent} onChange={(v) => set('welcome_sent', v)} />
               </div>
               <div>
-                <FieldLabel>Nuevos miembros que se presentaron</FieldLabel>
+                <FieldLabel>New members who introduced themselves</FieldLabel>
                 <NumberInput value={form.new_members_introduced} onChange={(v) => set('new_members_introduced', v)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <FieldLabel>Check-ins a miembros inactivos +7 días</FieldLabel>
+                <FieldLabel>Check-ins to inactive members +7 days</FieldLabel>
                 <NumberInput value={form.checkins_sent} onChange={(v) => set('checkins_sent', v)} />
               </div>
               <div>
-                <FieldLabel>Check-ins que generaron respuesta</FieldLabel>
+                <FieldLabel>Check-ins that generated a response</FieldLabel>
                 <NumberInput value={form.checkins_responded} onChange={(v) => set('checkins_responded', v)} />
               </div>
             </div>
@@ -363,31 +363,31 @@ export default function NuevoSpcPerfPage() {
           {/* ── Sección 4: Retención y conversión ── */}
           <SectionCard>
             <SectionHeader
-              label="Retención y conversión"
-              weight="Peso: 30%"
+              label="Retention & Conversion"
+              weight="Weight: 30%"
               color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div>
-                <FieldLabel>Trials que vencían hoy</FieldLabel>
+                <FieldLabel>Trials expiring today</FieldLabel>
                 <NumberInput value={form.trials_expiring_today} onChange={(v) => set('trials_expiring_today', v)} />
               </div>
               <div>
-                <FieldLabel>Trials convertidos a activos</FieldLabel>
+                <FieldLabel>Trials converted to active</FieldLabel>
                 <NumberInput value={form.trials_converted} onChange={(v) => set('trials_converted', v)} />
               </div>
               <div>
-                <FieldLabel>Trials contactados el día de vencimiento</FieldLabel>
+                <FieldLabel>Trials contacted on expiration day</FieldLabel>
                 <NumberInput value={form.trials_contacted} onChange={(v) => set('trials_contacted', v)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <FieldLabel>Solicitudes de cancelación hoy</FieldLabel>
+                <FieldLabel>Cancellation requests today</FieldLabel>
                 <NumberInput value={form.cancellation_requests} onChange={(v) => set('cancellation_requests', v)} />
               </div>
               <div>
-                <FieldLabel>Miembros retenidos (evitaron cancelar)</FieldLabel>
+                <FieldLabel>Members retained (avoided cancelling)</FieldLabel>
                 <NumberInput value={form.cancellations_retained} onChange={(v) => set('cancellations_retained', v)} />
               </div>
             </div>
@@ -396,21 +396,21 @@ export default function NuevoSpcPerfPage() {
           {/* ── Sección 5: Operación ── */}
           <SectionCard>
             <SectionHeader
-              label="Operación"
-              weight="Peso: 10%"
+              label="Operations"
+              weight="Weight: 10%"
               color="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
             />
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <FieldLabel>Preguntas en la comunidad</FieldLabel>
+                <FieldLabel>Questions in the community</FieldLabel>
                 <NumberInput value={form.questions_total} onChange={(v) => set('questions_total', v)} />
               </div>
               <div>
-                <FieldLabel>Respondidas en menos de 24h</FieldLabel>
+                <FieldLabel>Answered within 24h</FieldLabel>
                 <NumberInput value={form.questions_answered_24h} onChange={(v) => set('questions_answered_24h', v)} />
               </div>
               <div>
-                <FieldLabel>Referencias generadas</FieldLabel>
+                <FieldLabel>Referrals generated</FieldLabel>
                 <NumberInput value={form.referrals_generated} onChange={(v) => set('referrals_generated', v)} />
               </div>
             </div>
@@ -418,34 +418,34 @@ export default function NuevoSpcPerfPage() {
 
           {/* ── Sección 6: Insights cualitativos ── */}
           <SectionCard>
-            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-4">Insights cualitativos</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-4">Qualitative Insights</p>
             <div className="mb-4">
-              <FieldLabel>3 insights clave del día</FieldLabel>
+              <FieldLabel>3 key insights from today</FieldLabel>
               <textarea
                 value={form.insights}
                 onChange={(e) => set('insights', e.target.value)}
-                placeholder="¿Qué observaste hoy en la comunidad?"
+                placeholder="What did you observe today in the community?"
                 rows={3}
                 className={`${inputCls} resize-none`}
               />
             </div>
             <div className="mb-4">
-              <FieldLabel>¿Qué acción tuvo más impacto hoy?</FieldLabel>
+              <FieldLabel>Which action had the most impact today?</FieldLabel>
               <textarea
                 value={form.top_action}
                 onChange={(e) => set('top_action', e.target.value)}
-                placeholder="Describe la acción más impactante…"
+                placeholder="Describe the most impactful action…"
                 rows={2}
                 className={`${inputCls} resize-none`}
               />
             </div>
             <div>
-              <FieldLabel>Nivel de energía de la comunidad (1–5)</FieldLabel>
+              <FieldLabel>Community energy level (1–5)</FieldLabel>
               <ScalePicker
                 value={form.community_energy}
                 onChange={(v) => set('community_energy', v)}
-                lowLabel="1 = Muy baja"
-                highLabel="5 = Muy alta"
+                lowLabel="1 = Very low"
+                highLabel="5 = Very high"
               />
             </div>
           </SectionCard>
@@ -457,7 +457,7 @@ export default function NuevoSpcPerfPage() {
               className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60 hover:opacity-90"
               style={{ backgroundColor: '#185FA5' }}
             >
-              {submitting ? 'Guardando…' : 'Guardar reporte'}
+              {submitting ? 'Saving…' : 'Save report'}
             </button>
           </div>
         </form>
