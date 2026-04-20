@@ -8,8 +8,9 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Pencil, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
@@ -146,46 +147,368 @@ function collectObjections(reports: HtReport[]): [string, number][] {
 
 // ── Row detail expand ─────────────────────────────────────────────────────────
 
-function ReportDetail({ report }: { report: HtReport }) {
-  const rowCls = 'flex items-start gap-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0'
-  const labelCls = 'text-xs text-zinc-400 w-40 shrink-0'
-  const valCls = 'text-xs text-zinc-700 dark:text-zinc-300 font-medium'
+const LOST_REASONS = ['Lack of interest', 'Price', 'Timing', 'Not qualified', 'Other']
+
+function ReportDetail({
+  report,
+  onEdit,
+  onDelete,
+}: {
+  report: HtReport
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
+  const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
+  const subLabel = 'text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 mt-3'
 
   function Row({ label, value }: { label: string; value: string | number | null | undefined }) {
     if (value === null || value === undefined || value === '') return null
     return (
-      <div className={rowCls}>
-        <span className={labelCls}>{label}</span>
-        <span className={valCls}>{String(value)}</span>
+      <div className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+        <span className={rowLabel}>{label}</span>
+        <span className={rowValue}>{String(value)}</span>
       </div>
     )
   }
 
   return (
-    <div className="px-4 pb-4 pt-2 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-100 dark:border-zinc-800">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0">
+    <div className="px-6 pb-5 pt-3 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-100 dark:border-zinc-800">
+      {/* Action bar */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-xs text-zinc-400">
+          {formatDate(report.date)} · {report.rep_name}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit() }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-800 transition-colors"
+          >
+            <Pencil className="h-3 w-3" />
+            Edit
+          </button>
+          {!confirmDelete ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-lg px-3 py-1.5">
+              <span className="text-xs text-red-700 dark:text-red-300 font-medium">Delete this report?</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete() }}
+                className="text-xs font-bold text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
+                className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Two-column detail */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+        {/* Left column */}
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5 mt-2">Objections</p>
-          <Row label="Objection 1" value={report.objection_1} />
-          <Row label="Objection 2" value={report.objection_2} />
-          <Row label="Objection 3" value={report.objection_3} />
+          <p className={subLabel}>Funnel Metrics</p>
+          <Row label="Graduates contacted"    value={report.graduates_contacted} />
+          <Row label="Graduates responded"    value={report.graduates_responded} />
+          <Row label="Real conversations"     value={report.real_conversations} />
+          <Row label="Ascension invitations"  value={report.ascension_invitations} />
+          <Row label="Calls scheduled"        value={report.calls_scheduled} />
+          <Row label="Calls showed"           value={report.calls_showed} />
+          <Row label="Enrollments closed"     value={report.enrollments_closed} />
+          <Row label="Total calls this week"  value={report.total_calls_week} />
+
+          <p className={subLabel}>Lost Opportunities</p>
+          <Row label="Leads lost"      value={report.leads_lost} />
+          <Row label="Primary reason"  value={report.lost_reason} />
+
+          <p className={subLabel}>Objections</p>
+          <Row label="Objection 1"       value={report.objection_1} />
+          <Row label="Objection 2"       value={report.objection_2} />
+          <Row label="Objection 3"       value={report.objection_3} />
           <Row label="Graduate patterns" value={report.graduate_patterns} />
         </div>
+
+        {/* Right column */}
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5 mt-2">Lost</p>
-          <Row label="Leads lost" value={report.leads_lost} />
-          <Row label="Primary reason" value={report.lost_reason} />
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5 mt-2">Key Learnings</p>
+          <p className={subLabel}>Key Learnings</p>
           <Row label="Learning 1" value={report.learning_1} />
           <Row label="Learning 2" value={report.learning_2} />
           <Row label="Learning 3" value={report.learning_3} />
+
+          <p className={subLabel}>Self-Assessment</p>
+          <Row label="Performance score"  value={`${report.performance_score} / 10`} />
+          <Row label="Improvement notes"  value={report.improvement_notes} />
         </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5 mt-2">Self-Assessment</p>
-          <Row label="Performance score" value={`${report.performance_score} / 10`} />
-          <Row label="Improvement notes" value={report.improvement_notes} />
+      </div>
+    </div>
+  )
+}
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
+
+interface EditForm {
+  date: string
+  rep_name: string
+  graduates_contacted: string
+  graduates_responded: string
+  real_conversations: string
+  ascension_invitations: string
+  calls_scheduled: string
+  calls_showed: string
+  enrollments_closed: string
+  total_calls_week: string
+  objection_1: string
+  objection_2: string
+  objection_3: string
+  graduate_patterns: string
+  leads_lost: string
+  lost_reason: string
+  learning_1: string
+  learning_2: string
+  learning_3: string
+  performance_score: number
+  improvement_notes: string
+}
+
+function reportToEditForm(r: HtReport): EditForm {
+  return {
+    date:                   r.date,
+    rep_name:               r.rep_name,
+    graduates_contacted:    String(r.graduates_contacted),
+    graduates_responded:    String(r.graduates_responded),
+    real_conversations:     String(r.real_conversations),
+    ascension_invitations:  String(r.ascension_invitations),
+    calls_scheduled:        String(r.calls_scheduled),
+    calls_showed:           String(r.calls_showed),
+    enrollments_closed:     String(r.enrollments_closed),
+    total_calls_week:       String(r.total_calls_week),
+    objection_1:            r.objection_1 ?? '',
+    objection_2:            r.objection_2 ?? '',
+    objection_3:            r.objection_3 ?? '',
+    graduate_patterns:      r.graduate_patterns ?? '',
+    leads_lost:             String(r.leads_lost),
+    lost_reason:            r.lost_reason ?? '',
+    learning_1:             r.learning_1 ?? '',
+    learning_2:             r.learning_2 ?? '',
+    learning_3:             r.learning_3 ?? '',
+    performance_score:      r.performance_score,
+    improvement_notes:      r.improvement_notes ?? '',
+  }
+}
+
+function EditModal({
+  report,
+  onClose,
+  onSaved,
+}: {
+  report: HtReport
+  onClose: () => void
+  onSaved: (updated: HtReport) => void
+}) {
+  const supabase = useMemo(() => createClient(), [])
+  const [form, setForm] = useState<EditForm>(() => reportToEditForm(report))
+  const [saving, setSaving] = useState(false)
+
+  function set<K extends keyof EditForm>(key: K, value: EditForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+  const readonlyCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400'
+  const labelCls = 'block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1'
+  const sectionCls = 'text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 mt-4 first:mt-0'
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const { data, error } = await supabase
+        .from('ht_csm_reports')
+        .update({
+          date:                   form.date,
+          rep_name:               form.rep_name,
+          graduates_contacted:    parseInt(form.graduates_contacted) || 0,
+          graduates_responded:    parseInt(form.graduates_responded) || 0,
+          real_conversations:     parseInt(form.real_conversations) || 0,
+          ascension_invitations:  parseInt(form.ascension_invitations) || 0,
+          calls_scheduled:        parseInt(form.calls_scheduled) || 0,
+          calls_showed:           parseInt(form.calls_showed) || 0,
+          enrollments_closed:     parseInt(form.enrollments_closed) || 0,
+          total_calls_week:       parseInt(form.total_calls_week) || 0,
+          objection_1:            form.objection_1 || null,
+          objection_2:            form.objection_2 || null,
+          objection_3:            form.objection_3 || null,
+          graduate_patterns:      form.graduate_patterns || null,
+          leads_lost:             parseInt(form.leads_lost) || 0,
+          lost_reason:            form.lost_reason || null,
+          learning_1:             form.learning_1 || null,
+          learning_2:             form.learning_2 || null,
+          learning_3:             form.learning_3 || null,
+          performance_score:      form.performance_score,
+          improvement_notes:      form.improvement_notes || null,
+        })
+        .eq('id', report.id)
+        .select()
+        .single()
+
+      if (error) { toast.error(`Save failed: ${error.message}`); return }
+      toast.success('Report updated')
+      onSaved(data as HtReport)
+    } catch (err) {
+      toast.error(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function NumInput({ field }: { field: keyof EditForm }) {
+    return (
+      <input
+        type="number"
+        min={0}
+        value={form[field] as string}
+        onChange={(e) => set(field, e.target.value as EditForm[typeof field])}
+        placeholder="0"
+        className={inputCls}
+      />
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900 z-10">
+          <div>
+            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Edit Report</p>
+            <p className="text-xs text-zinc-400 mt-0.5">{report.rep_name} · {formatDate(report.date)}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Fields */}
+        <div className="px-6 py-5 space-y-3">
+          {/* General */}
+          <p className={sectionCls}>General</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Rep name</label>
+              <input type="text" value={form.rep_name} onChange={(e) => set('rep_name', e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Week</label>
+              <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Funnel */}
+          <p className={sectionCls}>Funnel Metrics</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>Graduates contacted</label><NumInput field="graduates_contacted" /></div>
+            <div><label className={labelCls}>Graduates responded</label><NumInput field="graduates_responded" /></div>
+            <div><label className={labelCls}>Real conversations</label><NumInput field="real_conversations" /></div>
+            <div><label className={labelCls}>Ascension invitations</label><NumInput field="ascension_invitations" /></div>
+            <div><label className={labelCls}>Calls scheduled</label><NumInput field="calls_scheduled" /></div>
+            <div><label className={labelCls}>Calls showed</label><NumInput field="calls_showed" /></div>
+            <div><label className={labelCls}>Enrollments closed</label><NumInput field="enrollments_closed" /></div>
+            <div><label className={labelCls}>Total calls this week</label><NumInput field="total_calls_week" /></div>
+          </div>
+
+          {/* Quality */}
+          <p className={sectionCls}>Conversation Quality</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={labelCls}>Objection 1</label><input type="text" value={form.objection_1} onChange={(e) => set('objection_1', e.target.value)} className={inputCls} /></div>
+            <div><label className={labelCls}>Objection 2</label><input type="text" value={form.objection_2} onChange={(e) => set('objection_2', e.target.value)} className={inputCls} /></div>
+            <div><label className={labelCls}>Objection 3</label><input type="text" value={form.objection_3} onChange={(e) => set('objection_3', e.target.value)} className={inputCls} /></div>
+          </div>
+          <div>
+            <label className={labelCls}>Graduate patterns</label>
+            <textarea value={form.graduate_patterns} onChange={(e) => set('graduate_patterns', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} />
+          </div>
+
+          {/* Lost */}
+          <p className={sectionCls}>Lost Opportunities</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>Leads lost</label><NumInput field="leads_lost" /></div>
+            <div>
+              <label className={labelCls}>Primary reason</label>
+              <select value={form.lost_reason} onChange={(e) => set('lost_reason', e.target.value)} className={inputCls}>
+                <option value="">Select…</option>
+                {LOST_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Learnings */}
+          <p className={sectionCls}>Strategic Insights</p>
+          <div className="space-y-2">
+            <div><label className={labelCls}>Learning 1</label><input type="text" value={form.learning_1} onChange={(e) => set('learning_1', e.target.value)} className={inputCls} /></div>
+            <div><label className={labelCls}>Learning 2</label><input type="text" value={form.learning_2} onChange={(e) => set('learning_2', e.target.value)} className={inputCls} /></div>
+            <div><label className={labelCls}>Learning 3</label><input type="text" value={form.learning_3} onChange={(e) => set('learning_3', e.target.value)} className={inputCls} /></div>
+          </div>
+
+          {/* Self-assessment */}
+          <p className={sectionCls}>Performance Self-Assessment</p>
+          <div>
+            <label className={labelCls}>Performance score (1–10)</label>
+            <div className="flex gap-1.5 flex-wrap mt-1">
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => set('performance_score', n)}
+                  className={cn(
+                    'w-9 h-9 rounded-lg text-sm font-bold border-2 transition-all',
+                    form.performance_score === n
+                      ? n >= 8 ? 'bg-green-500 border-green-500 text-white'
+                        : n >= 5 ? 'bg-amber-400 border-amber-400 text-white'
+                        : 'bg-red-500 border-red-500 text-white'
+                      : 'border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:border-zinc-400'
+                  )}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Improvement notes</label>
+            <textarea value={form.improvement_notes} onChange={(e) => set('improvement_notes', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 sticky bottom-0 bg-white dark:bg-zinc-900">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-5 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
+            style={{ backgroundColor: '#185FA5' }}
+          >
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
         </div>
       </div>
     </div>
@@ -200,7 +523,16 @@ export default function HtCsmDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('30d')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingReport, setEditingReport] = useState<HtReport | null>(null)
   const [page, setPage] = useState(0)
+
+  async function handleDelete(id: string) {
+    const { error } = await supabase.from('ht_csm_reports').delete().eq('id', id)
+    if (error) { toast.error(`Delete failed: ${error.message}`); return }
+    setReports((prev) => prev.filter((r) => r.id !== id))
+    setExpandedId(null)
+    toast.success('Report deleted')
+  }
 
   const fetchReports = useCallback(async () => {
     setLoading(true)
@@ -577,7 +909,11 @@ export default function HtCsmDashboardPage() {
                                   transition={{ duration: 0.15 }}
                                 >
                                   <td colSpan={10} className="p-0">
-                                    <ReportDetail report={r} />
+                                    <ReportDetail
+                                      report={r}
+                                      onEdit={() => setEditingReport(r)}
+                                      onDelete={() => handleDelete(r.id)}
+                                    />
                                   </td>
                                 </motion.tr>
                               )}
@@ -618,6 +954,17 @@ export default function HtCsmDashboardPage() {
           </>
         )}
       </div>
+
+      {editingReport && (
+        <EditModal
+          report={editingReport}
+          onClose={() => setEditingReport(null)}
+          onSaved={(updated) => {
+            setReports((prev) => prev.map((r) => r.id === updated.id ? updated : r))
+            setEditingReport(null)
+          }}
+        />
+      )}
     </PageTransition>
   )
 }
