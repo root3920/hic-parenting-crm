@@ -102,9 +102,15 @@ export async function POST(req: NextRequest) {
           continue
         }
 
+        const date = parseDate(row['Created At'] ?? '')
+        if (!date) {
+          errors.push(`Row skipped (no valid date): ${row['Customer Email'] ?? txId}`)
+          continue
+        }
+
         records.push({
           transaction_id: txId,
-          date:           parseDate(row['Created At'] ?? ''),
+          date,
           cost:           parseAmount(row['Amount'] ?? ''),
           currency:       row['Currency']?.trim() || 'USD',
           status:         isRefund ? 'refunded' : 'failed',
@@ -135,10 +141,15 @@ export async function POST(req: NextRequest) {
 
         const dateStr = row['Transaction date']?.trim() ?? ''
         const timeStr = row['Transaction time']?.trim() ?? ''
+        const date = parseDate(dateStr ? `${dateStr} ${timeStr}` : '')
+        if (!date) {
+          errors.push(`Row skipped (no valid date): ${row['Customer email'] ?? txId}`)
+          continue
+        }
 
         records.push({
           transaction_id:  txId,
-          date:            parseDate(dateStr ? `${dateStr} ${timeStr}` : '', ''),
+          date,
           cost:            amount,
           currency:        row['Currency']?.trim() || 'USD',
           status:          isRefunded ? 'refunded' : 'failed',
