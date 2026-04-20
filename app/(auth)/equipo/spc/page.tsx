@@ -298,7 +298,7 @@ export default function SpcPerfDashboard() {
   const kpis = useMemo(() => {
     if (allMetrics.length === 0) return null
     const scores       = allMetrics.map(({ m }) => m.score)
-    const pctEngSem    = allMetrics.map(({ r }) => safe(r.active_members_count, r.total_members_count))
+    const pctEngSem    = allMetrics.map(({ r }) => safe(r.members_participated, r.total_members_count))
     const messages     = allMetrics.map(({ r }) => r.avg_daily_messages)
     const pctReact     = allMetrics.map(({ m }) => m.pctReactivacion)
     const pctConv      = allMetrics.map(({ m }) => m.pctConvTrial)
