@@ -83,8 +83,15 @@ function rateStatus(v: number, goal: number, alert: number): 'good' | 'warn' | '
 
 function callsStatus(v: number): 'good' | 'warn' | 'alert' {
   if (isNaN(v)) return 'alert'
-  if (v >= 4) return 'good'
+  if (v >= 4 && v <= 6) return 'good'
   if (v >= 3) return 'warn'
+  return 'alert'
+}
+
+function closeRateStatus(v: number): 'good' | 'warn' | 'alert' {
+  if (isNaN(v)) return 'alert'
+  if (v >= 30 && v <= 40) return 'good'
+  if (v >= 25) return 'warn'
   return 'alert'
 }
 
@@ -109,12 +116,13 @@ const CELL_BG: Record<'good' | 'warn' | 'alert', string> = {
 // ── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, value, sub, status,
+  label, value, sub, status, goal,
 }: {
   label: string
   value: string
   sub?: string
   status: 'good' | 'warn' | 'alert'
+  goal?: string
 }) {
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
@@ -123,6 +131,10 @@ function KpiCard({
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 leading-none">{label}</p>
       </div>
       <p className={cn('text-2xl font-bold', RATE_COLORS[status])}>{value}</p>
+      {goal && <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{goal}</p>}
+      {status === 'alert' && (
+        <p className="text-[10px] font-medium text-red-500 dark:text-red-400 mt-0.5">Below target</p>
+      )}
       {sub && <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{sub}</p>}
     </div>
   )
@@ -229,7 +241,7 @@ function ReportDetail({
           <Row label="Calls scheduled"        value={report.calls_scheduled} />
           <Row label="Calls showed"           value={report.calls_showed} />
           <Row label="Enrollments closed"     value={report.enrollments_closed} />
-          <Row label="Total calls this week"  value={report.total_calls_week} />
+          <Row label="Calls today"             value={report.total_calls_week} />
 
           <p className={subLabel}>Lost Opportunities</p>
           <Row label="Leads lost"      value={report.leads_lost} />
@@ -427,7 +439,7 @@ function EditModal({
             <div><label className={labelCls}>Calls scheduled</label><NumInput field="calls_scheduled" /></div>
             <div><label className={labelCls}>Calls showed</label><NumInput field="calls_showed" /></div>
             <div><label className={labelCls}>Enrollments closed</label><NumInput field="enrollments_closed" /></div>
-            <div><label className={labelCls}>Total calls this week</label><NumInput field="total_calls_week" /></div>
+            <div><label className={labelCls}>Calls today</label><NumInput field="total_calls_week" /></div>
           </div>
 
           {/* Quality */}
@@ -565,7 +577,7 @@ export default function HtCsmDashboardPage() {
     const totScheduled   = reports.reduce((s, r) => s + r.calls_scheduled, 0)
     const totShowed      = reports.reduce((s, r) => s + r.calls_showed, 0)
     const totClosed      = reports.reduce((s, r) => s + r.enrollments_closed, 0)
-    const avgCalls       = avg(reports.map((r) => r.total_calls_week))
+    const sumCalls       = reports.reduce((s, r) => s + r.total_calls_week, 0)
     const avgScore       = avg(reports.map((r) => r.performance_score))
 
     return {
@@ -574,7 +586,7 @@ export default function HtCsmDashboardPage() {
       pitchRate:     pct(totInvitations, totConversations),
       showRate:      pct(totShowed, totScheduled),
       closeRate:     pct(totClosed, totShowed),
-      avgCalls,
+      sumCalls,
       avgScore,
       totalClosed: totClosed,
     }
@@ -684,38 +696,39 @@ export default function HtCsmDashboardPage() {
               <KpiCard
                 label="Outreach Rate"
                 value={fmtPct(kpis.outreachRate)}
-                sub="contacted / total graduates"
+                goal="Goal: ≥ 50%"
                 status={rateStatus(kpis.outreachRate, 50, 40)}
               />
               <KpiCard
                 label="Response Rate"
                 value={fmtPct(kpis.responseRate)}
-                sub="conversations / contacted"
+                goal="Goal: ≥ 35%"
                 status={rateStatus(kpis.responseRate, 35, 25)}
               />
               <KpiCard
                 label="Pitch Rate"
                 value={fmtPct(kpis.pitchRate)}
-                sub="invitations / conversations"
+                goal="Goal: ≥ 45%"
                 status={rateStatus(kpis.pitchRate, 45, 30)}
               />
               <KpiCard
                 label="Show Rate"
                 value={fmtPct(kpis.showRate)}
-                sub="showed / scheduled"
+                goal="Goal: ≥ 65%"
                 status={rateStatus(kpis.showRate, 65, 50)}
               />
               <KpiCard
                 label="Close Rate"
                 value={fmtPct(kpis.closeRate)}
-                sub="closed / showed"
-                status={rateStatus(kpis.closeRate, 30, 25)}
+                goal="Goal: 30–40%"
+                status={closeRateStatus(kpis.closeRate)}
               />
               <KpiCard
-                label="Calls / Week"
-                value={isNaN(kpis.avgCalls) ? '—' : kpis.avgCalls.toFixed(1)}
-                sub="avg ascension calls"
-                status={callsStatus(kpis.avgCalls)}
+                label="Calls this week"
+                value={String(kpis.sumCalls)}
+                goal="Goal: 4–6 calls"
+                sub="sum of daily calls"
+                status={callsStatus(kpis.sumCalls)}
               />
               <KpiCard
                 label="Avg Score"
@@ -835,7 +848,7 @@ export default function HtCsmDashboardPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['', 'Week', 'Rep', 'Outreach%', 'Response%', 'Pitch%', 'Show%', 'Close%', 'Calls', 'Score'].map((h, i) => (
+                        {['', 'Week', 'Rep', 'Outreach%', 'Response%', 'Pitch%', 'Show%', 'Close%', 'Calls (day)', 'Score'].map((h, i) => (
                           <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>

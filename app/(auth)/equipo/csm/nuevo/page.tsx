@@ -333,7 +333,7 @@ export default function HtCsmNewReportPage() {
               color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
             />
             <div>
-              <FieldLabel>Total ascension calls completed this week</FieldLabel>
+              <FieldLabel>Calls today</FieldLabel>
               <NumberInput value={form.total_calls_week} onChange={(v) => set('total_calls_week', v)} />
             </div>
           </SectionCard>
