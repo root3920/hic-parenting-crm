@@ -166,6 +166,11 @@ function noteDotCls(dateStr: string): string {
   return 'bg-red-500'
 }
 
+function isPaymentOverdue(dateStr: string, plan: 'monthly' | 'annual'): boolean {
+  const days = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)
+  return plan === 'annual' ? days > 370 : days > 35
+}
+
 function LastNoteCell({ lastNoteAt, onClick }: { lastNoteAt?: string; onClick: (e: React.MouseEvent) => void }) {
   if (!lastNoteAt) {
     return <span className="text-xs text-zinc-400 italic">No notes</span>
@@ -1032,6 +1037,18 @@ export default function SpcPage() {
     return map
   }, [spcTransactions])
 
+  // ── Last completed payment date per member email ──────────────────────────
+  const lastPaymentByEmail = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const tx of spcTransactions) {
+      if (tx.status !== 'completed') continue
+      const email = (tx.buyer_email ?? '').toLowerCase()
+      if (!email) continue
+      if (!map[email] || tx.date > map[email]) map[email] = tx.date
+    }
+    return map
+  }, [spcTransactions])
+
   // ── Date anchors ─────────────────────────────────────────────────────────
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
@@ -1705,6 +1722,7 @@ export default function SpcPage() {
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead className="hidden md:table-cell">Provider</TableHead>
                         <TableHead className="hidden md:table-cell">Joined</TableHead>
+                        <TableHead className="hidden md:table-cell">Last Payment</TableHead>
                         <TableHead className="hidden md:table-cell">Next Payment</TableHead>
                         <TableHead className="hidden lg:table-cell">Last Note</TableHead>
                       </AnimatedTableRow>
@@ -1736,6 +1754,18 @@ export default function SpcPage() {
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
+                          <TableCell className="text-xs whitespace-nowrap hidden md:table-cell">
+                            {(() => {
+                              const lp = lastPaymentByEmail[(m.email ?? '').toLowerCase()]
+                              if (!lp) return <span className="text-zinc-400">—</span>
+                              const overdue = isPaymentOverdue(lp, m.plan)
+                              return (
+                                <span className={overdue ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-zinc-500'}>
+                                  {formatDate(lp)}
+                                </span>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{calcNextPayment(transactionsByEmail[(m.email ?? '').toLowerCase()], m.plan)}</TableCell>
                           <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
                             <LastNoteCell
