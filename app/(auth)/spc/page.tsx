@@ -1994,7 +1994,11 @@ export default function SpcPage() {
                               )
                             })()}
                           </TableCell>
-                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{calcNextPayment(transactionsByEmail[(m.email ?? '').toLowerCase()], m.plan)}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">
+                            {m.next_payment_date
+                              ? formatDate(m.next_payment_date)
+                              : calcNextPayment(transactionsByEmail[(m.email ?? '').toLowerCase()], m.plan)}
+                          </TableCell>
                           <TableCell className="hidden lg:table-cell">
                             {(() => {
                               const cfg = leadScoreConfig(m.lead_score)
