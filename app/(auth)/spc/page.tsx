@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { KPICard } from '@/components/shared/KPICard'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -149,6 +149,39 @@ function calcNextPayment(
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatRelativeTime(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime()
+  const hours = diffMs / (1000 * 60 * 60)
+  if (hours < 1) return 'Just now'
+  if (hours < 24) return `${Math.floor(hours)}h ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'Yesterday'
+  return `${days}d ago`
+}
+
+function noteDotCls(dateStr: string): string {
+  const days = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)
+  if (days <= 3) return 'bg-green-500'
+  if (days <= 7) return 'bg-yellow-400'
+  return 'bg-red-500'
+}
+
+function LastNoteCell({ lastNoteAt, onClick }: { lastNoteAt?: string; onClick: (e: React.MouseEvent) => void }) {
+  if (!lastNoteAt) {
+    return <span className="text-xs text-zinc-400 italic">No notes</span>
+  }
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 hover:opacity-70 transition-opacity"
+      title="Open notes"
+    >
+      <span className={cn('w-2 h-2 rounded-full shrink-0', noteDotCls(lastNoteAt))} />
+      <span className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{formatRelativeTime(lastNoteAt)}</span>
+    </button>
+  )
+}
+
 function SpcModal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -211,6 +244,7 @@ function MemberProfileModal({
   onSave,
   onSaveCancellation,
   memberTransactions,
+  highlightNotes,
 }: {
   selected: SelectedMember
   notes: SpcMemberNote[]
@@ -222,12 +256,24 @@ function MemberProfileModal({
   onSave: (updated: SpcMember) => void
   onSaveCancellation: (updated: SpcCancellation) => void
   memberTransactions: Transaction[]
+  highlightNotes?: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
   const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
   const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
   const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+
+  const notesRef = useRef<HTMLDivElement>(null)
+  const [notesFocused, setNotesFocused] = useState(false)
+  useEffect(() => {
+    if (highlightNotes) {
+      setNotesFocused(true)
+      notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      const t = setTimeout(() => setNotesFocused(false), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [highlightNotes])
 
   const [isEditing, setIsEditing] = useState(false)
   const [isCancelEditing, setIsCancelEditing] = useState(false)
@@ -819,7 +865,7 @@ function MemberProfileModal({
         </div>
 
         {/* ── RIGHT: Contact Notes (always visible) ── */}
-        <div className="flex flex-col">
+        <div ref={notesRef} className={cn('flex flex-col rounded-xl transition-all duration-500', notesFocused && 'ring-2 ring-blue-400 ring-offset-2 p-2')}>
           <div className="flex items-center gap-2 mb-3">
             <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />
             <p className={cn(sectionLabel, 'mb-0')}>Contact Notes</p>
@@ -892,6 +938,8 @@ export default function SpcPage() {
   const [notes, setNotes] = useState<SpcMemberNote[]>([])
   const [noteText, setNoteText] = useState('')
   const [addingNote, setAddingNote] = useState(false)
+  const [lastNoteByEmail, setLastNoteByEmail] = useState<Record<string, string>>({})
+  const [highlightNotes, setHighlightNotes] = useState(false)
 
   // ── CSV upload state ──────────────────────────────────────────────────────
   const [csvModalOpen, setCsvModalOpen] = useState(false)
@@ -914,9 +962,10 @@ export default function SpcPage() {
     setNotes(data ?? [])
   }, [supabase])
 
-  function openModal(member: SelectedMember) {
+  function openModal(member: SelectedMember, focusNotes = false) {
     setSelectedMember(member)
     setNoteText('')
+    setHighlightNotes(focusNotes)
     const email = member.data.email
     if (email) fetchNotes(email)
     else setNotes([])
@@ -941,7 +990,7 @@ export default function SpcPage() {
 
   useEffect(() => {
     async function fetchData() {
-      const [membersResult, cancelsResult, txResult] = await Promise.all([
+      const [membersResult, cancelsResult, txResult, notesResult] = await Promise.all([
         supabase.from('spc_members').select('*').order('joined_at', { ascending: false }),
         supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false }),
         supabase
@@ -949,6 +998,7 @@ export default function SpcPage() {
           .select('*')
           .ilike('offer_title', '%Secure Parent%')
           .order('date', { ascending: false }),
+        supabase.from('spc_member_notes').select('member_id, created_at'),
       ])
       setMembers(membersResult.data ?? [])
       setCancellations(cancelsResult.data ?? [])
@@ -957,6 +1007,14 @@ export default function SpcPage() {
           (tx: Transaction) => getCanonicalProduct(tx.offer_title ?? '') === 'Secure Parent Collective'
         )
       )
+      // Build last-note-at map keyed by lowercase email
+      const noteMap: Record<string, string> = {}
+      for (const n of (notesResult.data ?? [])) {
+        const key = (n.member_id ?? '').toLowerCase()
+        if (!key) continue
+        if (!noteMap[key] || n.created_at > noteMap[key]) noteMap[key] = n.created_at
+      }
+      setLastNoteByEmail(noteMap)
       setLoading(false)
     }
     fetchData()
@@ -1648,6 +1706,7 @@ export default function SpcPage() {
                         <TableHead className="hidden md:table-cell">Provider</TableHead>
                         <TableHead className="hidden md:table-cell">Joined</TableHead>
                         <TableHead className="hidden md:table-cell">Next Payment</TableHead>
+                        <TableHead className="hidden lg:table-cell">Last Note</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
@@ -1678,6 +1737,12 @@ export default function SpcPage() {
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{calcNextPayment(transactionsByEmail[(m.email ?? '').toLowerCase()], m.plan)}</TableCell>
+                          <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
+                            <LastNoteCell
+                              lastNoteAt={lastNoteByEmail[(m.email ?? '').toLowerCase()]}
+                              onClick={(e) => { e.stopPropagation(); openModal({ kind: 'member', data: m }, true) }}
+                            />
+                          </TableCell>
                         </AnimatedTableRow>
                       ))}
                     </TableBody>
@@ -1733,6 +1798,7 @@ export default function SpcPage() {
                           <TableHead>Expires</TableHead>
                           <TableHead>Days Left</TableHead>
                           <TableHead className="hidden md:table-cell">Payment Method</TableHead>
+                          <TableHead className="hidden lg:table-cell">Last Note</TableHead>
                         </AnimatedTableRow>
                       </TableHeader>
                       <TableBody>
@@ -1757,6 +1823,12 @@ export default function SpcPage() {
                             </TableCell>
                             <TableCell>{trialUrgencyPill(m)}</TableCell>
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                            <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
+                              <LastNoteCell
+                                lastNoteAt={lastNoteByEmail[(m.email ?? '').toLowerCase()]}
+                                onClick={(e) => { e.stopPropagation(); openModal({ kind: 'member', data: m }, true) }}
+                              />
+                            </TableCell>
                           </AnimatedTableRow>
                         ))}
                       </TableBody>
@@ -1914,6 +1986,7 @@ export default function SpcPage() {
                             <TableHead className="hidden lg:table-cell">Subscribed</TableHead>
                             <TableHead className="hidden sm:table-cell">Cancelled</TableHead>
                             <TableHead className="text-right hidden sm:table-cell">Days</TableHead>
+                            <TableHead className="hidden lg:table-cell">Last Note</TableHead>
                           </AnimatedTableRow>
                         </TableHeader>
                         <TableBody>
@@ -1954,6 +2027,12 @@ export default function SpcPage() {
                                 <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">{c.cancelled_at ? formatDate(c.cancelled_at) : '—'}</TableCell>
                                 <TableCell className="text-right text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
                                   {c.subscribed_at && c.cancelled_at ? `${daysActive(c.subscribed_at, c.cancelled_at)}d` : '—'}
+                                </TableCell>
+                                <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
+                                  <LastNoteCell
+                                    lastNoteAt={lastNoteByEmail[(c.email ?? '').toLowerCase()]}
+                                    onClick={(e) => { e.stopPropagation(); openModal({ kind: 'cancellation', data: c }, true) }}
+                                  />
                                 </TableCell>
                               </AnimatedTableRow>
                             ))}
@@ -2162,6 +2241,7 @@ export default function SpcPage() {
               ? (transactionsByEmail[(selectedMember.data.email ?? '').toLowerCase()] ?? [])
               : []
           }
+          highlightNotes={highlightNotes}
           onSave={(updated) => {
             if (!updated) return
             setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
