@@ -99,17 +99,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No valid attendance rows found' }, { status: 400 })
     }
 
-    // Upsert all records
+    // Deduplicate by email — keep the row with the longest duration
+    // (same person can appear multiple times in a Zoom export if they rejoined)
+    const dedupMap: Record<string, typeof records[0]> = {}
+    for (const record of records) {
+      const existing = dedupMap[record.member_email]
+      if (!existing || record.duration_minutes > existing.duration_minutes) {
+        dedupMap[record.member_email] = record
+      }
+    }
+    const deduped = Object.values(dedupMap)
+
+    // Upsert deduplicated records
     const { error: upsertError } = await supabaseAdmin
       .from('spc_class_attendance')
-      .upsert(records, { onConflict: 'member_email,class_date', ignoreDuplicates: false })
+      .upsert(deduped, { onConflict: 'member_email,class_date', ignoreDuplicates: false })
 
     if (upsertError) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
 
     // Check which emails exist in spc_members
-    const emails = records.map((r) => r.member_email)
+    const emails = deduped.map((r) => r.member_email)
     const { data: memberRows } = await supabaseAdmin
       .from('spc_members')
       .select('email')
@@ -132,7 +143,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       class_date: classDate,
-      total:      records.length,
+      total:      deduped.length,
       matched,
       unmatched,
     })
