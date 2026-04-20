@@ -1061,6 +1061,7 @@ export default function SpcPage() {
   // ── Zoom CSV upload state ─────────────────────────────────────────────────
   const [zoomModalOpen, setZoomModalOpen] = useState(false)
   const [zoomCsvContent, setZoomCsvContent] = useState('')
+  const [zoomFileName, setZoomFileName] = useState('')
   const [zoomImporting, setZoomImporting] = useState(false)
   const [zoomResult, setZoomResult] = useState<{ class_date?: string; total?: number; matched?: number; unmatched?: number; error?: string } | null>(null)
 
@@ -1476,7 +1477,7 @@ export default function SpcPage() {
           </nav>
           <div className="pb-2 shrink-0 flex items-center gap-2">
             <button
-              onClick={() => { setZoomModalOpen(true); setZoomCsvContent(''); setZoomResult(null) }}
+              onClick={() => { setZoomModalOpen(true); setZoomCsvContent(''); setZoomFileName(''); setZoomResult(null) }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 bg-violet-600"
             >
               <Upload className="h-3.5 w-3.5" />
@@ -2312,15 +2313,29 @@ export default function SpcPage() {
               </button>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-              Paste the Zoom participant CSV exported from your Zoom account. Required columns: <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Name (original name)</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Email</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Join time</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Duration (minutes)</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Guest</span>.
+              Select the Zoom participant CSV exported from your Zoom account. Required columns: <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Name (original name)</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Email</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Join time</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Duration (minutes)</span>, <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">Guest</span>.
             </p>
-            <textarea
-              value={zoomCsvContent}
-              onChange={(e) => { setZoomCsvContent(e.target.value); setZoomResult(null) }}
-              placeholder="Paste Zoom CSV here…"
-              rows={8}
-              className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none font-mono mb-3"
-            />
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">CSV file</label>
+              <input
+                key={zoomModalOpen ? 'open' : 'closed'}
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setZoomResult(null)
+                  setZoomFileName(file.name)
+                  const reader = new FileReader()
+                  reader.onload = (ev) => setZoomCsvContent(ev.target?.result as string ?? '')
+                  reader.readAsText(file)
+                }}
+                className="block w-full text-sm text-zinc-600 dark:text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-100 dark:file:bg-zinc-800 file:text-zinc-700 dark:file:text-zinc-300 hover:file:bg-zinc-200 dark:hover:file:bg-zinc-700 cursor-pointer"
+              />
+              {zoomFileName && (
+                <p className="mt-1.5 text-xs text-zinc-400">{zoomFileName}</p>
+              )}
+            </div>
             {zoomResult && !zoomResult.error && (
               <div className="mb-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 text-xs text-emerald-800 dark:text-emerald-300">
                 <p className="font-semibold mb-0.5">Uploaded — Class date: {zoomResult.class_date}</p>
