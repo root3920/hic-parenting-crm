@@ -53,12 +53,16 @@ function mapKajabiStatus(status: string): { cancel_type: CancelType; mapped_stat
   return null
 }
 
-function mapGHLStatus(status: string): { cancel_type: CancelType; mapped_status: string } | null {
-  const s = status.trim().toLowerCase()
-  if (s === 'cancelled') return { cancel_type: 'paid_cancel', mapped_status: 'cancelled' }
-  if (s === 'failed') return { cancel_type: 'paid_cancel', mapped_status: 'failed' }
-  if (s === 'cancel') return { cancel_type: 'paid_cancel', mapped_status: 'cancelled' }
-  return null
+// GHL: all known status values → normalized status
+const GHL_STATUS_MAP: Record<string, string> = {
+  canceled:           'cancelled',
+  cancelled:          'cancelled',
+  incomplete_expired: 'cancelled',
+  trialing:           'trial',
+  approval_pending:   'trial',
+  active:             'active',
+  paused:             'active',
+  past_due:           'active',
 }
 
 function parseAmount(val: string): number {
@@ -83,9 +87,11 @@ export async function POST(req: NextRequest) {
 
     const rows = parseCSV(csv)
     const errors: string[] = []
-    const records: Record<string, unknown>[] = []
 
+    // ── MODE: members (Kajabi active import) ──────────────────────────────────
     if (mode === 'members') {
+      const records: Record<string, unknown>[] = []
+
       for (const row of rows) {
         if (source === 'kajabi') {
           const status = row['Status']?.trim()
@@ -100,9 +106,10 @@ export async function POST(req: NextRequest) {
             status:    'active',
           })
         } else {
-          // GHL
-          const status = row['Status']?.trim().toLowerCase()
-          if (status !== 'active' && status !== 'trialing') continue
+          // GHL members mode — uses same unified path as cancellations mode below
+          const rawStatus = row['Status']?.trim().toLowerCase()
+          const mappedStatus = GHL_STATUS_MAP[rawStatus]
+          if (!mappedStatus || mappedStatus === 'cancelled') continue
           records.push({
             name:      row['Customer name']?.trim() || null,
             email:     row['Customer email']?.trim() || null,
@@ -110,7 +117,7 @@ export async function POST(req: NextRequest) {
             plan:      'monthly',
             provider:  row['Payment provider']?.trim() || 'GHL',
             joined_at: row['Subscription start']?.trim() || null,
-            status:    status === 'trialing' ? 'trial' : 'active',
+            status:    mappedStatus,
           })
         }
       }
@@ -127,9 +134,7 @@ export async function POST(req: NextRequest) {
 
       if (toInsert.length > 0) {
         const { error: insertError } = await supabaseAdmin.from('spc_members').insert(toInsert)
-        if (insertError) {
-          return NextResponse.json({ error: insertError.message }, { status: 500 })
-        }
+        if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
       }
 
       for (const record of toUpdate) {
@@ -137,17 +142,19 @@ export async function POST(req: NextRequest) {
           .from('spc_members')
           .update(record)
           .eq('email', record.email as string)
-        if (updateError) {
-          errors.push(`Failed to update ${record.email}: ${updateError.message}`)
-        }
+        if (updateError) errors.push(`Failed to update ${record.email}: ${updateError.message}`)
       }
 
       return NextResponse.json({ imported: toInsert.length, updated: toUpdate.length, skipped: 0, errors })
     }
 
-    // mode === 'cancellations' (default)
-    for (const row of rows) {
-      if (source === 'kajabi') {
+    // ── MODE: cancellations (default) ─────────────────────────────────────────
+
+    if (source === 'kajabi') {
+      // ── Kajabi: unchanged logic ──────────────────────────────────────────────
+      const records: Record<string, unknown>[] = []
+
+      for (const row of rows) {
         const mapped = mapKajabiStatus(row['Status'] ?? '')
         if (!mapped) continue
 
@@ -172,81 +179,204 @@ export async function POST(req: NextRequest) {
           subscribed_at:   row['Created At']?.trim() || null,
           source:          'kajabi',
         })
-      } else {
-        // GHL
-        const mapped = mapGHLStatus(row['Status'] ?? '')
-        if (!mapped) continue
+      }
 
+      if (records.length === 0) {
+        return NextResponse.json({ imported: 0, skipped: 0, errors })
+      }
+
+      const subIds = records.map(r => r.subscription_id as string)
+      const { data: existingCancels } = await supabaseAdmin
+        .from('spc_cancellations')
+        .select('subscription_id')
+        .in('subscription_id', subIds)
+
+      const existingIds = new Set((existingCancels ?? []).map((e: { subscription_id: string }) => e.subscription_id))
+      const newRecords = records.filter(r => !existingIds.has(r.subscription_id as string))
+      const skipped = records.length - newRecords.length
+
+      if (newRecords.length > 0) {
+        const { error: insertError } = await supabaseAdmin.from('spc_cancellations').insert(newRecords)
+        if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+
+        const cancelledEmails = newRecords
+          .map(r => r.email as string | null)
+          .filter((e): e is string => !!e)
+
+        if (cancelledEmails.length > 0) {
+          const { data: membersToUpdate } = await supabaseAdmin
+            .from('spc_members')
+            .select('id')
+            .in('email', cancelledEmails)
+            .in('status', ['active', 'trial'])
+
+          if (membersToUpdate && membersToUpdate.length > 0) {
+            await supabaseAdmin
+              .from('spc_members')
+              .update({ status: 'cancelled' })
+              .in('id', membersToUpdate.map((m: { id: string }) => m.id))
+          }
+        }
+      }
+
+      return NextResponse.json({ imported: newRecords.length, skipped, errors })
+    }
+
+    // ── GHL: unified status handler ──────────────────────────────────────────
+
+    type CancelRow = Record<string, unknown>
+    type MemberRow = { email: string | null; name: string | null; amount: number; status: string; plan: string; provider: string; joined_at: string | null }
+
+    const cancelRows: CancelRow[] = []
+    const memberRows: MemberRow[] = []
+    let skippedCount = 0
+
+    for (const row of rows) {
+      const rawStatus = (row['Status'] ?? '').trim().toLowerCase()
+      const mappedStatus = GHL_STATUS_MAP[rawStatus]
+
+      if (!mappedStatus) {
+        skippedCount++
+        continue
+      }
+
+      const email     = row['Customer email']?.trim() || null
+      const name      = row['Customer name']?.trim() || null
+      const amount    = parseAmount(row['Total amount'] ?? '0')
+      const provider  = row['Payment provider']?.trim() || 'GHL'
+      const joinedAt  = row['Subscription start']?.trim() || null
+
+      if (mappedStatus === 'cancelled') {
         const subId = row['Subscription id']?.trim()
         if (!subId) {
-          errors.push(`Row skipped (no subscription ID): ${row['Customer email'] ?? 'unknown'}`)
+          errors.push(`Row skipped (no subscription ID): ${email ?? 'unknown'}`)
           continue
         }
-
-        records.push({
+        cancelRows.push({
           subscription_id: subId,
-          name:            row['Customer name']?.trim() || null,
-          email:           row['Customer email']?.trim() || null,
+          name,
+          email,
           customer_phone:  row['Customer phone']?.trim() || null,
-          amount:          parseAmount(row['Total amount'] ?? '0'),
+          amount,
           currency:        row['Currency']?.trim() || null,
           plan:            'monthly',
-          cancel_type:     mapped.cancel_type,
+          cancel_type:     'paid_cancel' as CancelType,
           cancelled_at:    row['Cancelled at']?.trim() || null,
           offer_title:     row['Line item name']?.trim() || null,
-          provider:        row['Payment provider']?.trim() || null,
-          subscribed_at:   row['Subscription start']?.trim() || null,
+          provider,
+          subscribed_at:   joinedAt,
           source:          'ghl',
         })
+      } else {
+        // trial or active
+        memberRows.push({ email, name, amount, status: mappedStatus, plan: 'monthly', provider, joined_at: joinedAt })
       }
     }
 
-    if (records.length === 0) {
-      return NextResponse.json({ imported: 0, skipped: 0, errors })
-    }
+    // ── Process cancellations ────────────────────────────────────────────────
+    let cancelledCount = 0
 
-    // Check which subscription_ids already exist in this batch
-    const subIds = records.map((r) => r.subscription_id as string)
-    const { data: existing } = await supabaseAdmin
-      .from('spc_cancellations')
-      .select('subscription_id')
-      .in('subscription_id', subIds)
-
-    const existingIds = new Set((existing ?? []).map((e: { subscription_id: string }) => e.subscription_id))
-    const newRecords = records.filter((r) => !existingIds.has(r.subscription_id as string))
-    const skipped = records.length - newRecords.length
-
-    if (newRecords.length > 0) {
-      const { error: insertError } = await supabaseAdmin
+    if (cancelRows.length > 0) {
+      const subIds = cancelRows.map(r => r.subscription_id as string)
+      const { data: existingCancels } = await supabaseAdmin
         .from('spc_cancellations')
-        .insert(newRecords)
+        .select('subscription_id')
+        .in('subscription_id', subIds)
 
-      if (insertError) {
-        return NextResponse.json({ error: insertError.message }, { status: 500 })
-      }
+      const existingIds = new Set((existingCancels ?? []).map((e: { subscription_id: string }) => e.subscription_id))
+      const newCancels = cancelRows.filter(r => !existingIds.has(r.subscription_id as string))
+      skippedCount += cancelRows.length - newCancels.length
 
-      // ── Sync spc_members status for newly cancelled emails ─────────────────
-      const cancelledEmails = newRecords
-        .map((r) => r.email as string | null)
-        .filter((e): e is string => !!e)
+      if (newCancels.length > 0) {
+        const { error: insertError } = await supabaseAdmin.from('spc_cancellations').insert(newCancels)
+        if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-      if (cancelledEmails.length > 0) {
-        const { data: membersToUpdate } = await supabaseAdmin
-          .from('spc_members')
-          .select('id')
-          .in('email', cancelledEmails)
-          .in('status', ['active', 'trial'])
+        cancelledCount = newCancels.length
 
-        if (membersToUpdate && membersToUpdate.length > 0) {
-          await supabaseAdmin
+        // Update spc_members status → cancelled for these emails
+        const cancelledEmails = newCancels
+          .map(r => r.email as string | null)
+          .filter((e): e is string => !!e)
+
+        if (cancelledEmails.length > 0) {
+          const { data: membersToCancel } = await supabaseAdmin
             .from('spc_members')
-            .update({ status: 'cancelled' })
-            .in('id', membersToUpdate.map((m: { id: string }) => m.id))
+            .select('id')
+            .in('email', cancelledEmails)
+            .in('status', ['active', 'trial'])
+
+          if (membersToCancel && membersToCancel.length > 0) {
+            await supabaseAdmin
+              .from('spc_members')
+              .update({ status: 'cancelled' })
+              .in('id', membersToCancel.map((m: { id: string }) => m.id))
+          }
         }
       }
     }
 
-    return NextResponse.json({ imported: newRecords.length, skipped, errors })
+    // ── Process trial / active members ───────────────────────────────────────
+    let updatedToTrial = 0
+    let updatedToActive = 0
+    let insertedNew = 0
+
+    if (memberRows.length > 0) {
+      const emails = memberRows.map(r => r.email).filter((e): e is string => !!e)
+
+      const { data: existingMembers } = await supabaseAdmin
+        .from('spc_members')
+        .select('id, email, status')
+        .in('email', emails)
+
+      const existingMap = new Map(
+        (existingMembers ?? []).map((m: { id: string; email: string; status: string }) => [m.email, m])
+      )
+
+      const toInsert: typeof memberRows = []
+
+      for (const row of memberRows) {
+        if (!row.email) continue
+
+        const existing = existingMap.get(row.email)
+
+        if (existing) {
+          // Never downgrade a cancelled member
+          if (existing.status === 'cancelled') continue
+
+          const { error } = await supabaseAdmin
+            .from('spc_members')
+            .update({ status: row.status })
+            .eq('id', existing.id)
+
+          if (error) {
+            errors.push(`Failed to update ${row.email}: ${error.message}`)
+          } else {
+            if (row.status === 'trial') updatedToTrial++
+            else updatedToActive++
+          }
+        } else {
+          toInsert.push(row)
+        }
+      }
+
+      if (toInsert.length > 0) {
+        const { error: insertError } = await supabaseAdmin.from('spc_members').insert(toInsert)
+        if (insertError) {
+          errors.push(`Bulk insert failed: ${insertError.message}`)
+        } else {
+          insertedNew = toInsert.length
+        }
+      }
+    }
+
+    return NextResponse.json({
+      cancelled:        cancelledCount,
+      updated_to_trial: updatedToTrial,
+      updated_to_active: updatedToActive,
+      inserted_new:     insertedNew,
+      skipped:          skippedCount,
+      errors,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
