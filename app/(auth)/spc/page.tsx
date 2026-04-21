@@ -243,6 +243,7 @@ interface MemberEditForm {
   joined_at: string
   status: MemberStatus
   next_payment_date: string
+  trial_end_date: string
 }
 
 interface CancelEditForm {
@@ -315,7 +316,7 @@ function MemberProfileModal({
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState<MemberEditForm>({
     name: '', email: '', phone: '', plan: 'monthly',
-    provider: 'Stripe', joined_at: '', status: 'active', next_payment_date: '',
+    provider: 'Stripe', joined_at: '', status: 'active', next_payment_date: '', trial_end_date: '',
   })
   const [cancelForm, setCancelForm] = useState<CancelEditForm>({
     name: '', email: '', customer_phone: '', cancel_type: 'paid_cancel',
@@ -343,6 +344,7 @@ function MemberProfileModal({
       joined_at: m.joined_at ?? '',
       status: (m.status as MemberStatus) ?? 'active',
       next_payment_date: m.next_payment_date ?? autoDate,
+      trial_end_date: m.trial_end_date ?? '',
     })
     setIsEditing(true)
   }
@@ -378,6 +380,7 @@ function MemberProfileModal({
           joined_at: editForm.joined_at || null,
           status: editForm.status,
           next_payment_date: editForm.next_payment_date || null,
+          trial_end_date: editForm.trial_end_date || null,
         })
         .eq('id', selected.data.id)
         .select()
@@ -891,6 +894,13 @@ function MemberProfileModal({
                   <input type="date" value={editForm.next_payment_date} onChange={(e) => setField('next_payment_date', e.target.value)} className={inputCls} />
                   <p className="text-[10px] text-zinc-400 mt-1">Auto-calculated from last payment. Override manually if needed.</p>
                 </div>
+                {editForm.status === 'trial' && (
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Trial Expires</label>
+                    <input type="date" value={editForm.trial_end_date} onChange={(e) => setField('trial_end_date', e.target.value)} className={inputCls} />
+                    <p className="text-[10px] text-zinc-400 mt-1">When this trial ends. Days Left is calculated from this date.</p>
+                  </div>
+                )}
               </div>
 
               {/* Save / Cancel */}
