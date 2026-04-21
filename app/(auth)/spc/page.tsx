@@ -1167,7 +1167,22 @@ export default function SpcPage() {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvPreviewRows, setCsvPreviewRows] = useState<string[][]>([])
   const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[]; error?: string } | null>(null)
+  const [importResult, setImportResult] = useState<{
+    // Legacy Kajabi / members mode fields
+    imported?: number; updated?: number; skipped?: number;
+    // GHL unified fields
+    parsed_total?: number;
+    status_counts?: Record<string, number>;
+    cancellations_inserted?: number;
+    members_updated_to_cancelled?: number;
+    members_updated_to_trial?: number;
+    members_updated_to_active?: number;
+    new_members_inserted?: number;
+    // Shared
+    cancelled?: number;
+    errors?: string[];
+    error?: string;
+  } | null>(null)
 
   const fetchNotes = useCallback(async (memberId: string) => {
     const { data } = await supabase
@@ -1481,15 +1496,27 @@ export default function SpcPage() {
     const data = await res.json()
     setImporting(false)
     setImportResult(data)
-    if (res.ok && data.imported > 0) {
-      if (csvMode === 'members') {
-        const result = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
-        setMembers(result.data ?? [])
-      } else {
-        const result = await supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false })
-        setCancellations(result.data ?? [])
-      }
+    if (!res.ok) return
+
+    // Determine what changed and refresh accordingly
+    const hasNewCancels = (data.cancellations_inserted ?? data.cancelled ?? data.imported ?? 0) > 0
+    const hasMemberChanges = (data.members_updated_to_cancelled ?? 0) + (data.members_updated_to_trial ?? 0) +
+      (data.members_updated_to_active ?? 0) + (data.new_members_inserted ?? 0) + (data.updated ?? 0) + (data.imported ?? 0) > 0
+
+    const refreshes: Promise<void>[] = []
+    if (hasNewCancels || csvMode === 'cancellations') {
+      refreshes.push(
+        supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false })
+          .then(({ data }) => { if (data) setCancellations(data) })
+      )
     }
+    if (hasMemberChanges || csvMode === 'members') {
+      refreshes.push(
+        supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+          .then(({ data }) => { if (data) setMembers(data) })
+      )
+    }
+    await Promise.all(refreshes)
   }
 
   function resetCsvModal() {
@@ -2601,15 +2628,43 @@ export default function SpcPage() {
               )}>
                 {importResult.error ? (
                   <p>Error: {importResult.error}</p>
+                ) : importResult.parsed_total != null ? (
+                  /* GHL unified result */
+                  <div className="space-y-1.5">
+                    <p className="font-semibold">{importResult.parsed_total} rows parsed</p>
+                    {importResult.status_counts && (
+                      <p className="text-xs opacity-70">
+                        CSV statuses: {Object.entries(importResult.status_counts).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs mt-1">
+                      {(importResult.cancellations_inserted ?? 0) > 0 && <p>Cancellations inserted: <strong>{importResult.cancellations_inserted}</strong></p>}
+                      {(importResult.members_updated_to_cancelled ?? 0) > 0 && <p>Members → cancelled: <strong>{importResult.members_updated_to_cancelled}</strong></p>}
+                      {(importResult.members_updated_to_trial ?? 0) > 0 && <p>Members → trial: <strong>{importResult.members_updated_to_trial}</strong></p>}
+                      {(importResult.members_updated_to_active ?? 0) > 0 && <p>Members → active: <strong>{importResult.members_updated_to_active}</strong></p>}
+                      {(importResult.new_members_inserted ?? 0) > 0 && <p>New members: <strong>{importResult.new_members_inserted}</strong></p>}
+                      {(importResult.skipped ?? 0) > 0 && <p>Skipped: <strong>{importResult.skipped}</strong></p>}
+                    </div>
+                    {(importResult.errors?.length ?? 0) > 0 && (
+                      <details className="mt-1.5">
+                        <summary className="text-xs cursor-pointer opacity-70">{importResult.errors!.length} warnings</summary>
+                        <ul className="mt-1 text-xs space-y-0.5 opacity-60 max-h-32 overflow-y-auto">
+                          {importResult.errors!.map((e, i) => <li key={i}>• {e}</li>)}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
                 ) : (
+                  /* Legacy Kajabi / members mode result */
                   <>
                     <p className="font-semibold">
-                      {importResult.imported} records imported
-                      {importResult.skipped > 0 && `, ${importResult.skipped} skipped (already exist)`}
+                      {importResult.imported ?? 0} records imported
+                      {(importResult.updated ?? 0) > 0 && `, ${importResult.updated} updated`}
+                      {(importResult.skipped ?? 0) > 0 && `, ${importResult.skipped} skipped (already exist)`}
                     </p>
-                    {importResult.errors?.length > 0 && (
-                      <ul className="mt-1.5 text-xs space-y-0.5 text-zinc-500 dark:text-zinc-400">
-                        {importResult.errors.map((e, i) => <li key={i}>• {e}</li>)}
+                    {(importResult.errors?.length ?? 0) > 0 && (
+                      <ul className="mt-1.5 text-xs space-y-0.5 opacity-70">
+                        {importResult.errors!.map((e, i) => <li key={i}>• {e}</li>)}
                       </ul>
                     )}
                   </>
