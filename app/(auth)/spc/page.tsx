@@ -1506,14 +1506,16 @@ export default function SpcPage() {
     const refreshes: Promise<void>[] = []
     if (hasNewCancels || csvMode === 'cancellations') {
       refreshes.push(
-        supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false })
-          .then(({ data }) => { if (data) setCancellations(data) })
+        Promise.resolve(
+          supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false })
+        ).then(({ data }) => { if (data) setCancellations(data) })
       )
     }
     if (hasMemberChanges || csvMode === 'members') {
       refreshes.push(
-        supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
-          .then(({ data }) => { if (data) setMembers(data) })
+        Promise.resolve(
+          supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+        ).then(({ data }) => { if (data) setMembers(data) })
       )
     }
     await Promise.all(refreshes)
@@ -2720,8 +2722,9 @@ export default function SpcPage() {
             setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
             setSelectedMember({ kind: 'member', data: updated })
             if (updated.status === 'cancelled') {
-              supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false })
-                .then(({ data }) => { if (data) setCancellations(data) })
+              Promise.resolve(
+                supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false })
+              ).then(({ data }) => { if (data) setCancellations(data) })
             }
           }}
           onSaveCancellation={(updated) => {
