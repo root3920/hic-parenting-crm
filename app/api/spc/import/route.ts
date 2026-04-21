@@ -1,46 +1,32 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import Papa from 'papaparse'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// ── CSV parser ────────────────────────────────────────────────────────────────
+// ── CSV parser via papaparse ─────────────────────────────────────────────────
 
 function parseCSV(text: string): Record<string, string>[] {
   // Strip BOM (common in GHL exports)
   const cleaned = text.replace(/^\uFEFF/, '')
-  const lines = cleaned.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n')
-  if (lines.length < 2) return []
+  const result = Papa.parse<Record<string, string>>(cleaned, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (h) => h.trim(),
+    transform: (v) => v.trim(),
+  })
+  return result.data
+}
 
-  function parseRow(line: string): string[] {
-    const fields: string[] = []
-    let current = ''
-    let inQuotes = false
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i]
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
-        else inQuotes = !inQuotes
-      } else if (ch === ',' && !inQuotes) {
-        fields.push(current.trim()); current = ''
-      } else {
-        current += ch
-      }
-    }
-    fields.push(current.trim())
-    return fields
-  }
+// ── Case-insensitive column lookup ───────────────────────────────────────────
 
-  const headers = parseRow(lines[0])
-  return lines
-    .slice(1)
-    .filter((l) => l.trim())
-    .map((line) => {
-      const values = parseRow(line)
-      return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']))
-    })
+function getCol(row: Record<string, string>, name: string): string {
+  const lower = name.toLowerCase()
+  const key = Object.keys(row).find((k) => k.trim().toLowerCase() === lower)
+  return key ? (row[key] ?? '').trim() : ''
 }
 
 // ── Status mappers ────────────────────────────────────────────────────────────
@@ -99,7 +85,10 @@ export async function POST(req: NextRequest) {
     // Debug: log parsed headers so column name issues are visible
     if (rows.length > 0) {
       console.log('[SPC Import] Parsed headers:', Object.keys(rows[0]))
+      console.log('[SPC Import] First row sample:', JSON.stringify(rows[0]).slice(0, 300))
       console.log('[SPC Import] Total rows:', rows.length, '| Source:', source, '| Mode:', mode)
+    } else {
+      console.log('[SPC Import] WARNING: 0 rows parsed from CSV')
     }
 
     // ── MODE: members (Kajabi active import) ──────────────────────────────────
@@ -108,28 +97,28 @@ export async function POST(req: NextRequest) {
 
       for (const row of rows) {
         if (source === 'kajabi') {
-          const status = row['Status']?.trim()
+          const status = getCol(row, 'Status')
           if (status !== 'active' && status !== 'Pending Cancellation') continue
           records.push({
-            name:      row['Customer Name']?.trim() || null,
-            email:     (row['Customer Email']?.trim() || '').toLowerCase() || null,
-            amount:    parseAmount(row['Amount'] ?? '0'),
-            plan:      mapInterval(row['Interval'] ?? ''),
-            provider:  row['Provider']?.trim() || 'Kajabi',
-            joined_at: row['Created At']?.trim() || null,
+            name:      getCol(row, 'Customer Name') || null,
+            email:     getCol(row, 'Customer Email').toLowerCase() || null,
+            amount:    parseAmount(getCol(row, 'Amount')),
+            plan:      mapInterval(getCol(row, 'Interval')),
+            provider:  getCol(row, 'Provider') || 'Kajabi',
+            joined_at: getCol(row, 'Created At') || null,
             status:    'active',
           })
         } else {
-          const rawStatus = (row['Status'] ?? '').trim().toLowerCase()
+          const rawStatus = getCol(row, 'Status').toLowerCase()
           const mappedStatus = GHL_STATUS_MAP[rawStatus]
           if (!mappedStatus || mappedStatus === 'cancelled') continue
           records.push({
-            name:      row['Customer name']?.trim() || null,
-            email:     (row['Customer email']?.trim() || '').toLowerCase() || null,
-            amount:    parseAmount(row['Total amount'] ?? '0'),
-            plan:      deriveIntervalFromName(row['Line item name'] ?? ''),
-            provider:  row['Payment provider']?.trim() || 'GHL',
-            joined_at: row['Subscription start']?.trim() || null,
+            name:      getCol(row, 'Customer name') || null,
+            email:     getCol(row, 'Customer email').toLowerCase() || null,
+            amount:    parseAmount(getCol(row, 'Total amount')),
+            plan:      deriveIntervalFromName(getCol(row, 'Line item name')),
+            provider:  getCol(row, 'Payment provider') || 'GHL',
+            joined_at: getCol(row, 'Subscription start') || null,
             status:    mappedStatus,
           })
         }
@@ -170,28 +159,28 @@ export async function POST(req: NextRequest) {
       const records: Record<string, unknown>[] = []
 
       for (const row of rows) {
-        const mapped = mapKajabiStatus(row['Status'] ?? '')
+        const mapped = mapKajabiStatus(getCol(row, 'Status'))
         if (!mapped) continue
 
-        const subId = row['Kajabi Subscription ID']?.trim()
+        const subId = getCol(row, 'Kajabi Subscription ID')
         if (!subId) {
-          errors.push(`Row skipped (no subscription ID): ${row['Customer Email'] ?? 'unknown'}`)
+          errors.push(`Row skipped (no subscription ID): ${getCol(row, 'Customer Email') || 'unknown'}`)
           continue
         }
 
         records.push({
           subscription_id: subId,
-          name:            row['Customer Name']?.trim() || null,
-          email:           (row['Customer Email']?.trim() || '').toLowerCase() || null,
-          amount:          parseAmount(row['Amount'] ?? '0'),
-          currency:        row['Currency']?.trim() || null,
-          interval:        row['Interval']?.trim() || null,
-          plan:            mapInterval(row['Interval'] ?? ''),
+          name:            getCol(row, 'Customer Name') || null,
+          email:           getCol(row, 'Customer Email').toLowerCase() || null,
+          amount:          parseAmount(getCol(row, 'Amount')),
+          currency:        getCol(row, 'Currency') || null,
+          interval:        getCol(row, 'Interval') || null,
+          plan:            mapInterval(getCol(row, 'Interval')),
           cancel_type:     mapped.cancel_type,
-          cancelled_at:    row['Canceled On']?.trim() || null,
-          offer_title:     row['Offer Title']?.trim() || null,
-          provider:        row['Provider']?.trim() || null,
-          subscribed_at:   row['Created At']?.trim() || null,
+          cancelled_at:    getCol(row, 'Canceled On') || null,
+          offer_title:     getCol(row, 'Offer Title') || null,
+          provider:        getCol(row, 'Provider') || null,
+          subscribed_at:   getCol(row, 'Created At') || null,
           source:          'kajabi',
         })
       }
@@ -243,8 +232,8 @@ export async function POST(req: NextRequest) {
     // Step 1: Count raw statuses for debug
     const statusCounts: Record<string, number> = {}
     for (const row of rows) {
-      const raw = (row['Status'] ?? '').trim().toLowerCase()
-      statusCounts[raw] = (statusCounts[raw] || 0) + 1
+      const raw = getCol(row, 'Status').toLowerCase()
+      statusCounts[raw || '(empty)'] = (statusCounts[raw || '(empty)'] || 0) + 1
     }
     console.log('[SPC Import GHL] Raw status counts:', statusCounts)
 
@@ -254,25 +243,25 @@ export async function POST(req: NextRequest) {
     let skippedCount = 0
 
     for (const row of rows) {
-      const rawStatus = (row['Status'] ?? '').trim().toLowerCase()
+      const rawStatus = getCol(row, 'Status').toLowerCase()
       const mappedStatus = GHL_STATUS_MAP[rawStatus]
 
       if (!mappedStatus) {
         skippedCount++
-        errors.push(`Unknown status "${rawStatus}" for ${row['Customer email'] ?? 'unknown'}`)
+        if (rawStatus) errors.push(`Unknown status "${rawStatus}" for ${getCol(row, 'Customer email') || 'unknown'}`)
         continue
       }
 
-      const email     = (row['Customer email']?.trim() || '').toLowerCase() || null
-      const name      = row['Customer name']?.trim() || null
-      const amount    = parseAmount(row['Total amount'] ?? '0')
-      const lineItem  = row['Line item name']?.trim() || ''
+      const email     = getCol(row, 'Customer email').toLowerCase() || null
+      const name      = getCol(row, 'Customer name') || null
+      const amount    = parseAmount(getCol(row, 'Total amount'))
+      const lineItem  = getCol(row, 'Line item name')
       const plan      = deriveIntervalFromName(lineItem)
-      const provider  = row['Payment provider']?.trim() || 'GHL'
-      const joinedAt  = row['Subscription start']?.trim() || null
+      const provider  = getCol(row, 'Payment provider') || 'GHL'
+      const joinedAt  = getCol(row, 'Subscription start') || null
 
       if (mappedStatus === 'cancelled') {
-        const subId = row['Subscription id']?.trim()
+        const subId = getCol(row, 'Subscription id')
         if (!subId) {
           errors.push(`Cancelled row skipped (no subscription ID): ${email ?? 'unknown'}`)
           continue
@@ -283,15 +272,15 @@ export async function POST(req: NextRequest) {
           subscription_id: subId,
           name,
           email,
-          customer_phone:  row['Customer phone']?.trim() || null,
+          customer_phone:  getCol(row, 'Customer phone') || null,
           amount,
-          currency:        row['Currency']?.trim() || 'USD',
+          currency:        getCol(row, 'Currency') || 'USD',
           interval:        lineItem || null,
           plan,
           cancel_type:     isPaidCancel ? 'paid_cancel' : 'trial_cancel',
           paid_cancel:     isPaidCancel,
           trial_cancel:    !isPaidCancel,
-          cancelled_at:    row['Cancelled at']?.trim() || null,
+          cancelled_at:    getCol(row, 'Cancelled at') || null,
           offer_title:     lineItem || null,
           provider,
           subscribed_at:   joinedAt,
@@ -318,7 +307,6 @@ export async function POST(req: NextRequest) {
     if (cancelRows.length > 0) {
       // Dedup against existing cancellations
       const subIds = cancelRows.map(r => r.subscription_id as string)
-      // Supabase .in() has a limit of ~100 values, batch if needed
       const existingIds = new Set<string>()
       for (let i = 0; i < subIds.length; i += 100) {
         const batch = subIds.slice(i, i + 100)
@@ -326,7 +314,7 @@ export async function POST(req: NextRequest) {
           .from('spc_cancellations')
           .select('subscription_id')
           .in('subscription_id', batch)
-        for (const row of data ?? []) existingIds.add((row as { subscription_id: string }).subscription_id)
+        for (const r of data ?? []) existingIds.add((r as { subscription_id: string }).subscription_id)
       }
 
       const newCancels = cancelRows.filter(r => !existingIds.has(r.subscription_id as string))
@@ -341,6 +329,7 @@ export async function POST(req: NextRequest) {
         const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
         if (error) {
           errors.push(`Cancel insert failed for ${cancel.email}: ${error.message}`)
+          console.log(`[SPC Import GHL] Cancel insert FAILED for ${cancel.email}: ${error.message}`)
         } else {
           cancellationsInserted++
         }
@@ -385,7 +374,6 @@ export async function POST(req: NextRequest) {
 
     if (memberRows.length > 0) {
       for (const row of memberRows) {
-        // Case-insensitive lookup
         const { data: existing } = await supabaseAdmin
           .from('spc_members')
           .select('id, email, status')
@@ -400,7 +388,6 @@ export async function POST(req: NextRequest) {
             continue
           }
 
-          // Only update if status actually changes
           if (existing.status !== row.status) {
             const { error } = await supabaseAdmin
               .from('spc_members')
@@ -416,7 +403,6 @@ export async function POST(req: NextRequest) {
             }
           }
         } else {
-          // Insert new member
           const { error } = await supabaseAdmin.from('spc_members').insert({
             name:      row.name || 'Unknown',
             email:     row.email,
