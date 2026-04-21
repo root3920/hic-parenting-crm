@@ -630,24 +630,19 @@ function MemberProfileModal({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Days Left</span>
-                  {selected.kind === 'member' && selected.data.status === 'trial' && selected.data.trial_end_date
+                  {selected.kind === 'member' && selected.data.trial_end_date
                     ? (() => {
                         const d = daysUntil(selected.data.trial_end_date)
-                        return (
-                          <span className={cn(
-                            'inline-flex px-2 py-0.5 rounded-full text-xs font-bold',
-                            d < 0 ? 'bg-red-100 text-red-700' :
-                            d <= 7 ? 'bg-orange-100 text-orange-700' :
-                            'bg-green-100 text-green-700'
-                          )}>
-                            {d < 0 ? 'Expired' : `${d}d left`}
-                          </span>
-                        )
+                        if (d < 0) return <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Expired</span>
+                        if (d <= 3) return <span className="text-xs font-bold text-red-600 dark:text-red-400">{d}d left</span>
+                        if (d <= 7) return <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{d}d left</span>
+                        if (d <= 14) return <span className="text-xs font-bold text-green-600 dark:text-green-400">{d}d left</span>
+                        return <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">{d}d left</span>
                       })()
                     : <span className={rowValue}>—</span>
                   }
                 </div>
-                {selected.kind === 'member' && selected.data.status === 'trial' && selected.data.trial_end_date && (
+                {selected.kind === 'member' && selected.data.trial_end_date && (
                   <div className="flex items-center justify-between">
                     <span className={rowLabel}>Trial Expires</span>
                     <span className={rowValue}>{formatDate(selected.data.trial_end_date)}</span>
@@ -1417,13 +1412,13 @@ export default function SpcPage() {
   // ────────────────────────────────────────────────────────────────────────
 
   function trialUrgencyPill(m: SpcMember) {
-    if (!m.trial_end_date) return <StatusPill label="No end date" variant="neutral" />
+    if (!m.trial_end_date) return <span className="text-xs text-zinc-400">—</span>
     const days = daysUntil(m.trial_end_date)
     if (days < 0) return <StatusPill label="Expired" variant="danger" />
-    if (days <= 7) return <StatusPill label={`${days}d left`} variant="danger" />
-    if (days <= 14) return <StatusPill label={`${days}d left`} variant="warning" />
-    if (days <= 21) return <StatusPill label={`${days}d left`} variant="info" />
-    return <StatusPill label={`${days}d left`} variant="neutral" />
+    if (days <= 3) return <span className="text-xs font-semibold text-red-600 dark:text-red-400">{days}d left</span>
+    if (days <= 7) return <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{days}d left</span>
+    if (days <= 14) return <span className="text-xs font-semibold text-green-600 dark:text-green-400">{days}d left</span>
+    return <span className="text-xs text-zinc-500 dark:text-zinc-400">{days}d left</span>
   }
 
   // ── CSV helpers ───────────────────────────────────────────────────────────
