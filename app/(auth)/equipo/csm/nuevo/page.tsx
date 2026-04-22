@@ -201,7 +201,7 @@ export default function HtCsmNewReportPage() {
           </Link>
         </div>
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Weekly Report — Client Success HT</h1>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Daily Report — Client Success HT</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Graduate ascension activity log</p>
         </div>
 
@@ -224,7 +224,7 @@ export default function HtCsmNewReportPage() {
                 </select>
               </div>
               <div>
-                <FieldLabel>Week evaluated</FieldLabel>
+                <FieldLabel>Date</FieldLabel>
                 <input
                   type="date"
                   value={form.date}
@@ -249,7 +249,7 @@ export default function HtCsmNewReportPage() {
               color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
             />
             <div>
-              <FieldLabel>Graduates contacted this week</FieldLabel>
+              <FieldLabel>Graduates contacted today</FieldLabel>
               <NumberInput value={form.graduates_contacted} onChange={(v) => set('graduates_contacted', v)} />
             </div>
           </SectionCard>
@@ -329,7 +329,7 @@ export default function HtCsmNewReportPage() {
           {/* ── Calls / Week ── */}
           <SectionCard>
             <SectionHeader
-              label="Calls / Week"
+              label="Calls Today"
               color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
             />
             <div>
@@ -400,7 +400,7 @@ export default function HtCsmNewReportPage() {
             <div className="space-y-3">
               <div>
                 <FieldLabel>Key learning 1</FieldLabel>
-                <input type="text" value={form.learning_1} onChange={(e) => set('learning_1', e.target.value)} placeholder="What worked well this week?" className={inputCls} />
+                <input type="text" value={form.learning_1} onChange={(e) => set('learning_1', e.target.value)} placeholder="What worked well today?" className={inputCls} />
               </div>
               <div>
                 <FieldLabel>Key learning 2</FieldLabel>
@@ -444,7 +444,7 @@ export default function HtCsmNewReportPage() {
               </div>
             </div>
             <div>
-              <FieldLabel>What would you improve next week?</FieldLabel>
+              <FieldLabel>What would you improve tomorrow?</FieldLabel>
               <textarea
                 value={form.improvement_notes}
                 onChange={(e) => set('improvement_notes', e.target.value)}

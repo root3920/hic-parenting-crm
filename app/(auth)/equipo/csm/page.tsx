@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 10
 
-type Preset = '7d' | '30d' | 'all'
+type Preset = '7d' | '30d' | '90d' | 'all'
 
 interface HtReport {
   id: string
@@ -69,7 +69,7 @@ function getDateRange(preset: Preset): { from: string; to: string } | null {
   const today = new Date()
   const fmt = (d: Date) => d.toISOString().split('T')[0]
   const from = new Date(today)
-  from.setDate(today.getDate() - (preset === '7d' ? 6 : 29))
+  from.setDate(today.getDate() - (preset === '7d' ? 6 : preset === '30d' ? 29 : 89))
   return { from: fmt(from), to: fmt(today) }
 }
 
@@ -442,7 +442,7 @@ function EditModal({
               <input type="text" value={form.rep_name} onChange={(e) => set('rep_name', e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Week</label>
+              <label className={labelCls}>Date</label>
               <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} className={inputCls} />
             </div>
           </div>
@@ -663,11 +663,11 @@ export default function HtCsmDashboardPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Client Success — High Ticket" description="Weekly HT CSM performance">
+        <PageHeader title="Client Success — High Ticket" description="Daily HT CSM performance">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Date preset */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', 'all'] as Preset[]).map((p) => (
+              {(['7d', '30d', '90d', 'all'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPreset(p)}
@@ -747,12 +747,11 @@ export default function HtCsmDashboardPage() {
                 status={closeRateStatus(kpis.closeRate)}
               />
               <KpiCard
-                label="Calls this week"
+                label="Total Calls"
                 value={String(kpis.sumCalls)}
-                goal="Goal: 4–6 calls"
-                sub="sum of daily calls"
-                barPct={(kpis.sumCalls / 6) * 100}
-                status={callsStatus(kpis.sumCalls)}
+                sub="sum for period"
+                barPct={Math.min(100, (kpis.sumCalls / (reports.length * 6)) * 100)}
+                status={kpis.sumCalls > 0 ? 'good' : 'alert'}
               />
               <KpiCard
                 label="Avg Score"
@@ -798,10 +797,10 @@ export default function HtCsmDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Weekly call volume */}
+              {/* Daily call volume */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Weekly Call Volume</CardTitle>
+                  <CardTitle className="text-sm font-semibold">Daily Call Volume</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={200}>
@@ -874,7 +873,7 @@ export default function HtCsmDashboardPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['', 'Week', 'Rep', 'Outreach%', 'Response%', 'Pitch%', 'Show%', 'Close%', 'Calls (day)', 'Score'].map((h, i) => (
+                        {['', 'Date', 'Rep', 'Outreach%', 'Response%', 'Pitch%', 'Show%', 'Close%', 'Calls', 'Score'].map((h, i) => (
                           <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
