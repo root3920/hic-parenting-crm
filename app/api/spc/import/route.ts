@@ -269,22 +269,27 @@ export async function POST(req: NextRequest) {
 
       const email    = (getCol(row, 'Customer email') || '').toLowerCase().trim() || null
       const name     = getCol(row, 'Customer name') || null
-      const amount   = parseAmount(getCol(row, 'Total amount'))
+      const subTotal = parseFloat(getCol(row, 'Sub total').replace(/[$,\s]/g, '')) || 0
+      const trialDays = parseInt(getCol(row, 'Number of trial days')) || 0
       const lineItem = getCol(row, 'Line item name')
-      const isPaid   = amount > 0
+      const lineItemLower = lineItem.toLowerCase()
+
+      const isTrialCancel = subTotal === 0 || trialDays > 0 ||
+        lineItemLower.includes('trial') || lineItemLower.includes('free')
+      const isPaidCancel = !isTrialCancel
 
       cancelRows.push({
         subscription_id: getCol(row, 'Subscription id') || null,
         name,
         email,
         customer_phone: getCol(row, 'Customer phone') || null,
-        amount,
+        amount:         subTotal,
         currency:       'USD',
         interval:       lineItem || null,
         plan:           deriveIntervalFromName(lineItem),
-        cancel_type:    isPaid ? 'paid_cancel' : 'trial_cancel',
-        paid_cancel:    isPaid,
-        trial_cancel:   !isPaid,
+        cancel_type:    isPaidCancel ? 'paid_cancel' : 'trial_cancel',
+        paid_cancel:    isPaidCancel,
+        trial_cancel:   isTrialCancel,
         cancelled_at:   getCol(row, 'Cancelled at') || null,
         offer_title:    lineItem || null,
         provider:       getCol(row, 'Payment provider') || 'GHL',
@@ -296,6 +301,8 @@ export async function POST(req: NextRequest) {
     console.log(`[SPC Import GHL] Found ${cancelRows.length} cancelled rows out of ${rows.length} total`)
 
     let cancellationsUpserted = 0
+    let trialCancelsImported = 0
+    let paidCancelsImported = 0
     let membersUpdatedToCancelled = 0
     let skippedAlreadyCancelled = 0
 
@@ -303,40 +310,48 @@ export async function POST(req: NextRequest) {
       const email = cancel.email as string | null
 
       // Upsert into spc_cancellations by email
+      let upsertOk = false
       if (!email) {
         const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
         if (error) {
           errors.push(`Cancel insert failed (no email): ${error.message}`)
         } else {
-          cancellationsUpserted++
-        }
-        continue
-      }
-
-      const { data: existing } = await supabaseAdmin
-        .from('spc_cancellations')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle()
-
-      if (existing) {
-        const { error } = await supabaseAdmin
-          .from('spc_cancellations')
-          .update(cancel)
-          .eq('id', existing.id)
-        if (error) {
-          errors.push(`Cancel update failed for ${email}: ${error.message}`)
-        } else {
-          cancellationsUpserted++
+          upsertOk = true
         }
       } else {
-        const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
-        if (error) {
-          errors.push(`Cancel insert failed for ${email}: ${error.message}`)
+        const { data: existing } = await supabaseAdmin
+          .from('spc_cancellations')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle()
+
+        if (existing) {
+          const { error } = await supabaseAdmin
+            .from('spc_cancellations')
+            .update(cancel)
+            .eq('id', existing.id)
+          if (error) {
+            errors.push(`Cancel update failed for ${email}: ${error.message}`)
+          } else {
+            upsertOk = true
+          }
         } else {
-          cancellationsUpserted++
+          const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
+          if (error) {
+            errors.push(`Cancel insert failed for ${email}: ${error.message}`)
+          } else {
+            upsertOk = true
+          }
         }
       }
+
+      if (upsertOk) {
+        cancellationsUpserted++
+        if (cancel.trial_cancel) trialCancelsImported++
+        else paidCancelsImported++
+      }
+
+      if (!email) continue
 
       // Update spc_members if they exist and are not already cancelled
       const { data: member } = await supabaseAdmin
@@ -368,6 +383,8 @@ export async function POST(req: NextRequest) {
       total_rows:                  rows.length,
       cancelled_rows_found:        cancelRows.length,
       cancellations_upserted:      cancellationsUpserted,
+      trial_cancels_imported:      trialCancelsImported,
+      paid_cancels_imported:       paidCancelsImported,
       members_updated_to_cancelled: membersUpdatedToCancelled,
       skipped_already_cancelled:   skippedAlreadyCancelled,
       status_counts:               statusCounts,

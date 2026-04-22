@@ -1258,12 +1258,18 @@ export default function SpcPage() {
     imported?: number; updated?: number; skipped?: number;
     // GHL unified fields
     parsed_total?: number;
+    total_rows?: number;
+    cancelled_rows_found?: number;
     status_counts?: Record<string, number>;
     cancellations_inserted?: number;
+    cancellations_upserted?: number;
+    trial_cancels_imported?: number;
+    paid_cancels_imported?: number;
     members_updated_to_cancelled?: number;
     members_updated_to_trial?: number;
     members_updated_to_active?: number;
     new_members_inserted?: number;
+    skipped_already_cancelled?: number;
     // Shared
     cancelled?: number;
     errors?: string[];
@@ -1682,7 +1688,7 @@ export default function SpcPage() {
     if (!res.ok) return
 
     // Determine what changed and refresh accordingly
-    const hasNewCancels = (data.cancellations_inserted ?? data.cancelled ?? data.imported ?? 0) > 0
+    const hasNewCancels = (data.cancellations_upserted ?? data.cancellations_inserted ?? data.cancelled ?? data.imported ?? 0) > 0
     const hasMemberChanges = (data.members_updated_to_cancelled ?? 0) + (data.members_updated_to_trial ?? 0) +
       (data.members_updated_to_active ?? 0) + (data.new_members_inserted ?? 0) + (data.updated ?? 0) + (data.imported ?? 0) > 0
 
@@ -2961,22 +2967,25 @@ export default function SpcPage() {
               )}>
                 {importResult.error ? (
                   <p>Error: {importResult.error}</p>
-                ) : importResult.parsed_total != null ? (
-                  /* GHL unified result */
+                ) : (importResult.parsed_total != null || importResult.total_rows != null) ? (
+                  /* GHL result */
                   <div className="space-y-1.5">
-                    <p className="font-semibold">{importResult.parsed_total} rows parsed</p>
+                    <p className="font-semibold">{importResult.total_rows ?? importResult.parsed_total} rows parsed</p>
                     {importResult.status_counts && (
                       <p className="text-xs opacity-70">
                         CSV statuses: {Object.entries(importResult.status_counts).map(([k, v]) => `${k}: ${v}`).join(', ')}
                       </p>
                     )}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs mt-1">
-                      {(importResult.cancellations_inserted ?? 0) > 0 && <p>Cancellations inserted: <strong>{importResult.cancellations_inserted}</strong></p>}
+                      {(importResult.cancelled_rows_found ?? 0) > 0 && <p>Cancelled rows found: <strong>{importResult.cancelled_rows_found}</strong></p>}
+                      {(importResult.cancellations_upserted ?? importResult.cancellations_inserted ?? 0) > 0 && <p>Cancellations upserted: <strong>{importResult.cancellations_upserted ?? importResult.cancellations_inserted}</strong></p>}
+                      {(importResult.trial_cancels_imported ?? 0) > 0 && <p>Trial cancels: <strong>{importResult.trial_cancels_imported}</strong></p>}
+                      {(importResult.paid_cancels_imported ?? 0) > 0 && <p>Paid cancels: <strong>{importResult.paid_cancels_imported}</strong></p>}
                       {(importResult.members_updated_to_cancelled ?? 0) > 0 && <p>Members → cancelled: <strong>{importResult.members_updated_to_cancelled}</strong></p>}
+                      {(importResult.skipped_already_cancelled ?? 0) > 0 && <p>Already cancelled: <strong>{importResult.skipped_already_cancelled}</strong></p>}
                       {(importResult.members_updated_to_trial ?? 0) > 0 && <p>Members → trial: <strong>{importResult.members_updated_to_trial}</strong></p>}
                       {(importResult.members_updated_to_active ?? 0) > 0 && <p>Members → active: <strong>{importResult.members_updated_to_active}</strong></p>}
                       {(importResult.new_members_inserted ?? 0) > 0 && <p>New members: <strong>{importResult.new_members_inserted}</strong></p>}
-                      {(importResult.skipped ?? 0) > 0 && <p>Skipped: <strong>{importResult.skipped}</strong></p>}
                     </div>
                     {(importResult.errors?.length ?? 0) > 0 && (
                       <details className="mt-1.5">
