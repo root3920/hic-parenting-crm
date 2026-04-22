@@ -2542,25 +2542,6 @@ export default function SpcPage() {
                 </CardContent>
               </Card>
 
-              {unknownDateCancels > 0 && (
-                <Card>
-                  <CardContent className="pt-5 pb-4">
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                      Unknown Date
-                    </p>
-                    {loading ? (
-                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
-                    ) : (
-                      <>
-                        <p className="text-2xl font-semibold text-zinc-400 dark:text-zinc-500">
-                          {unknownDateCancels}
-                        </p>
-                        <p className="text-xs text-zinc-500 mt-1">records without cancellation date</p>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
             </div>
 
             {/* Cancellations by month chart */}
