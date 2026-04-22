@@ -248,9 +248,11 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ── GHL: unified status handler ──────────────────────────────────────────
+    // ── GHL: cancellations only ────────────────────────────────────────────
 
-    // Step 1: Count raw statuses for debug
+    const CANCEL_STATUSES = new Set(['canceled', 'cancelled', 'incomplete_expired'])
+
+    // Count raw statuses for debug
     const statusCounts: Record<string, number> = {}
     for (const row of rows) {
       const raw = getCol(row, 'Status').toLowerCase()
@@ -258,208 +260,117 @@ export async function POST(req: NextRequest) {
     }
     console.log('[SPC Import GHL] Raw status counts:', statusCounts)
 
-    // Step 2: Bucket rows
+    // Only pick cancelled rows, skip everything else
     const cancelRows: Record<string, unknown>[] = []
-    const memberRows: { email: string; name: string | null; amount: number; status: string; plan: 'monthly' | 'annual'; provider: string; joined_at: string | null }[] = []
-    let skippedCount = 0
 
     for (const row of rows) {
       const rawStatus = getCol(row, 'Status').toLowerCase()
-      const mappedStatus = GHL_STATUS_MAP[rawStatus]
+      if (!CANCEL_STATUSES.has(rawStatus)) continue
 
-      if (!mappedStatus) {
-        skippedCount++
-        if (rawStatus) errors.push(`Unknown status "${rawStatus}" for ${getCol(row, 'Customer email') || 'unknown'}`)
+      const email    = (getCol(row, 'Customer email') || '').toLowerCase().trim() || null
+      const name     = getCol(row, 'Customer name') || null
+      const amount   = parseAmount(getCol(row, 'Total amount'))
+      const lineItem = getCol(row, 'Line item name')
+      const isPaid   = amount > 0
+
+      cancelRows.push({
+        subscription_id: getCol(row, 'Subscription id') || null,
+        name,
+        email,
+        customer_phone: getCol(row, 'Customer phone') || null,
+        amount,
+        currency:       'USD',
+        interval:       lineItem || null,
+        plan:           deriveIntervalFromName(lineItem),
+        cancel_type:    isPaid ? 'paid_cancel' : 'trial_cancel',
+        paid_cancel:    isPaid,
+        trial_cancel:   !isPaid,
+        cancelled_at:   getCol(row, 'Cancelled at') || null,
+        offer_title:    lineItem || null,
+        provider:       getCol(row, 'Payment provider') || 'GHL',
+        subscribed_at:  getCol(row, 'Subscription start') || null,
+        source:         'ghl',
+      })
+    }
+
+    console.log(`[SPC Import GHL] Found ${cancelRows.length} cancelled rows out of ${rows.length} total`)
+
+    let cancellationsUpserted = 0
+    let membersUpdatedToCancelled = 0
+    let skippedAlreadyCancelled = 0
+
+    for (const cancel of cancelRows) {
+      const email = cancel.email as string | null
+
+      // Upsert into spc_cancellations by email
+      if (!email) {
+        const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
+        if (error) {
+          errors.push(`Cancel insert failed (no email): ${error.message}`)
+        } else {
+          cancellationsUpserted++
+        }
         continue
       }
 
-      const email     = getCol(row, 'Customer email').toLowerCase() || null
-      const name      = getCol(row, 'Customer name') || null
-      const amount    = parseAmount(getCol(row, 'Total amount'))
-      const lineItem  = getCol(row, 'Line item name')
-      const plan      = deriveIntervalFromName(lineItem)
-      const provider  = getCol(row, 'Payment provider') || 'GHL'
-      const joinedAt  = getCol(row, 'Subscription start') || null
+      const { data: existing } = await supabaseAdmin
+        .from('spc_cancellations')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle()
 
-      if (mappedStatus === 'cancelled') {
-        const subId = getCol(row, 'Subscription id')
-        if (!subId) {
-          errors.push(`Cancelled row skipped (no subscription ID): ${email ?? 'unknown'}`)
-          continue
-        }
-
-        const isPaidCancel = amount > 0
-        cancelRows.push({
-          subscription_id: subId,
-          name,
-          email,
-          customer_phone:  getCol(row, 'Customer phone') || null,
-          amount,
-          currency:        getCol(row, 'Currency') || 'USD',
-          interval:        lineItem || null,
-          plan,
-          cancel_type:     isPaidCancel ? 'paid_cancel' : 'trial_cancel',
-          paid_cancel:     isPaidCancel,
-          trial_cancel:    !isPaidCancel,
-          cancelled_at:    getCol(row, 'Cancelled at') || null,
-          offer_title:     lineItem || null,
-          provider,
-          subscribed_at:   joinedAt,
-          source:          'ghl',
-        })
-      } else {
-        if (!email) {
-          errors.push(`Member row skipped (no email): ${name ?? 'unknown'}`)
-          continue
-        }
-        memberRows.push({ email, name, amount, status: mappedStatus, plan, provider, joined_at: joinedAt })
-      }
-    }
-
-    console.log(`[SPC Import GHL] Bucketed: ${cancelRows.length} cancels, ${memberRows.length} members, ${skippedCount} skipped`)
-    if (cancelRows.length > 0) {
-      console.log('[SPC Import GHL] First 3 cancel emails:', cancelRows.slice(0, 3).map(r => r.email))
-    }
-
-    // ── Step 3: Process cancellations ────────────────────────────────────────
-    let cancellationsInserted = 0
-    let membersUpdatedToCancelled = 0
-
-    if (cancelRows.length > 0) {
-      // Upsert by email — updates existing record if same email, inserts otherwise
-      for (const cancel of cancelRows) {
-        const email = cancel.email as string | null
-
-        if (!email) {
-          const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
-          if (error) {
-            errors.push(`Cancel insert failed (no email): ${error.message}`)
-          } else {
-            cancellationsInserted++
-          }
-          continue
-        }
-
-        const { data: existing } = await supabaseAdmin
+      if (existing) {
+        const { error } = await supabaseAdmin
           .from('spc_cancellations')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle()
-
-        if (existing) {
-          const { error } = await supabaseAdmin
-            .from('spc_cancellations')
-            .update(cancel)
-            .eq('id', existing.id)
-          if (error) {
-            errors.push(`Cancel update failed for ${email}: ${error.message}`)
-          } else {
-            cancellationsInserted++
-            console.log(`[SPC Import GHL] Updated existing cancel: ${email}`)
-          }
-          continue
+          .update(cancel)
+          .eq('id', existing.id)
+        if (error) {
+          errors.push(`Cancel update failed for ${email}: ${error.message}`)
+        } else {
+          cancellationsUpserted++
         }
-
+      } else {
         const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
         if (error) {
           errors.push(`Cancel insert failed for ${email}: ${error.message}`)
-          console.log(`[SPC Import GHL] Cancel insert FAILED for ${email}: ${error.message}`)
         } else {
-          cancellationsInserted++
-
-          // Only update spc_members for genuinely new cancellations
-          const { data: member } = await supabaseAdmin
-            .from('spc_members')
-            .select('id, email, status')
-            .ilike('email', email)
-            .in('status', ['active', 'trial'])
-            .limit(1)
-            .maybeSingle()
-
-          if (member) {
-            const { error: mErr } = await supabaseAdmin
-              .from('spc_members')
-              .update({ status: 'cancelled' })
-              .eq('id', member.id)
-
-            if (mErr) {
-              errors.push(`Failed to cancel member ${email}: ${mErr.message}`)
-            } else {
-              membersUpdatedToCancelled++
-              console.log(`[SPC Import GHL] Cancelled member: ${email} (was ${member.status})`)
-            }
-          }
+          cancellationsUpserted++
         }
       }
 
-      console.log(`[SPC Import GHL] Upserted ${cancellationsInserted} cancellations`)
-    }
+      // Update spc_members if they exist and are not already cancelled
+      const { data: member } = await supabaseAdmin
+        .from('spc_members')
+        .select('id, status')
+        .ilike('email', email)
+        .limit(1)
+        .maybeSingle()
 
-    // ── Step 4: Process trial / active members ──────────────────────────────
-    let membersUpdatedToTrial = 0
-    let membersUpdatedToActive = 0
-    let newMembersInserted = 0
-
-    if (memberRows.length > 0) {
-      for (const row of memberRows) {
-        const { data: existing } = await supabaseAdmin
-          .from('spc_members')
-          .select('id, email, status')
-          .ilike('email', row.email)
-          .limit(1)
-          .maybeSingle()
-
-        if (existing) {
-          // Never overwrite a cancelled status
-          if (existing.status === 'cancelled') {
-            console.log(`[SPC Import GHL] Skipping ${row.email} — already cancelled`)
-            continue
-          }
-
-          if (existing.status !== row.status) {
-            const { error } = await supabaseAdmin
-              .from('spc_members')
-              .update({ status: row.status })
-              .eq('id', existing.id)
-
-            if (error) {
-              errors.push(`Failed to update ${row.email}: ${error.message}`)
-            } else {
-              if (row.status === 'trial') membersUpdatedToTrial++
-              else membersUpdatedToActive++
-              console.log(`[SPC Import GHL] Updated ${row.email}: ${existing.status} → ${row.status}`)
-            }
-          }
+      if (member) {
+        if (member.status === 'cancelled') {
+          skippedAlreadyCancelled++
         } else {
-          const { error } = await supabaseAdmin.from('spc_members').insert({
-            name:      row.name || 'Unknown',
-            email:     row.email,
-            amount:    row.amount,
-            plan:      row.plan,
-            provider:  row.provider,
-            joined_at: row.joined_at || new Date().toISOString().split('T')[0],
-            status:    row.status,
-          })
-
-          if (error) {
-            errors.push(`Failed to insert ${row.email}: ${error.message}`)
+          const { error: mErr } = await supabaseAdmin
+            .from('spc_members')
+            .update({ status: 'cancelled' })
+            .eq('id', member.id)
+          if (mErr) {
+            errors.push(`Failed to cancel member ${email}: ${mErr.message}`)
           } else {
-            newMembersInserted++
-            console.log(`[SPC Import GHL] Inserted new member: ${row.email} (${row.status})`)
+            membersUpdatedToCancelled++
+            console.log(`[SPC Import GHL] Cancelled member: ${email} (was ${member.status})`)
           }
         }
       }
     }
 
     const result = {
-      parsed_total:                rows.length,
-      status_counts:               statusCounts,
-      cancellations_inserted:      cancellationsInserted,
+      total_rows:                  rows.length,
+      cancelled_rows_found:        cancelRows.length,
+      cancellations_upserted:      cancellationsUpserted,
       members_updated_to_cancelled: membersUpdatedToCancelled,
-      members_updated_to_trial:    membersUpdatedToTrial,
-      members_updated_to_active:   membersUpdatedToActive,
-      new_members_inserted:        newMembersInserted,
-      skipped:                     skippedCount,
+      skipped_already_cancelled:   skippedAlreadyCancelled,
+      status_counts:               statusCounts,
       errors,
     }
 
