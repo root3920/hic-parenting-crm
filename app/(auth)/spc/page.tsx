@@ -250,11 +250,13 @@ interface MemberEditForm {
   trial_end_date: string
 }
 
+type CancelTypeOrReactivate = 'paid_cancel' | 'pending_cancel' | 'trial_cancel' | 'reactivate_active' | 'reactivate_trial'
+
 interface CancelEditForm {
   name: string
   email: string
   customer_phone: string
-  cancel_type: 'paid_cancel' | 'pending_cancel' | 'trial_cancel'
+  cancel_type: CancelTypeOrReactivate
   offer_title: string
   amount: string
   currency: string
@@ -279,6 +281,7 @@ function MemberProfileModal({
   onClose,
   onSave,
   onSaveCancellation,
+  onReactivate,
   memberTransactions,
   memberAttendance,
   highlightNotes,
@@ -293,6 +296,7 @@ function MemberProfileModal({
   onClose: () => void
   onSave: (updated: SpcMember) => void
   onSaveCancellation: (updated: SpcCancellation) => void
+  onReactivate: (cancellationId: string, member: SpcMember) => void
   memberTransactions: Transaction[]
   memberAttendance: SpcClassAttendance[]
   highlightNotes?: boolean
@@ -431,34 +435,91 @@ function MemberProfileModal({
   async function handleSaveCancellation() {
     if (selected.kind !== 'cancellation') return
     setSaving(true)
+
+    const isReactivation = cancelForm.cancel_type === 'reactivate_active' || cancelForm.cancel_type === 'reactivate_trial'
+
     try {
-      const { data, error } = await supabase
-        .from('spc_cancellations')
-        .update({
-          name: cancelForm.name || null,
-          email: cancelForm.email || null,
-          customer_phone: cancelForm.customer_phone || null,
-          cancel_type: cancelForm.cancel_type,
-          offer_title: cancelForm.offer_title || null,
-          amount: parseFloat(cancelForm.amount) || 0,
-          currency: cancelForm.currency || null,
-          cancelled_at: cancelForm.cancelled_at || null,
-          provider: cancelForm.provider || null,
-        })
-        .eq('id', selected.data.id)
-        .select()
-        .single()
-      if (error) {
-        toast.error(`Failed to save: ${error.message}`)
-        return
+      if (isReactivation) {
+        const newStatus = cancelForm.cancel_type === 'reactivate_active' ? 'active' : 'trial'
+        const email = (cancelForm.email || '').toLowerCase().trim()
+
+        // Check if member already exists in spc_members
+        const { data: existing } = email
+          ? await supabase.from('spc_members').select('id').eq('email', email).maybeSingle()
+          : { data: null }
+
+        let memberData: SpcMember
+        if (existing) {
+          // Update existing member
+          const { data, error } = await supabase
+            .from('spc_members')
+            .update({ status: newStatus, name: cancelForm.name || undefined })
+            .eq('id', existing.id)
+            .select()
+            .single()
+          if (error) { toast.error(`Failed to reactivate: ${error.message}`); return }
+          memberData = data as SpcMember
+        } else {
+          // Insert new member
+          const { data, error } = await supabase
+            .from('spc_members')
+            .insert({
+              name: cancelForm.name || 'Unknown',
+              email: cancelForm.email || '',
+              phone: cancelForm.customer_phone || null,
+              plan: (selected.data.plan as 'monthly' | 'annual') ?? 'monthly',
+              amount: parseFloat(cancelForm.amount) || 0,
+              provider: (cancelForm.provider || 'Stripe') as 'Kajabi' | 'Stripe' | 'PayPal',
+              status: newStatus,
+              joined_at: new Date().toISOString().split('T')[0],
+            })
+            .select()
+            .single()
+          if (error) { toast.error(`Failed to create member: ${error.message}`); return }
+          memberData = data as SpcMember
+        }
+
+        // Delete from cancellations
+        const { error: delError } = await supabase
+          .from('spc_cancellations')
+          .delete()
+          .eq('id', selected.data.id)
+        if (delError) { toast.error(`Failed to remove cancellation: ${delError.message}`); return }
+
+        const statusLabel = newStatus === 'active' ? 'Active' : 'Trial'
+        toast.success(`Member reactivated as ${statusLabel}`)
+        onReactivate(selected.data.id, memberData)
+        setIsCancelEditing(false)
+      } else {
+        // Normal cancellation update
+        const { data, error } = await supabase
+          .from('spc_cancellations')
+          .update({
+            name: cancelForm.name || null,
+            email: cancelForm.email || null,
+            customer_phone: cancelForm.customer_phone || null,
+            cancel_type: cancelForm.cancel_type as 'paid_cancel' | 'pending_cancel' | 'trial_cancel',
+            offer_title: cancelForm.offer_title || null,
+            amount: parseFloat(cancelForm.amount) || 0,
+            currency: cancelForm.currency || null,
+            cancelled_at: cancelForm.cancelled_at || null,
+            provider: cancelForm.provider || null,
+          })
+          .eq('id', selected.data.id)
+          .select()
+          .single()
+        if (error) {
+          toast.error(`Failed to save: ${error.message}`)
+          return
+        }
+        if (!data) {
+          toast.error('Save failed: no data returned. Check table permissions.')
+          return
+        }
+        toast.success('Cancellation updated successfully')
+        onSaveCancellation(data as SpcCancellation)
+        setIsCancelEditing(false)
       }
-      if (!data) {
-        toast.error('Save failed: no data returned. Check table permissions.')
-        return
-      }
-      toast.success('Cancellation updated successfully')
-      onSaveCancellation(data as SpcCancellation)
-      setIsCancelEditing(false)
     } catch (err) {
       toast.error(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
@@ -744,6 +805,8 @@ function MemberProfileModal({
                     ['paid_cancel',    'Cancelled',       STATUS_CONFIG.cancelled.cls],
                     ['pending_cancel', 'Pending Cancel',  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'],
                     ['trial_cancel',   'Trial Cancelled', STATUS_CONFIG.expired.cls],
+                    ['reactivate_active', 'Active',       STATUS_CONFIG.active.cls],
+                    ['reactivate_trial',  'Trial',        STATUS_CONFIG.trial.cls],
                   ] as [CancelEditForm['cancel_type'], string, string][]).map(([key, label, cls]) => (
                     <button
                       key={key}
@@ -760,6 +823,11 @@ function MemberProfileModal({
                     </button>
                   ))}
                 </div>
+                {(cancelForm.cancel_type === 'reactivate_active' || cancelForm.cancel_type === 'reactivate_trial') && (
+                  <p className="mt-2 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+                    This will move the member back to {cancelForm.cancel_type === 'reactivate_active' ? 'Active Members' : 'Free Trials'} and remove them from Cancellations.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -2869,6 +2937,14 @@ export default function SpcPage() {
             if (!updated) return
             setCancellations((prev) => prev.map((c) => c.id === updated.id ? updated : c))
             setSelectedMember({ kind: 'cancellation', data: updated })
+          }}
+          onReactivate={(cancellationId, member) => {
+            setCancellations((prev) => prev.filter((c) => c.id !== cancellationId))
+            setMembers((prev) => {
+              const exists = prev.some((m) => m.id === member.id)
+              return exists ? prev.map((m) => m.id === member.id ? member : m) : [...prev, member]
+            })
+            setSelectedMember(null)
           }}
         />
       )}
