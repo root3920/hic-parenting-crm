@@ -1294,9 +1294,6 @@ export default function SpcPage() {
 
   // ── Date anchors ─────────────────────────────────────────────────────────
   const now = new Date()
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10)
@@ -1401,9 +1398,13 @@ export default function SpcPage() {
   const pendingCancels = cancellations.filter((c) => !isPaidCancel(c) && !isTrialCancel(c))
   // Non-trial cancellations = paid + pending (CSV imports without type info)
   const nonTrialCancels = cancellations.filter((c) => !isTrialCancel(c))
-  const thisMonthCancels = nonTrialCancels.filter(
-    (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= firstOfMonth
-  )
+  const thisMonthCancels = nonTrialCancels.filter((c) => {
+    const dateStr = c.cancelled_at ?? c.created_at
+    if (!dateStr) return false
+    const d = new Date(dateStr)
+    const now2 = new Date()
+    return d.getFullYear() === now2.getFullYear() && d.getMonth() === now2.getMonth()
+  })
 
   const mrrLost = paidCancels
     .filter((c) => (c.cancelled_at?.slice(0, 10) ?? '') >= sixtyDaysAgo)
@@ -1426,13 +1427,11 @@ export default function SpcPage() {
     ? parseFloat(((convertedTrials / trialConversionDenominator) * 100).toFixed(1))
     : 0
 
-  const cancels30d = nonTrialCancels.filter(
-    (c) => (c.cancelled_at?.slice(0, 10) ?? '') >= thirtyDaysAgo
-  ).length
-  const churnRate =
-    activeMembers.length > 0
-      ? parseFloat(((cancels30d / activeMembers.length) * 100).toFixed(1))
-      : 0
+  const cancelsThisMonth = thisMonthCancels.length
+  const membersAtStartOfMonth = activeMembers.length + cancelsThisMonth
+  const churnRate = membersAtStartOfMonth > 0
+    ? parseFloat(((cancelsThisMonth / membersAtStartOfMonth) * 100).toFixed(1))
+    : 0
 
   const churnColor =
     churnRate < 3
@@ -1756,8 +1755,11 @@ export default function SpcPage() {
                         </span>
                         <span className="text-sm text-zinc-400">monthly</span>
                       </div>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${churnBadgeClass}`}>
-                        {thisMonthCancels.length} cancellations this month
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        {cancelsThisMonth} / {membersAtStartOfMonth} members
+                      </p>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${churnBadgeClass}`}>
+                        {cancelsThisMonth} cancellations this month
                       </span>
                     </>
                   )}
@@ -2358,7 +2360,7 @@ export default function SpcPage() {
                       <p className={`text-2xl font-semibold ${churnColor}`}>
                         {churnRate}%
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">paid cancellations only</p>
+                      <p className="text-xs text-zinc-500 mt-1">{cancelsThisMonth} / {membersAtStartOfMonth} members</p>
                     </>
                   )}
                 </CardContent>
