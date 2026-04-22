@@ -189,26 +189,47 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ parsed_total: rows.length, cancelled: 0, skipped: 0, errors })
       }
 
-      const subIds = records.map(r => r.subscription_id as string)
-      const { data: existingCancels } = await supabaseAdmin
-        .from('spc_cancellations')
-        .select('subscription_id')
-        .in('subscription_id', subIds)
+      // Upsert by email — updates existing record if same email, inserts otherwise
+      let upserted = 0
+      let skipped = 0
 
-      const existingIds = new Set((existingCancels ?? []).map((e: { subscription_id: string }) => e.subscription_id))
-      const newRecords = records.filter(r => !existingIds.has(r.subscription_id as string))
-      const skipped = records.length - newRecords.length
+      for (const record of records) {
+        const email = record.email as string | null
+        if (!email) {
+          // No email — insert directly (won't conflict with unique index)
+          const { error } = await supabaseAdmin.from('spc_cancellations').insert(record)
+          if (error) {
+            errors.push(`Insert failed for ${record.subscription_id}: ${error.message}`)
+          } else {
+            upserted++
+          }
+          continue
+        }
 
-      if (newRecords.length > 0) {
-        const { error: insertError } = await supabaseAdmin.from('spc_cancellations').insert(newRecords)
-        if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+        const { data: existing } = await supabaseAdmin
+          .from('spc_cancellations')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle()
 
-        const cancelledEmails = newRecords
-          .map(r => r.email as string | null)
-          .filter((e): e is string => !!e)
+        if (existing) {
+          const { error } = await supabaseAdmin
+            .from('spc_cancellations')
+            .update(record)
+            .eq('id', existing.id)
+          if (error) {
+            errors.push(`Update failed for ${email}: ${error.message}`)
+          } else {
+            upserted++
+          }
+        } else {
+          const { error } = await supabaseAdmin.from('spc_cancellations').insert(record)
+          if (error) {
+            errors.push(`Insert failed for ${email}: ${error.message}`)
+          } else {
+            upserted++
 
-        if (cancelledEmails.length > 0) {
-          for (const email of cancelledEmails) {
+            // Only update spc_members for new cancellations
             await supabaseAdmin
               .from('spc_members')
               .update({ status: 'cancelled' })
@@ -220,8 +241,8 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         parsed_total: rows.length,
-        cancelled: newRecords.length,
-        members_updated_to_cancelled: newRecords.length,
+        cancelled: upserted,
+        members_updated_to_cancelled: upserted,
         skipped,
         errors,
       })
@@ -305,66 +326,73 @@ export async function POST(req: NextRequest) {
     let membersUpdatedToCancelled = 0
 
     if (cancelRows.length > 0) {
-      // Dedup against existing cancellations
-      const subIds = cancelRows.map(r => r.subscription_id as string)
-      const existingIds = new Set<string>()
-      for (let i = 0; i < subIds.length; i += 100) {
-        const batch = subIds.slice(i, i + 100)
-        const { data } = await supabaseAdmin
-          .from('spc_cancellations')
-          .select('subscription_id')
-          .in('subscription_id', batch)
-        for (const r of data ?? []) existingIds.add((r as { subscription_id: string }).subscription_id)
-      }
+      // Upsert by email — updates existing record if same email, inserts otherwise
+      for (const cancel of cancelRows) {
+        const email = cancel.email as string | null
 
-      const newCancels = cancelRows.filter(r => !existingIds.has(r.subscription_id as string))
-      const dupeCancels = cancelRows.length - newCancels.length
-      if (dupeCancels > 0) {
-        console.log(`[SPC Import GHL] ${dupeCancels} cancellations already exist, skipping`)
-        skippedCount += dupeCancels
-      }
-
-      // Insert new cancellations one-by-one to avoid partial batch failures
-      for (const cancel of newCancels) {
-        const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
-        if (error) {
-          errors.push(`Cancel insert failed for ${cancel.email}: ${error.message}`)
-          console.log(`[SPC Import GHL] Cancel insert FAILED for ${cancel.email}: ${error.message}`)
-        } else {
-          cancellationsInserted++
+        if (!email) {
+          const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
+          if (error) {
+            errors.push(`Cancel insert failed (no email): ${error.message}`)
+          } else {
+            cancellationsInserted++
+          }
+          continue
         }
-      }
 
-      console.log(`[SPC Import GHL] Inserted ${cancellationsInserted} cancellations`)
-
-      // Update spc_members status → cancelled for these emails
-      const cancelEmails = newCancels
-        .map(r => (r.email as string | null))
-        .filter((e): e is string => !!e)
-
-      for (const email of cancelEmails) {
-        const { data: member } = await supabaseAdmin
-          .from('spc_members')
-          .select('id, email, status')
-          .ilike('email', email)
-          .in('status', ['active', 'trial'])
-          .limit(1)
+        const { data: existing } = await supabaseAdmin
+          .from('spc_cancellations')
+          .select('id')
+          .eq('email', email)
           .maybeSingle()
 
-        if (member) {
+        if (existing) {
           const { error } = await supabaseAdmin
-            .from('spc_members')
-            .update({ status: 'cancelled' })
-            .eq('id', member.id)
-
+            .from('spc_cancellations')
+            .update(cancel)
+            .eq('id', existing.id)
           if (error) {
-            errors.push(`Failed to cancel member ${email}: ${error.message}`)
+            errors.push(`Cancel update failed for ${email}: ${error.message}`)
           } else {
-            membersUpdatedToCancelled++
-            console.log(`[SPC Import GHL] Cancelled member: ${email} (was ${member.status})`)
+            cancellationsInserted++
+            console.log(`[SPC Import GHL] Updated existing cancel: ${email}`)
+          }
+          continue
+        }
+
+        const { error } = await supabaseAdmin.from('spc_cancellations').insert(cancel)
+        if (error) {
+          errors.push(`Cancel insert failed for ${email}: ${error.message}`)
+          console.log(`[SPC Import GHL] Cancel insert FAILED for ${email}: ${error.message}`)
+        } else {
+          cancellationsInserted++
+
+          // Only update spc_members for genuinely new cancellations
+          const { data: member } = await supabaseAdmin
+            .from('spc_members')
+            .select('id, email, status')
+            .ilike('email', email)
+            .in('status', ['active', 'trial'])
+            .limit(1)
+            .maybeSingle()
+
+          if (member) {
+            const { error: mErr } = await supabaseAdmin
+              .from('spc_members')
+              .update({ status: 'cancelled' })
+              .eq('id', member.id)
+
+            if (mErr) {
+              errors.push(`Failed to cancel member ${email}: ${mErr.message}`)
+            } else {
+              membersUpdatedToCancelled++
+              console.log(`[SPC Import GHL] Cancelled member: ${email} (was ${member.status})`)
+            }
           }
         }
       }
+
+      console.log(`[SPC Import GHL] Upserted ${cancellationsInserted} cancellations`)
     }
 
     // ── Step 4: Process trial / active members ──────────────────────────────
