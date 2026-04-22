@@ -19,7 +19,7 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, Calendar, Clock, ExternalLink, Mail, MessageSquare, Pencil, Phone, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, Calendar, Clock, ExternalLink, Mail, MessageSquare, Pencil, Phone, Search, Trash2, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -89,6 +89,10 @@ type SelectedMember =
   | { kind: 'cancellation'; data: SpcCancellation }
 
 type Tab = 'growth' | 'overview' | 'active' | 'trials' | 'cancellations'
+
+type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'score_desc' | 'last_note_desc'
+type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
+type CancelSort = 'cancelled_desc' | 'cancelled_asc' | 'subscribed_desc' | 'subscribed_asc' | 'days_active_desc'
 
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -1163,6 +1167,14 @@ export default function SpcPage() {
   const [csvMode, setCsvMode] = useState<'cancellations' | 'members'>('cancellations')
   const [cancelPage, setCancelPage] = useState(0)
   const CANCEL_PAGE_SIZE = 50
+
+  // Search & sort state
+  const [activeSearch, setActiveSearch] = useState('')
+  const [trialSearch, setTrialSearch] = useState('')
+  const [cancelSearch, setCancelSearch] = useState('')
+  const [activeSort, setActiveSort] = useState<ActiveSort>('joined_desc')
+  const [trialSort, setTrialSort] = useState<TrialSort>('trial_start_desc')
+  const [cancelSort, setCancelSort] = useState<CancelSort>('cancelled_desc')
   const [csvContent, setCsvContent] = useState('')
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvPreviewRows, setCsvPreviewRows] = useState<string[][]>([])
@@ -1334,6 +1346,54 @@ export default function SpcPage() {
     .sort((a, b) => daysUntil(a.trial_end_date!) - daysUntil(b.trial_end_date!))
 
   const sortedTrials = [...trialMembers].sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0))
+
+  // ── Filtered & sorted lists ─────────────────────────────────────────────
+  function matchesSearch(name: string | null, email: string | null, q: string): boolean {
+    if (!q) return true
+    const lower = q.toLowerCase()
+    return (name ?? '').toLowerCase().includes(lower) || (email ?? '').toLowerCase().includes(lower)
+  }
+
+  const filteredActiveMembers = useMemo(() => {
+    let list = activeMembers.filter((m) => matchesSearch(m.name, m.email, activeSearch))
+    switch (activeSort) {
+      case 'joined_desc': list.sort((a, b) => (b.joined_at ?? '').localeCompare(a.joined_at ?? '')); break
+      case 'joined_asc': list.sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? '')); break
+      case 'last_payment_desc': list.sort((a, b) => (lastPaymentByEmail[(b.email ?? '').toLowerCase()] ?? '').localeCompare(lastPaymentByEmail[(a.email ?? '').toLowerCase()] ?? '')); break
+      case 'last_payment_asc': list.sort((a, b) => (lastPaymentByEmail[(a.email ?? '').toLowerCase()] ?? '').localeCompare(lastPaymentByEmail[(b.email ?? '').toLowerCase()] ?? '')); break
+      case 'score_desc': list.sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0)); break
+      case 'last_note_desc': list.sort((a, b) => (lastNoteByEmail[(b.email ?? '').toLowerCase()] ?? '').localeCompare(lastNoteByEmail[(a.email ?? '').toLowerCase()] ?? '')); break
+    }
+    return list
+  }, [activeMembers, activeSearch, activeSort, lastPaymentByEmail, lastNoteByEmail])
+
+  const filteredTrialMembers = useMemo(() => {
+    let list = sortedTrials.filter((m) => matchesSearch(m.name, m.email, trialSearch))
+    switch (trialSort) {
+      case 'trial_start_desc': list.sort((a, b) => (b.joined_at ?? '').localeCompare(a.joined_at ?? '')); break
+      case 'trial_start_asc': list.sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? '')); break
+      case 'expires_asc': list.sort((a, b) => (a.trial_end_date ?? '').localeCompare(b.trial_end_date ?? '')); break
+      case 'score_desc': list.sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0)); break
+      case 'last_note_desc': list.sort((a, b) => (lastNoteByEmail[(b.email ?? '').toLowerCase()] ?? '').localeCompare(lastNoteByEmail[(a.email ?? '').toLowerCase()] ?? '')); break
+    }
+    return list
+  }, [sortedTrials, trialSearch, trialSort, lastNoteByEmail])
+
+  const filteredCancellations = useMemo(() => {
+    let list = cancellations.filter((c) => matchesSearch(c.name, c.email, cancelSearch))
+    switch (cancelSort) {
+      case 'cancelled_desc': list.sort((a, b) => (b.cancelled_at ?? '').localeCompare(a.cancelled_at ?? '')); break
+      case 'cancelled_asc': list.sort((a, b) => (a.cancelled_at ?? '').localeCompare(b.cancelled_at ?? '')); break
+      case 'subscribed_desc': list.sort((a, b) => (b.subscribed_at ?? '').localeCompare(a.subscribed_at ?? '')); break
+      case 'subscribed_asc': list.sort((a, b) => (a.subscribed_at ?? '').localeCompare(b.subscribed_at ?? '')); break
+      case 'days_active_desc': list.sort((a, b) => {
+        const da = a.subscribed_at && a.cancelled_at ? daysActive(a.subscribed_at, a.cancelled_at) : 0
+        const db = b.subscribed_at && b.cancelled_at ? daysActive(b.subscribed_at, b.cancelled_at) : 0
+        return db - da
+      }); break
+    }
+    return list
+  }, [cancellations, cancelSearch, cancelSort])
 
   // ── Cancellation metrics ─────────────────────────────────────────────────
   const paidCancels = cancellations.filter(isPaidCancel)
@@ -1978,7 +2038,33 @@ export default function SpcPage() {
         {activeTab === 'active' && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">{activeMembers.length} Active Members</CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <CardTitle className="text-sm font-semibold">{activeMembers.length} Active Members</CardTitle>
+                <div className="flex items-center gap-2 sm:ml-auto">
+                  <div className="relative flex-1 sm:flex-initial">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                    <input
+                      type="text"
+                      value={activeSearch}
+                      onChange={(e) => setActiveSearch(e.target.value)}
+                      placeholder="Search by name or email..."
+                      className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                  </div>
+                  <select
+                    value={activeSort}
+                    onChange={(e) => setActiveSort(e.target.value as ActiveSort)}
+                    className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="joined_desc">Joined (newest)</option>
+                    <option value="joined_asc">Joined (oldest)</option>
+                    <option value="last_payment_desc">Last Payment (newest)</option>
+                    <option value="last_payment_asc">Last Payment (oldest)</option>
+                    <option value="score_desc">Score (highest)</option>
+                    <option value="last_note_desc">Last Note (recent)</option>
+                  </select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
@@ -1987,8 +2073,8 @@ export default function SpcPage() {
                     <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ))}
                 </div>
-              ) : activeMembers.length === 0 ? (
-                <EmptyState title="No active members" description="Active subscribers will appear here." />
+              ) : filteredActiveMembers.length === 0 ? (
+                <EmptyState title={activeSearch ? 'No matching members' : 'No active members'} description={activeSearch ? 'Try a different search term.' : 'Active subscribers will appear here.'} />
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -2007,7 +2093,7 @@ export default function SpcPage() {
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
-                      {activeMembers.map((m, i) => (
+                      {filteredActiveMembers.map((m, i) => (
                         <AnimatedTableRow
                           key={m.id}
                           variants={rowVariants}
@@ -2100,7 +2186,32 @@ export default function SpcPage() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">{trialMembers.length} Free Trials</CardTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <CardTitle className="text-sm font-semibold">{trialMembers.length} Free Trials</CardTitle>
+                  <div className="flex items-center gap-2 sm:ml-auto">
+                    <div className="relative flex-1 sm:flex-initial">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                      <input
+                        type="text"
+                        value={trialSearch}
+                        onChange={(e) => setTrialSearch(e.target.value)}
+                        placeholder="Search by name or email..."
+                        className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      />
+                    </div>
+                    <select
+                      value={trialSort}
+                      onChange={(e) => setTrialSort(e.target.value as TrialSort)}
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    >
+                      <option value="trial_start_desc">Trial Start (newest)</option>
+                      <option value="trial_start_asc">Trial Start (oldest)</option>
+                      <option value="expires_asc">Expires (soonest)</option>
+                      <option value="score_desc">Score (highest)</option>
+                      <option value="last_note_desc">Last Note (recent)</option>
+                    </select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {loading ? (
@@ -2109,8 +2220,8 @@ export default function SpcPage() {
                       <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                     ))}
                   </div>
-                ) : trialMembers.length === 0 ? (
-                  <EmptyState title="No free trials" description="Trial members will appear here." />
+                ) : filteredTrialMembers.length === 0 ? (
+                  <EmptyState title={trialSearch ? 'No matching trials' : 'No free trials'} description={trialSearch ? 'Try a different search term.' : 'Trial members will appear here.'} />
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
@@ -2127,7 +2238,7 @@ export default function SpcPage() {
                         </AnimatedTableRow>
                       </TableHeader>
                       <TableBody>
-                        {sortedTrials.map((m, i) => (
+                        {filteredTrialMembers.map((m, i) => (
                           <AnimatedTableRow
                             key={m.id}
                             variants={rowVariants}
@@ -2337,9 +2448,34 @@ export default function SpcPage() {
             {/* Unified cancellations list with pagination */}
             <Card>
               <CardHeader className="pb-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <CardTitle className="text-sm font-semibold">All Cancellations</CardTitle>
-                  <span className="ml-auto text-xs text-zinc-400">{cancellations.length} total records</span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-sm font-semibold">All Cancellations</CardTitle>
+                    <span className="text-xs text-zinc-400">{cancellations.length} total</span>
+                  </div>
+                  <div className="flex items-center gap-2 sm:ml-auto">
+                    <div className="relative flex-1 sm:flex-initial">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                      <input
+                        type="text"
+                        value={cancelSearch}
+                        onChange={(e) => { setCancelSearch(e.target.value); setCancelPage(0) }}
+                        placeholder="Search by name or email..."
+                        className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      />
+                    </div>
+                    <select
+                      value={cancelSort}
+                      onChange={(e) => { setCancelSort(e.target.value as CancelSort); setCancelPage(0) }}
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    >
+                      <option value="cancelled_desc">Cancelled (newest)</option>
+                      <option value="cancelled_asc">Cancelled (oldest)</option>
+                      <option value="subscribed_desc">Subscribed (newest)</option>
+                      <option value="subscribed_asc">Subscribed (oldest)</option>
+                      <option value="days_active_desc">Days Active (most)</option>
+                    </select>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -2349,8 +2485,8 @@ export default function SpcPage() {
                       <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                     ))}
                   </div>
-                ) : cancellations.length === 0 ? (
-                  <EmptyState title="No cancellations" description="Import cancellations using the Upload CSV button." />
+                ) : filteredCancellations.length === 0 ? (
+                  <EmptyState title={cancelSearch ? 'No matching cancellations' : 'No cancellations'} description={cancelSearch ? 'Try a different search term.' : 'Import cancellations using the Upload CSV button.'} />
                 ) : (
                   <>
                     <div className="overflow-x-auto">
@@ -2370,7 +2506,7 @@ export default function SpcPage() {
                           </AnimatedTableRow>
                         </TableHeader>
                         <TableBody>
-                          {cancellations
+                          {filteredCancellations
                             .slice(cancelPage * CANCEL_PAGE_SIZE, (cancelPage + 1) * CANCEL_PAGE_SIZE)
                             .map((c, i) => (
                               <AnimatedTableRow
@@ -2420,10 +2556,10 @@ export default function SpcPage() {
                       </Table>
                     </div>
                     {/* Pagination */}
-                    {cancellations.length > CANCEL_PAGE_SIZE && (
+                    {filteredCancellations.length > CANCEL_PAGE_SIZE && (
                       <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
                         <p className="text-xs text-zinc-400">
-                          {cancelPage * CANCEL_PAGE_SIZE + 1}–{Math.min((cancelPage + 1) * CANCEL_PAGE_SIZE, cancellations.length)} of {cancellations.length}
+                          {cancelPage * CANCEL_PAGE_SIZE + 1}–{Math.min((cancelPage + 1) * CANCEL_PAGE_SIZE, filteredCancellations.length)} of {filteredCancellations.length}
                         </p>
                         <div className="flex items-center gap-2">
                           <button
@@ -2434,11 +2570,11 @@ export default function SpcPage() {
                             Previous
                           </button>
                           <span className="text-xs text-zinc-500">
-                            Page {cancelPage + 1} of {Math.ceil(cancellations.length / CANCEL_PAGE_SIZE)}
+                            Page {cancelPage + 1} of {Math.ceil(filteredCancellations.length / CANCEL_PAGE_SIZE)}
                           </span>
                           <button
-                            onClick={() => setCancelPage((p) => Math.min(Math.ceil(cancellations.length / CANCEL_PAGE_SIZE) - 1, p + 1))}
-                            disabled={cancelPage >= Math.ceil(cancellations.length / CANCEL_PAGE_SIZE) - 1}
+                            onClick={() => setCancelPage((p) => Math.min(Math.ceil(filteredCancellations.length / CANCEL_PAGE_SIZE) - 1, p + 1))}
+                            disabled={cancelPage >= Math.ceil(filteredCancellations.length / CANCEL_PAGE_SIZE) - 1}
                             className="px-2.5 py-1 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 disabled:opacity-30 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                           >
                             Next
