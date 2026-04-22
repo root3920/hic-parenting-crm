@@ -1243,6 +1243,12 @@ export default function SpcPage() {
   const [activeSort, setActiveSort] = useState<ActiveSort>('joined_desc')
   const [trialSort, setTrialSort] = useState<TrialSort>('trial_start_desc')
   const [cancelSort, setCancelSort] = useState<CancelSort>('cancelled_desc')
+
+  // Cancellation filters
+  const [cancelDateFrom, setCancelDateFrom] = useState('')
+  const [cancelDateTo, setCancelDateTo] = useState('')
+  const [cancelTypeFilter, setCancelTypeFilter] = useState<'all' | 'paid' | 'trial' | 'pending' | 'unknown_date'>('all')
+  const [cancelPlatformFilter, setCancelPlatformFilter] = useState<string>('all')
   const [csvContent, setCsvContent] = useState('')
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvPreviewRows, setCsvPreviewRows] = useState<string[][]>([])
@@ -1444,8 +1450,57 @@ export default function SpcPage() {
     return list
   }, [sortedTrials, trialSearch, trialSort, lastNoteByEmail])
 
+  const cancelFiltersActive = useMemo(() => {
+    let count = 0
+    if (cancelDateFrom) count++
+    if (cancelDateTo) count++
+    if (cancelTypeFilter !== 'all') count++
+    if (cancelPlatformFilter !== 'all') count++
+    return count
+  }, [cancelDateFrom, cancelDateTo, cancelTypeFilter, cancelPlatformFilter])
+
+  function resetCancelFilters() {
+    setCancelDateFrom('')
+    setCancelDateTo('')
+    setCancelTypeFilter('all')
+    setCancelPlatformFilter('all')
+    setCancelSearch('')
+    setCancelPage(0)
+  }
+
+  const cancelPlatforms = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of cancellations) {
+      const src = (c.source ?? '').trim()
+      if (src) set.add(src)
+    }
+    return Array.from(set).sort()
+  }, [cancellations])
+
   const filteredCancellations = useMemo(() => {
     let list = cancellations.filter((c) => matchesSearch(c.name, c.email, cancelSearch))
+
+    // Date range filter
+    if (cancelDateFrom) {
+      list = list.filter((c) => c.cancelled_at && c.cancelled_at.slice(0, 10) >= cancelDateFrom)
+    }
+    if (cancelDateTo) {
+      list = list.filter((c) => c.cancelled_at && c.cancelled_at.slice(0, 10) <= cancelDateTo)
+    }
+
+    // Cancel type filter
+    switch (cancelTypeFilter) {
+      case 'paid': list = list.filter(isPaidCancel); break
+      case 'trial': list = list.filter(isTrialCancel); break
+      case 'pending': list = list.filter((c) => !isPaidCancel(c) && !isTrialCancel(c)); break
+      case 'unknown_date': list = list.filter((c) => !c.cancelled_at); break
+    }
+
+    // Platform filter
+    if (cancelPlatformFilter !== 'all') {
+      list = list.filter((c) => (c.source ?? '').toLowerCase() === cancelPlatformFilter.toLowerCase())
+    }
+
     switch (cancelSort) {
       case 'cancelled_desc': list.sort((a, b) => (b.cancelled_at ?? '').localeCompare(a.cancelled_at ?? '')); break
       case 'cancelled_asc': list.sort((a, b) => (a.cancelled_at ?? '').localeCompare(b.cancelled_at ?? '')); break
@@ -1458,7 +1513,7 @@ export default function SpcPage() {
       }); break
     }
     return list
-  }, [cancellations, cancelSearch, cancelSort])
+  }, [cancellations, cancelSearch, cancelSort, cancelDateFrom, cancelDateTo, cancelTypeFilter, cancelPlatformFilter])
 
   // ── Cancellation metrics ─────────────────────────────────────────────────
   const paidCancels = cancellations.filter(isPaidCancel)
@@ -2546,11 +2601,16 @@ export default function SpcPage() {
 
             {/* Unified cancellations list with pagination */}
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 space-y-2">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-sm font-semibold">All Cancellations</CardTitle>
                     <span className="text-xs text-zinc-400">{cancellations.length} total</span>
+                    {(cancelFiltersActive > 0 || cancelSearch) && (
+                      <span className="text-xs text-zinc-400">
+                        · {filteredCancellations.length} shown
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 sm:ml-auto">
                     <div className="relative flex-1 sm:flex-initial">
@@ -2576,6 +2636,61 @@ export default function SpcPage() {
                     </select>
                   </div>
                 </div>
+                {/* Filters row */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide shrink-0">From</label>
+                    <input
+                      type="date"
+                      value={cancelDateFrom}
+                      onChange={(e) => { setCancelDateFrom(e.target.value); setCancelPage(0) }}
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide shrink-0">To</label>
+                    <input
+                      type="date"
+                      value={cancelDateTo}
+                      onChange={(e) => { setCancelDateTo(e.target.value); setCancelPage(0) }}
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                  </div>
+                  <select
+                    value={cancelTypeFilter}
+                    onChange={(e) => { setCancelTypeFilter(e.target.value as typeof cancelTypeFilter); setCancelPage(0) }}
+                    className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="all">All types</option>
+                    <option value="paid">Paid</option>
+                    <option value="trial">Trial</option>
+                    <option value="pending">Pending</option>
+                    <option value="unknown_date">Unknown date</option>
+                  </select>
+                  <select
+                    value={cancelPlatformFilter}
+                    onChange={(e) => { setCancelPlatformFilter(e.target.value); setCancelPage(0) }}
+                    className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="all">All platforms</option>
+                    {cancelPlatforms.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  {cancelFiltersActive > 0 && (
+                    <div className="flex items-center gap-2 ml-1">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        {cancelFiltersActive} filter{cancelFiltersActive > 1 ? 's' : ''} active
+                      </span>
+                      <button
+                        onClick={resetCancelFilters}
+                        className="text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        Reset filters
+                      </button>
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {loading ? (
@@ -2585,7 +2700,7 @@ export default function SpcPage() {
                     ))}
                   </div>
                 ) : filteredCancellations.length === 0 ? (
-                  <EmptyState title={cancelSearch ? 'No matching cancellations' : 'No cancellations'} description={cancelSearch ? 'Try a different search term.' : 'Import cancellations using the Upload CSV button.'} />
+                  <EmptyState title={(cancelSearch || cancelFiltersActive > 0) ? 'No matching cancellations' : 'No cancellations'} description={(cancelSearch || cancelFiltersActive > 0) ? 'Try adjusting your search or filters.' : 'Import cancellations using the Upload CSV button.'} />
                 ) : (
                   <>
                     <div className="overflow-x-auto">
