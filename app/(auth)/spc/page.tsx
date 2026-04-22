@@ -681,10 +681,20 @@ function MemberProfileModal({
                   </div>
                 )}
                 {selected.kind === 'cancellation' && (
-                  <div className="flex items-center justify-between">
-                    <span className={rowLabel}>Cancelled</span>
-                    <span className={rowValue}>{selected.data.cancelled_at ? formatDate(selected.data.cancelled_at) : '—'}</span>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className={rowLabel}>Cancelled</span>
+                      <span className={rowValue}>{selected.data.cancelled_at ? formatDate(selected.data.cancelled_at) : '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className={rowLabel}>Last Payment</span>
+                      <span className={rowValue}>
+                        {memberTransactions.filter((tx) => (tx.status ?? 'completed') === 'completed').length > 0
+                          ? formatDate(memberTransactions.filter((tx) => (tx.status ?? 'completed') === 'completed')[0].date)
+                          : '—'}
+                      </span>
+                    </div>
+                  </>
                 )}
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Plan</span>
@@ -719,7 +729,7 @@ function MemberProfileModal({
               </div>
 
               {/* ── Transactions ── */}
-              {selected.kind === 'member' && (
+              {(selected.kind === 'member' || selected.kind === 'cancellation') && (
                 <div className="mt-4">
                   <p className={sectionLabel}>Transactions</p>
                   {memberTransactions.length === 0 ? (
@@ -2702,6 +2712,7 @@ export default function SpcPage() {
                             <TableHead className="hidden md:table-cell">Platform</TableHead>
                             <TableHead className="hidden lg:table-cell">Subscribed</TableHead>
                             <TableHead className="hidden sm:table-cell">Cancelled</TableHead>
+                            <TableHead className="hidden lg:table-cell">Last Payment</TableHead>
                             <TableHead className="text-right hidden sm:table-cell">Days</TableHead>
                             <TableHead className="hidden lg:table-cell">Last Note</TableHead>
                           </AnimatedTableRow>
@@ -2742,6 +2753,7 @@ export default function SpcPage() {
                                 <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.source}</TableCell>
                                 <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">{c.subscribed_at ? formatDate(c.subscribed_at) : '—'}</TableCell>
                                 <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">{c.cancelled_at ? formatDate(c.cancelled_at) : '—'}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden lg:table-cell">{lastPaymentByEmail[(c.email ?? '').toLowerCase()] ? formatDate(lastPaymentByEmail[(c.email ?? '').toLowerCase()]) : '—'}</TableCell>
                                 <TableCell className="text-right text-xs text-zinc-500 whitespace-nowrap hidden sm:table-cell">
                                   {c.subscribed_at && c.cancelled_at ? `${daysActive(c.subscribed_at, c.cancelled_at)}d` : '—'}
                                 </TableCell>
@@ -3047,9 +3059,7 @@ export default function SpcPage() {
           onAddNote={handleAddNote}
           onClose={() => setSelectedMember(null)}
           memberTransactions={
-            selectedMember.kind === 'member'
-              ? (transactionsByEmail[(selectedMember.data.email ?? '').toLowerCase()] ?? [])
-              : []
+            transactionsByEmail[(selectedMember.data.email ?? '').toLowerCase()] ?? []
           }
           memberAttendance={memberAttendance}
           highlightNotes={highlightNotes}
