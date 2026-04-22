@@ -1466,16 +1466,17 @@ export default function SpcPage() {
   const pendingCancels = cancellations.filter((c) => !isPaidCancel(c) && !isTrialCancel(c))
   // Non-trial cancellations = paid + pending (CSV imports without type info)
   const nonTrialCancels = cancellations.filter((c) => !isTrialCancel(c))
+  // Only count cancellations with a known cancelled_at date for churn
   const thisMonthCancels = nonTrialCancels.filter((c) => {
-    const dateStr = c.cancelled_at ?? c.created_at
-    if (!dateStr) return false
-    const d = new Date(dateStr)
+    if (!c.cancelled_at) return false
+    const d = new Date(c.cancelled_at)
     const now2 = new Date()
     return d.getFullYear() === now2.getFullYear() && d.getMonth() === now2.getMonth()
   })
+  const unknownDateCancels = cancellations.filter((c) => !c.cancelled_at).length
 
   const mrrLost = paidCancels
-    .filter((c) => (c.cancelled_at?.slice(0, 10) ?? '') >= sixtyDaysAgo)
+    .filter((c) => c.cancelled_at && (c.cancelled_at.slice(0, 10) >= sixtyDaysAgo))
     .reduce((s, c) => s + (c.plan === 'annual' ? c.amount / 12 : c.amount), 0)
 
   // Trial churn rate
@@ -1522,7 +1523,7 @@ export default function SpcPage() {
   }
   const cancelsByMonth = last6Months.map((month) => ({
     date: month.slice(5), // "MM" for display
-    revenue: cancellations.filter((c) => c.cancelled_at?.slice(0, 7) === month).length,
+    revenue: cancellations.filter((c) => c.cancelled_at && c.cancelled_at.slice(0, 7) === month).length,
   }))
 
   // ── Growth tab calculations (baseline hardcoded from Mar 27 snapshot) ────
@@ -1824,11 +1825,16 @@ export default function SpcPage() {
                         <span className="text-sm text-zinc-400">monthly</span>
                       </div>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        {cancelsThisMonth} / {membersAtStartOfMonth} members
+                        {cancelsThisMonth} with known date / {membersAtStartOfMonth} members
                       </p>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${churnBadgeClass}`}>
                         {cancelsThisMonth} cancellations this month
                       </span>
+                      {unknownDateCancels > 0 && (
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1.5 italic">
+                          {unknownDateCancels} records without cancellation date excluded
+                        </p>
+                      )}
                     </>
                   )}
                 </CardContent>
@@ -2429,6 +2435,9 @@ export default function SpcPage() {
                         {churnRate}%
                       </p>
                       <p className="text-xs text-zinc-500 mt-1">{cancelsThisMonth} / {membersAtStartOfMonth} members</p>
+                      {unknownDateCancels > 0 && (
+                        <p className="text-[10px] text-zinc-400 mt-1 italic">{unknownDateCancels} without date excluded</p>
+                      )}
                     </>
                   )}
                 </CardContent>
@@ -2477,6 +2486,26 @@ export default function SpcPage() {
                   )}
                 </CardContent>
               </Card>
+
+              {unknownDateCancels > 0 && (
+                <Card>
+                  <CardContent className="pt-5 pb-4">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                      Unknown Date
+                    </p>
+                    {loading ? (
+                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <>
+                        <p className="text-2xl font-semibold text-zinc-400 dark:text-zinc-500">
+                          {unknownDateCancels}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">records without cancellation date</p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Cancellations by month chart */}
