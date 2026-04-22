@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
-import { Loader2, Check, Plus, X, UserPlus } from 'lucide-react'
+import { Loader2, Check, Plus, X, UserPlus, Pencil, Eye } from 'lucide-react'
+import { usePreviewRole } from '@/contexts/PreviewRoleContext'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { US_TIMEZONES } from '@/lib/timezones'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
@@ -89,6 +90,8 @@ export default function SettingsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [inviteForm, setInviteForm] = useState<InviteForm>(emptyInviteForm)
   const [inviting, setInviting] = useState(false)
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
+  const { previewRole, setPreviewRole } = usePreviewRole()
 
   useEffect(() => {
     void supabase.auth.getUser().then((r: { data: { user: { email?: string } | null } }) => {
@@ -108,6 +111,28 @@ export default function SettingsPage() {
   useEffect(() => {
     if (isAdmin) fetchTeamProfiles()
   }, [isAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRoleChange = useCallback(async (memberId: string, memberName: string, newRole: Role) => {
+    // Optimistic update
+    setTeamProfiles((prev) =>
+      prev.map((p) => (p.id === memberId ? { ...p, role: newRole } : p))
+    )
+    setEditingRoleId(null)
+
+    const res = await fetch(`/api/profiles/${memberId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: newRole }),
+    })
+
+    if (!res.ok) {
+      const data = await res.json()
+      toast.error(data.error ?? 'Failed to update role')
+      fetchTeamProfiles() // revert on failure
+    } else {
+      toast.success(`Role updated for ${memberName}`)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
     register,
@@ -312,9 +337,32 @@ export default function SettingsPage() {
                           <tr key={p.id} className="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
                             <td className="py-3 px-4 font-medium text-zinc-900 dark:text-zinc-100">{p.full_name}</td>
                             <td className="py-3 px-4">
-                              <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-semibold', ROLE_COLORS[p.role])}>
-                                {ROLE_LABELS[p.role]}
-                              </span>
+                              {editingRoleId === p.id ? (
+                                <select
+                                  autoFocus
+                                  value={p.role}
+                                  onChange={(e) => handleRoleChange(p.id, p.full_name, e.target.value as Role)}
+                                  onBlur={() => setEditingRoleId(null)}
+                                  className="text-xs border border-zinc-300 dark:border-zinc-600 rounded-lg px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                >
+                                  {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-semibold', ROLE_COLORS[p.role])}>
+                                    {ROLE_LABELS[p.role]}
+                                  </span>
+                                  <button
+                                    onClick={() => setEditingRoleId(p.id)}
+                                    className="p-0.5 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                    title="Edit role"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400">
                               {p.closer_name ?? p.setter_name ?? '—'}
@@ -329,6 +377,42 @@ export default function SettingsPage() {
                       </tbody>
                     </table>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Preview as role */}
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-zinc-500" />
+                  <CardTitle className="text-sm font-semibold">Preview as Role</CardTitle>
+                </div>
+                <CardDescription>
+                  Temporarily view the navigation as a different role. No data or permissions change.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setPreviewRole(previewRole === r ? null : r)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
+                        previewRole === r
+                          ? 'bg-amber-100 dark:bg-amber-900/40 border-amber-400 dark:border-amber-600 text-amber-900 dark:text-amber-100'
+                          : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                      )}
+                    >
+                      {ROLE_LABELS[r]}
+                    </button>
+                  ))}
+                </div>
+                {previewRole && (
+                  <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+                    Currently previewing as <strong>{ROLE_LABELS[previewRole]}</strong>. The navbar reflects this role&apos;s visibility. Refresh the page to exit.
+                  </p>
                 )}
               </CardContent>
             </Card>

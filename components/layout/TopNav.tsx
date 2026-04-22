@@ -17,6 +17,7 @@ import {
   FileText,
   BarChart2,
   TrendingUp,
+  Eye,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -26,6 +27,15 @@ import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useProfile } from '@/hooks/useProfile'
 import type { UserRole } from '@/hooks/useProfile'
+import { usePreviewRole } from '@/contexts/PreviewRoleContext'
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  admin:   'Admin',
+  closer:  'Closer',
+  setter:  'Setter',
+  csm_spc: 'Client Success SPC',
+  csm_ht:  'Client Success HT',
+}
 
 const ALL_NAV_ITEMS = [
   { href: '/dashboard',    label: 'Dashboard',   icon: LayoutDashboard, roles: ['admin'] as UserRole[] },
@@ -87,7 +97,9 @@ export function TopNav() {
   const [quickMenuOpen, setQuickMenuOpen] = useState(false)
   const quickMenuRef = useRef<HTMLDivElement>(null)
   const { profile, loading: profileLoading } = useProfile()
-  const role = profile?.role ?? null
+  const { previewRole, setPreviewRole } = usePreviewRole()
+  const actualRole = profile?.role ?? null
+  const role = previewRole ?? actualRole
 
   // Wait for profile to load before showing nav to avoid flashing all items
   const navItems = profileLoading
@@ -252,6 +264,25 @@ export function TopNav() {
           </div>
         </div>
       </motion.header>
+
+      {/* Preview role banner */}
+      {previewRole && (
+        <div className="fixed top-14 inset-x-0 z-40 bg-amber-100 dark:bg-amber-900/60 border-b border-amber-300 dark:border-amber-700">
+          <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-900 dark:text-amber-100">
+              <Eye className="h-4 w-4" />
+              Previewing as: <span className="font-bold">{ROLE_LABELS[previewRole]}</span>
+            </div>
+            <button
+              onClick={() => setPreviewRole(null)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 hover:bg-amber-300 dark:hover:bg-amber-700 transition-colors"
+            >
+              <X className="h-3 w-3" />
+              Exit Preview
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile drawer */}
       <AnimatePresence>
