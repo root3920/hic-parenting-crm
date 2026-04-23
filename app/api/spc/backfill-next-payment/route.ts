@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getCanonicalProduct } from '@/lib/products'
 
 const supabase = createClient(
@@ -7,12 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function GET(req: NextRequest) {
-  const secret = req.headers.get('x-sync-secret')
-  if (secret !== 'hic_sync_2026') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
+export async function GET() {
   // Fetch all active members
   const { data: members, error: membersErr } = await supabase
     .from('spc_members')

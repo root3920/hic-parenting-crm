@@ -1227,6 +1227,24 @@ export default function SpcPage() {
       setRecalculating(false)
     }
   }
+  const [backfillingPayments, setBackfillingPayments] = useState(false)
+
+  async function handleBackfillNextPayment() {
+    setBackfillingPayments(true)
+    try {
+      const res = await fetch('/api/spc/backfill-next-payment')
+      const data = await res.json()
+      if (data.error) { toast.error(`Backfill failed: ${data.error}`); return }
+      toast.success(`Updated ${data.updated} members' next payment date${data.no_transactions ? ` (${data.no_transactions} without transactions)` : ''}`)
+      const membersRes = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+      if (membersRes.data) setMembers(membersRes.data)
+    } catch {
+      toast.error('Backfill failed')
+    } finally {
+      setBackfillingPayments(false)
+    }
+  }
+
   const [zoomResult, setZoomResult] = useState<{ class_date?: string; total?: number; matched?: number; unmatched?: number; error?: string } | null>(null)
 
   // ── Member attendance (loaded per modal open) ─────────────────────────────
@@ -1834,6 +1852,13 @@ export default function SpcPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
             >
               {recalculating ? 'Recalculating…' : '↻ Recalculate Scores'}
+            </button>
+            <button
+              onClick={handleBackfillNextPayment}
+              disabled={backfillingPayments}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+            >
+              {backfillingPayments ? 'Backfilling…' : '↻ Backfill Payments'}
             </button>
             <button
               onClick={() => { setZoomModalOpen(true); setZoomCsvContent(''); setZoomFileName(''); setZoomResult(null) }}
