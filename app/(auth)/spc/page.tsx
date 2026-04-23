@@ -1249,6 +1249,24 @@ export default function SpcPage() {
     }
   }
 
+  const [backfillingConversions, setBackfillingConversions] = useState(false)
+
+  async function handleBackfillConversions() {
+    setBackfillingConversions(true)
+    try {
+      const res = await fetch('/api/spc/backfill-trial-conversions')
+      const data = await res.json()
+      if (data.error) { toast.error(`Backfill failed: ${data.error}`); return }
+      toast.success(`Found ${data.confirmed_conversions} trial conversions (${data.already_marked} already marked)`)
+      const membersRes = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+      if (membersRes.data) setMembers(membersRes.data)
+    } catch {
+      toast.error('Backfill failed')
+    } finally {
+      setBackfillingConversions(false)
+    }
+  }
+
   const [zoomResult, setZoomResult] = useState<{ class_date?: string; total?: number; matched?: number; unmatched?: number; error?: string } | null>(null)
 
   // ── Member attendance (loaded per modal open) ─────────────────────────────
@@ -1833,9 +1851,20 @@ export default function SpcPage() {
   const arrAddedInPeriod = growthNewMembers.reduce((s, m) =>
     s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
 
-  // Trial conversions in period
-  const growthConversionRate = (growthNewMembersCount + growthTrialCancelsCount) > 0
-    ? parseFloat(((growthNewMembersCount / (growthNewMembersCount + growthTrialCancelsCount)) * 100).toFixed(1))
+  // Verified trial conversions in period
+  const verifiedConversions = useMemo(() =>
+    activeMembers.filter((m) => m.converted_from_trial === true && inGrowthPeriod(m.converted_at)),
+    [activeMembers, growthRange] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const verifiedConversionCount = verifiedConversions.length
+  const growthConversionRate = (verifiedConversionCount + growthTrialCancelsCount) > 0
+    ? parseFloat(((verifiedConversionCount / (verifiedConversionCount + growthTrialCancelsCount)) * 100).toFixed(1))
+    : 0
+  // All-time verified conversion rate for scenarios
+  const totalVerifiedConversions = activeMembers.filter((m) => m.converted_from_trial === true).length
+  const totalTrialCancels = trialCancels.length
+  const allTimeConversionRate = (totalVerifiedConversions + totalTrialCancels) > 0
+    ? parseFloat(((totalVerifiedConversions / (totalVerifiedConversions + totalTrialCancels)) * 100).toFixed(1))
     : 0
 
   const progressMax = Math.max(monthlyCount, annualCount, 1)
@@ -2085,6 +2114,15 @@ export default function SpcPage() {
                 {backfillingPayments ? 'Backfilling…' : '↻ Backfill Payments'}
               </button>
             )}
+            {isAdmin && (
+              <button
+                onClick={handleBackfillConversions}
+                disabled={backfillingConversions}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+              >
+                {backfillingConversions ? 'Backfilling…' : '↻ Backfill Conversions'}
+              </button>
+            )}
             <button
               onClick={() => { setZoomModalOpen(true); setZoomCsvContent(''); setZoomFileName(''); setZoomResult(null) }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 bg-violet-600"
@@ -2254,10 +2292,10 @@ export default function SpcPage() {
                   ) : (
                     <>
                       <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
-                        {growthNewMembersCount}
+                        {verifiedConversionCount}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">new active members in period</p>
-                      {(growthNewMembersCount + growthTrialCancelsCount) > 0 && (
+                      <p className="text-xs text-zinc-500 mt-1">verified trial → paid</p>
+                      {(verifiedConversionCount + growthTrialCancelsCount) > 0 && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
                           {growthConversionRate}% conversion rate
                         </span>
@@ -2479,12 +2517,12 @@ export default function SpcPage() {
                       {/* Current state */}
                       <div className="min-w-[180px] flex-1 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-4">
                         <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 mb-2">
-                          Current
+                          Current · {allTimeConversionRate}% rate
                         </span>
                         <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-1">{formatCurrency(mrr)}</p>
                         <p className="text-[10px] text-zinc-400 uppercase font-medium">MRR</p>
                         <p className="text-xs text-zinc-500 mt-2">{formatCurrency(arr)} ARR</p>
-                        <p className="text-xs text-zinc-500">{activeMembers.length} active members</p>
+                        <p className="text-xs text-zinc-500">{activeMembers.length} active · {totalVerifiedConversions} converted</p>
                         <p className="text-xs text-zinc-500">{ct} trials pending</p>
                       </div>
                       {/* Scenario cards */}

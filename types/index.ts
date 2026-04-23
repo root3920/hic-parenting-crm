@@ -68,6 +68,8 @@ export interface SpcMember {
   whatsapp_active?: boolean | null
   whatsapp_joined_at?: string | null
   lead_score?: number | null
+  converted_from_trial?: boolean | null
+  converted_at?: string | null
 }
 
 export interface SpcClassAttendance {

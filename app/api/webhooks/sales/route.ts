@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
               next_payment_date: nextPaymentDate,
             })
           } else {
-            // Update next_payment_date for any existing member (trial→active or already active)
+            // Update next_payment_date for any existing member
             const memberPlan = existing.plan ?? plan
             const npd = new Date(date + 'T12:00:00')
             if (memberPlan === 'annual') npd.setFullYear(npd.getFullYear() + 1)
@@ -210,9 +210,30 @@ export async function POST(req: NextRequest) {
             const updateFields: Record<string, unknown> = {
               next_payment_date: npd.toISOString().slice(0, 10),
             }
+
             if (existing.status === 'trial' || existing.status === 'expired') {
               updateFields.status = 'active'
+
+              // Check if this is a trial → paid conversion
+              const { data: trialTx } = await supabase
+                .from('transactions')
+                .select('id')
+                .eq('buyer_email', buyer_email)
+                .eq('status', 'completed')
+                .ilike('offer_title', '%Secure Parent%')
+                .lte('cost', 0)
+                .lt('date', date)
+                .limit(1)
+
+              if (trialTx && trialTx.length > 0) {
+                updateFields.converted_from_trial = true
+                updateFields.converted_at = date
+                console.log(`[SPC Webhook] Trial conversion confirmed for ${buyer_email}`)
+              } else {
+                console.log(`[SPC Webhook] Direct paid signup for ${buyer_email}`)
+              }
             }
+
             await supabase.from('spc_members').update(updateFields).eq('id', existing.id)
           }
         }
