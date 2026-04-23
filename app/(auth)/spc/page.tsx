@@ -1806,6 +1806,33 @@ export default function SpcPage() {
     .reduce((s, m) => s + m.amount / 12, 0)
 
   const growthNewMembersCount = growthNewMembers.length
+
+  // Previous equivalent period for comparison
+  const prevPeriodNewCount = useMemo(() => {
+    if (!growthRange.start) return 0 // "all time" has no previous period
+    const start = new Date(growthRange.start + 'T12:00:00')
+    const end = new Date(growthRange.end + 'T12:00:00')
+    const durationMs = end.getTime() - start.getTime()
+    const prevEnd = new Date(start.getTime() - 1) // day before period start
+    const prevStart = new Date(prevEnd.getTime() - durationMs)
+    const ps = prevStart.toISOString().slice(0, 10)
+    const pe = prevEnd.toISOString().slice(0, 10)
+    return activeMembers.filter((m) => {
+      const j = (m.joined_at ?? '').slice(0, 10)
+      return j >= ps && j <= pe
+    }).length
+  }, [activeMembers, growthRange])
+
+  const growthPct = prevPeriodNewCount > 0
+    ? Math.round(((growthNewMembersCount - prevPeriodNewCount) / prevPeriodNewCount) * 100)
+    : growthNewMembersCount > 0 ? 100 : 0
+
+  // MRR & ARR added by new members in period
+  const mrrAddedInPeriod = growthNewMembers.reduce((s, m) =>
+    s + (m.plan === 'annual' ? m.amount / 12 : m.amount), 0)
+  const arrAddedInPeriod = growthNewMembers.reduce((s, m) =>
+    s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
+
   const progressMax = Math.max(monthlyCount, annualCount, 1)
 
   const mrrChartData = [
@@ -2126,6 +2153,11 @@ export default function SpcPage() {
                       )}>
                         +{growthNewMembersCount} new in period
                       </span>
+                      {growthRange.start && (
+                        <p className={cn('text-[10px] mt-1', growthPct > 0 ? 'text-green-600' : growthPct < 0 ? 'text-red-600' : 'text-zinc-400')}>
+                          {growthPct > 0 ? '↑' : growthPct < 0 ? '↓' : '→'} {Math.abs(growthPct)}% vs prev period ({prevPeriodNewCount})
+                        </p>
+                      )}
                     </>
                   )}
                 </CardContent>
@@ -2144,7 +2176,13 @@ export default function SpcPage() {
                       <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
                         {formatCurrency(mrr)}
                       </p>
-                      <p className="text-xs text-zinc-500">current monthly recurring</p>
+                      {mrrAddedInPeriod > 0 ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          +{formatCurrency(mrrAddedInPeriod)}/mo added
+                        </span>
+                      ) : (
+                        <p className="text-xs text-zinc-500">current monthly recurring</p>
+                      )}
                     </>
                   )}
                 </CardContent>
@@ -2163,7 +2201,13 @@ export default function SpcPage() {
                       <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
                         {formatCurrency(arr)}
                       </p>
-                      <p className="text-xs text-zinc-500">projected annual</p>
+                      {arrAddedInPeriod > 0 ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          +{formatCurrency(arrAddedInPeriod)}/yr added
+                        </span>
+                      ) : (
+                        <p className="text-xs text-zinc-500">projected annual</p>
+                      )}
                     </>
                   )}
                 </CardContent>
