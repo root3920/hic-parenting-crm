@@ -19,7 +19,7 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, Calendar, Clock, ExternalLink, Mail, MessageSquare, Pencil, Phone, Search, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, Calendar, Clock, Download, ExternalLink, Mail, MessageSquare, Pencil, Phone, Search, Trash2, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -1781,6 +1781,79 @@ export default function SpcPage() {
     return <span className="text-xs text-zinc-500 dark:text-zinc-400">{days}d left</span>
   }
 
+  // ── Export CSV ──────────────────────────────────────────────────────────
+  function csvEscape(v: string | number | null | undefined): string {
+    const s = String(v ?? '')
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+  }
+
+  function downloadCSV(data: string, filename: string) {
+    const blob = new Blob([data], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10)
+
+  function exportActiveMembers() {
+    const header = 'Name,Email,Phone,Plan,Amount,Provider,Joined,Last Payment,Next Payment,Score,WhatsApp Active,Last Note Date'
+    const rows = filteredActiveMembers.map((m) => [
+      csvEscape(m.name), csvEscape(m.email), csvEscape(m.phone),
+      m.plan, m.amount, m.provider, m.joined_at ?? '',
+      lastPaymentByEmail[(m.email ?? '').toLowerCase()] ?? '',
+      m.next_payment_date ?? calcNextPaymentISO(transactionsByEmail[(m.email ?? '').toLowerCase()], m.plan, m.joined_at),
+      m.lead_score ?? 0, m.whatsapp_active ? 'Yes' : 'No',
+      lastNoteByEmail[(m.email ?? '').toLowerCase()] ?? '',
+    ].join(','))
+    downloadCSV([header, ...rows].join('\n'), `spc-active-members-${todayStr}.csv`)
+    toast.success(`Exported ${rows.length} active members`)
+  }
+
+  function exportTrials() {
+    const header = 'Name,Email,Phone,Plan,Provider,Trial Start,Expires,Days Left,Score,Last Note Date'
+    const rows = filteredTrialMembers.map((m) => [
+      csvEscape(m.name), csvEscape(m.email), csvEscape(m.phone),
+      m.plan, m.provider, m.joined_at ?? '',
+      m.trial_end_date ?? '', m.trial_end_date ? daysUntil(m.trial_end_date) : '',
+      m.lead_score ?? 0, lastNoteByEmail[(m.email ?? '').toLowerCase()] ?? '',
+    ].join(','))
+    downloadCSV([header, ...rows].join('\n'), `spc-free-trials-${todayStr}.csv`)
+    toast.success(`Exported ${rows.length} free trials`)
+  }
+
+  function exportExpired() {
+    const header = 'Name,Email,Phone,Plan,Amount,Provider,Joined,Last Payment,Next Payment,Days Expired,Score,Last Note Date'
+    const rows = filteredExpiredMembers.map((m) => [
+      csvEscape(m.name), csvEscape(m.email), csvEscape(m.phone),
+      m.plan, m.amount, m.provider, m.joined_at ?? '',
+      lastPaymentByEmail[(m.email ?? '').toLowerCase()] ?? '',
+      m.next_payment_date ?? '', daysExpired(m),
+      m.lead_score ?? 0, lastNoteByEmail[(m.email ?? '').toLowerCase()] ?? '',
+    ].join(','))
+    downloadCSV([header, ...rows].join('\n'), `spc-expired-${todayStr}.csv`)
+    toast.success(`Exported ${rows.length} expired members`)
+  }
+
+  function exportCancellations() {
+    const header = 'Name,Email,Phone,Type,Plan,Amount,Platform,Subscribed,Cancelled At,Days Active,Last Note Date'
+    const rows = filteredCancellations.map((c) => {
+      const type = isTrialCancel(c) ? 'Trial' : isPaidCancel(c) ? 'Paid' : 'Pending'
+      const days = c.subscribed_at && c.cancelled_at ? daysActive(c.subscribed_at, c.cancelled_at) : ''
+      return [
+        csvEscape(c.name), csvEscape(c.email), csvEscape(c.customer_phone),
+        type, c.plan ?? '', c.amount, c.source ?? '',
+        c.subscribed_at ?? '', c.cancelled_at ?? '', days,
+        lastNoteByEmail[(c.email ?? '').toLowerCase()] ?? '',
+      ].join(',')
+    })
+    downloadCSV([header, ...rows].join('\n'), `spc-cancellations-${todayStr}.csv`)
+    toast.success(`Exported ${rows.length} cancellations`)
+  }
+
   // ── CSV helpers ───────────────────────────────────────────────────────────
   function parseCSVPreview(text: string, maxRows: number): { headers: string[]; rows: string[][] } {
     const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n')
@@ -2421,6 +2494,15 @@ export default function SpcPage() {
                     <option value="score_desc">Score (highest)</option>
                     <option value="last_note_desc">Last Note (recent)</option>
                   </select>
+                  {isAdmin && (
+                    <button
+                      onClick={exportActiveMembers}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      title="Export CSV"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -2580,6 +2662,15 @@ export default function SpcPage() {
                       <option value="score_desc">Score (highest)</option>
                       <option value="last_note_desc">Last Note (recent)</option>
                     </select>
+                    {isAdmin && (
+                      <button
+                        onClick={exportTrials}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        title="Export CSV"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -2685,6 +2776,15 @@ export default function SpcPage() {
                     <option value="last_payment_desc">Last Payment (newest)</option>
                     <option value="score_desc">Score (highest)</option>
                   </select>
+                  {isAdmin && (
+                    <button
+                      onClick={exportExpired}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      title="Export CSV"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -2981,6 +3081,15 @@ export default function SpcPage() {
                       <option value="subscribed_asc">Subscribed (oldest)</option>
                       <option value="days_active_desc">Days Active (most)</option>
                     </select>
+                    {isAdmin && (
+                      <button
+                        onClick={exportCancellations}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        title="Export CSV"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 {/* Filters row */}
