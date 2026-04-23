@@ -28,6 +28,8 @@ import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTable
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -1733,6 +1735,28 @@ export default function SpcPage() {
     [activeMembers, growthRange] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
+  // ── Cancellation timeline (current month, daily) ─────────────────────────
+  const cancelTimelineData = useMemo(() => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const dayCount = today.getDate()
+    const days: { date: string; paid: number; trial: number }[] = []
+    for (let d = 1; d <= dayCount; d++) {
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      const label = new Date(year, month, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      let paid = 0
+      let trial = 0
+      for (const c of cancellations) {
+        if (!c.cancelled_at || c.cancelled_at.slice(0, 10) !== iso) continue
+        if (isPaidCancel(c)) paid++
+        else if (isTrialCancel(c)) trial++
+      }
+      days.push({ date: label, paid, trial })
+    }
+    return days
+  }, [cancellations])
+
   // ── Growth tab calculations (baseline hardcoded from Mar 27 snapshot) ────
   const mrrNowMonthly = activeMembers
     .filter((m) => m.plan === 'monthly')
@@ -2321,6 +2345,45 @@ export default function SpcPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Cancellations timeline */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Cancellations this month</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="h-52 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-lg" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={cancelTimelineData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: '#71717a' }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval={2}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: '#71717a' }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDecimals={false}
+                      />
+                      <Tooltip contentStyle={{ fontSize: 11 }} />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        formatter={(v) => <span className="text-xs">{v === 'paid' ? 'Paid' : 'Trial'}</span>}
+                      />
+                      <Line type="monotone" dataKey="paid" name="paid" stroke="#E24B4A" strokeWidth={2} dot={{ r: 3, fill: '#E24B4A' }} />
+                      <Line type="monotone" dataKey="trial" name="trial" stroke="#EF9F27" strokeWidth={2} dot={{ r: 3, fill: '#EF9F27' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
 
             {/* 3. New Members List */}
             <Card>
