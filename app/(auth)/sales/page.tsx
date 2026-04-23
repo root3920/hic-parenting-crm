@@ -28,6 +28,7 @@ import { KPICardGrid } from '@/components/motion/KPICardGrid'
 import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTableRow'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
 
@@ -177,6 +178,8 @@ const selectClass =
 const labelClass = 'block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1'
 
 export default function SalesPage() {
+  const { profile } = useProfile()
+  const isAdmin = profile?.role === 'admin'
   const supabase = useMemo(() => createClient(), [])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
@@ -595,60 +598,64 @@ export default function SalesPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Sales Report" description="Revenue and transaction analytics">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Date mode buttons */}
-            <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              {DATE_MODES.map((m) => (
-                <button
-                  key={m.value}
-                  onClick={() => setDateMode(m.value)}
-                  className={cn(
-                    'px-2.5 py-1.5 text-xs font-medium transition-colors border-r border-zinc-200 dark:border-zinc-700 last:border-r-0',
-                    dateMode === m.value
-                      ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
-                      : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700'
-                  )}
-                >
-                  {m.label}
-                </button>
-              ))}
+        {isAdmin ? (
+          <PageHeader title="Sales Report" description="Revenue and transaction analytics">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Date mode buttons */}
+              <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                {DATE_MODES.map((m) => (
+                  <button
+                    key={m.value}
+                    onClick={() => setDateMode(m.value)}
+                    className={cn(
+                      'px-2.5 py-1.5 text-xs font-medium transition-colors border-r border-zinc-200 dark:border-zinc-700 last:border-r-0',
+                      dateMode === m.value
+                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
+                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                    )}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom date inputs — only shown in custom mode */}
+              {dateMode === 'custom' && (
+                <>
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  />
+                  <span className="text-xs text-zinc-400">→</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  />
+                </>
+              )}
+
+              <button
+                onClick={() => setCsvModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Upload CSV
+              </button>
+              <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                Add Sale
+              </Button>
             </div>
+          </PageHeader>
+        ) : (
+          <PageHeader title="Purchase Recovery" description="Follow up on failed purchases to recover revenue" />
+        )}
 
-            {/* Custom date inputs — only shown in custom mode */}
-            {dateMode === 'custom' && (
-              <>
-                <input
-                  type="date"
-                  value={customFrom}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-                />
-                <span className="text-xs text-zinc-400">→</span>
-                <input
-                  type="date"
-                  value={customTo}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-                />
-              </>
-            )}
-
-            <button
-              onClick={() => setCsvModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Upload CSV
-            </button>
-            <Button size="sm" onClick={() => setShowForm(true)} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" />
-              Add Sale
-            </Button>
-          </div>
-        </PageHeader>
-
-        <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-6">
+        {isAdmin && <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-6">
           {/* Total Revenue — custom card to fit gross/refund sub-line */}
           <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } } }}>
             <Card className="h-full">
@@ -710,7 +717,7 @@ export default function SalesPage() {
               </CardContent>
             </Card>
           </motion.div>
-        </KPICardGrid>
+        </KPICardGrid>}
 
         {/* ── Recuperación de compras ──────────────────────────────────── */}
         {!loading && totalFailed > 0 && (
@@ -800,6 +807,7 @@ export default function SalesPage() {
           </motion.div>
         )}
 
+        {isAdmin && <>
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-3 mb-6">
           <motion.div className="lg:col-span-2" variants={chartVariants} initial="hidden" animate="visible">
             <Card>
@@ -986,10 +994,11 @@ export default function SalesPage() {
             )}
           </CardContent>
         </Card>
+        </>}
       </div>
 
       {/* ── CSV Import Modal ── */}
-      {csvModalOpen && (
+      {isAdmin && csvModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={resetCsvModal} />
           <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700 p-6">
@@ -1120,7 +1129,7 @@ export default function SalesPage() {
       )}
 
       {/* Confirmation dialog */}
-      {confirm && confirmMeta && (
+      {isAdmin && confirm && confirmMeta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setConfirm(null)} />
           <div className="relative bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-sm animate-in fade-in zoom-in-95 duration-150">
@@ -1301,7 +1310,7 @@ export default function SalesPage() {
       )}
 
       {/* Slide-over panel */}
-      {showForm && (
+      {isAdmin && showForm && (
         <div className="fixed inset-0 z-50 flex">
           <div
             className="flex-1 bg-black/30 backdrop-blur-sm"

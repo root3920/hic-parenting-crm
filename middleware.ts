@@ -5,7 +5,7 @@ type UserRole = 'admin' | 'closer' | 'setter' | 'csm_spc' | 'csm_ht'
 
 const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/dashboard':          ['admin'],
-  '/sales':              ['admin'],
+  '/sales':              ['admin', 'csm_spc', 'csm_ht'],
   '/llamadas':           ['admin', 'closer'],
   '/spc':                ['admin', 'csm_spc'],
   '/students':           ['admin', 'csm_ht'],
