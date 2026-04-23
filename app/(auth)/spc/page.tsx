@@ -94,6 +94,7 @@ type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_pay
 type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
 type CancelSort = 'cancelled_desc' | 'cancelled_asc' | 'subscribed_desc' | 'subscribed_asc' | 'days_active_desc'
 type ExpiredSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'score_desc' | 'days_expired_desc'
+type GrowthPeriod = 'this_month' | 'last_30d' | 'last_90d' | 'this_year' | 'all'
 
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -1304,6 +1305,7 @@ export default function SpcPage() {
   const [cancelSort, setCancelSort] = useState<CancelSort>('cancelled_desc')
   const [expiredSearch, setExpiredSearch] = useState('')
   const [expiredSort, setExpiredSort] = useState<ExpiredSort>('days_expired_desc')
+  const [growthPeriod, setGrowthPeriod] = useState<GrowthPeriod>('this_month')
 
   // Cancellation filters
   const [cancelDateFrom, setCancelDateFrom] = useState('')
@@ -1670,6 +1672,67 @@ export default function SpcPage() {
     revenue: cancellations.filter((c) => c.cancelled_at && c.cancelled_at.slice(0, 7) === month).length,
   }))
 
+  // ── Growth period range ──────────────────────────────────────────────────
+  const growthRange = useMemo(() => {
+    const today = new Date()
+    const fmt = (d: Date) => d.toISOString().slice(0, 10)
+    const end = fmt(today)
+    switch (growthPeriod) {
+      case 'this_month': return { start: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10), end }
+      case 'last_30d': { const d = new Date(today); d.setDate(d.getDate() - 30); return { start: fmt(d), end } }
+      case 'last_90d': { const d = new Date(today); d.setDate(d.getDate() - 90); return { start: fmt(d), end } }
+      case 'this_year': return { start: `${today.getFullYear()}-01-01`, end }
+      case 'all': return { start: null, end }
+    }
+  }, [growthPeriod])
+
+  const growthPeriodLabel = useMemo(() => {
+    if (!growthRange.start) return 'All time'
+    const fmtD = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return `${fmtD(growthRange.start)} – ${fmtD(growthRange.end)}`
+  }, [growthRange])
+
+  function inGrowthPeriod(dateStr: string | null | undefined): boolean {
+    if (!dateStr) return false
+    const d = dateStr.slice(0, 10)
+    if (growthRange.start && d < growthRange.start) return false
+    if (d > growthRange.end) return false
+    return true
+  }
+
+  // Churn scoped to growth period
+  const growthNonTrialCancels = useMemo(() =>
+    nonTrialCancels.filter((c) => {
+      if (!c.cancelled_at) return false
+      return inGrowthPeriod(c.cancelled_at)
+    }),
+    [nonTrialCancels, growthRange] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const growthCancelsCount = growthNonTrialCancels.length
+  const growthMembersAtStart = activeMembers.length + growthCancelsCount
+  const growthChurnRate = growthMembersAtStart > 0
+    ? parseFloat(((growthCancelsCount / growthMembersAtStart) * 100).toFixed(1))
+    : 0
+  const growthChurnColor = growthChurnRate < 3 ? 'text-green-600' : growthChurnRate <= 6 ? 'text-amber-600' : 'text-red-600'
+  const growthChurnBadge = growthChurnRate < 3 ? 'bg-green-100 text-green-700' : growthChurnRate <= 6 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+
+  // Trial churn scoped to growth period
+  const growthTrialCancels = useMemo(() =>
+    trialCancels.filter((c) => inGrowthPeriod(c.cancelled_at)),
+    [trialCancels, growthRange] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const growthTrialCancelsCount = growthTrialCancels.length
+  const growthTrialChurnDenom = growthTrialCancelsCount + trialMembers.length
+  const growthTrialChurnRate = growthTrialChurnDenom > 0
+    ? parseFloat(((growthTrialCancelsCount / growthTrialChurnDenom) * 100).toFixed(1))
+    : 0
+
+  // New members in growth period
+  const growthNewMembers = useMemo(() =>
+    [...activeMembers].filter((m) => inGrowthPeriod(m.joined_at)).sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
+    [activeMembers, growthRange] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
   // ── Growth tab calculations (baseline hardcoded from Mar 27 snapshot) ────
   const mrrNowMonthly = activeMembers
     .filter((m) => m.plan === 'monthly')
@@ -1889,8 +1952,35 @@ export default function SpcPage() {
         {/* ── CRECIMIENTO ───────────────────────────────────────────────── */}
         {activeTab === 'growth' && (
           <div className="space-y-6">
+            {/* Period filter */}
+            <div>
+              <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden w-fit">
+                {([
+                  ['this_month', 'This month'],
+                  ['last_30d', 'Last 30d'],
+                  ['last_90d', 'Last 90d'],
+                  ['this_year', 'This year'],
+                  ['all', 'All time'],
+                ] as [GrowthPeriod, string][]).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setGrowthPeriod(key)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium transition-colors border-r border-zinc-200 dark:border-zinc-700 last:border-r-0',
+                      growthPeriod === key
+                        ? 'bg-[#185FA5] text-white'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1.5">{growthPeriodLabel}</p>
+            </div>
+
             {/* 1. KPI Comparison Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
               {/* Total Members */}
               <Card>
                 <CardContent className="pt-5 pb-4">
@@ -1977,22 +2067,37 @@ export default function SpcPage() {
                   ) : (
                     <>
                       <div className="flex items-baseline gap-2 mb-2">
-                        <span className={`text-2xl font-semibold ${churnColor}`}>
-                          {churnRate}%
+                        <span className={`text-2xl font-semibold ${growthChurnColor}`}>
+                          {growthChurnRate}%
                         </span>
-                        <span className="text-sm text-zinc-400">monthly</span>
                       </div>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        {cancelsThisMonth} with known date / {membersAtStartOfMonth} members
+                        {growthCancelsCount} / {growthMembersAtStart} members
                       </p>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${churnBadgeClass}`}>
-                        {cancelsThisMonth} cancellations this month
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${growthChurnBadge}`}>
+                        {growthCancelsCount} paid cancellations
                       </span>
-                      {unknownDateCancels > 0 && (
-                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1.5 italic">
-                          {unknownDateCancels} records without cancellation date excluded
-                        </p>
-                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Trial Churn */}
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Trial Churn
+                  </p>
+                  {loading ? (
+                    <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <p className="text-2xl font-semibold text-amber-600 dark:text-amber-400">
+                        {growthTrialChurnRate}%
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {growthTrialCancelsCount} trial cancels in period
+                      </p>
                     </>
                   )}
                 </CardContent>
@@ -2151,7 +2256,7 @@ export default function SpcPage() {
                   New active members
                   {!loading && (
                     <span className="ml-2 text-xs font-normal text-zinc-500">
-                      ({newSpcMembers.length} desde Mar 27)
+                      ({growthNewMembers.length} in period)
                     </span>
                   )}
                 </CardTitle>
@@ -2163,11 +2268,11 @@ export default function SpcPage() {
                       <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                     ))}
                   </div>
-                ) : newSpcMembers.length === 0 ? (
-                  <EmptyState title="No new members" description="Members who join after Mar 27 will appear here." />
+                ) : growthNewMembers.length === 0 ? (
+                  <EmptyState title="No new members" description="No members joined during this period." />
                 ) : (
                   <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                    {newSpcMembers.map((m, i) => (
+                    {growthNewMembers.map((m, i) => (
                       <motion.div
                         key={m.id}
                         initial={{ opacity: 0, x: -8 }}
