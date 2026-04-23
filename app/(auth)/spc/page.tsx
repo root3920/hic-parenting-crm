@@ -1256,11 +1256,15 @@ export default function SpcPage() {
     try {
       const res = await fetch('/api/spc/backfill-trial-conversions')
       const data = await res.json()
+      console.log('[Backfill Conversions] Full response:', JSON.stringify(data, null, 2))
       if (data.error) { toast.error(`Backfill failed: ${data.error}`); return }
-      toast.success(`Found ${data.confirmed_conversions} trial conversions (${data.already_marked} already marked)`)
+      toast.success(
+        `Trial conversions: ${data.trial_emails_found} trials found, ${data.confirmed_conversions} converted, ${data.updated_in_db} updated in DB${data.already_marked ? `, ${data.already_marked} already marked` : ''}`
+      )
       const membersRes = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
       if (membersRes.data) setMembers(membersRes.data)
-    } catch {
+    } catch (err) {
+      console.error('[Backfill Conversions] Error:', err)
       toast.error('Backfill failed')
     } finally {
       setBackfillingConversions(false)
