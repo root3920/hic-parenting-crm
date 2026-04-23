@@ -1833,6 +1833,11 @@ export default function SpcPage() {
   const arrAddedInPeriod = growthNewMembers.reduce((s, m) =>
     s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
 
+  // Trial conversions in period
+  const growthConversionRate = (growthNewMembersCount + growthTrialCancelsCount) > 0
+    ? parseFloat(((growthNewMembersCount / (growthNewMembersCount + growthTrialCancelsCount)) * 100).toFixed(1))
+    : 0
+
   const progressMax = Math.max(monthlyCount, annualCount, 1)
 
   const mrrChartData = [
@@ -2238,22 +2243,25 @@ export default function SpcPage() {
                 </CardContent>
               </Card>
 
-              {/* Trial Churn */}
+              {/* Trial Conversions */}
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
-                    Trial Churn
+                    Trial Conversions
                   </p>
                   {loading ? (
                     <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ) : (
                     <>
-                      <p className="text-2xl font-semibold text-amber-600 dark:text-amber-400">
-                        {growthTrialChurnRate}%
+                      <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
+                        {growthNewMembersCount}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">
-                        {growthTrialCancelsCount} trial cancels in period
-                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">new active members in period</p>
+                      {(growthNewMembersCount + growthTrialCancelsCount) > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                          {growthConversionRate}% conversion rate
+                        </span>
+                      )}
                     </>
                   )}
                 </CardContent>
@@ -2278,6 +2286,13 @@ export default function SpcPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Trial churn muted stat */}
+            {!loading && growthTrialCancelsCount > 0 && (
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 -mt-4 mb-6 px-0.5">
+                Trial churn in period: {growthTrialChurnRate}% ({growthTrialCancelsCount} trial cancellation{growthTrialCancelsCount !== 1 ? 's' : ''})
+              </p>
+            )}
 
             {/* 2. Two column section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
