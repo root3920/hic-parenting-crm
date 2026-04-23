@@ -1980,7 +1980,7 @@ export default function SpcPage() {
             </div>
 
             {/* 1. KPI Comparison Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
+            <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {/* Total Members */}
               <Card>
                 <CardContent className="pt-5 pb-4">
