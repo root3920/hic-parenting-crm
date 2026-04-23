@@ -1198,6 +1198,7 @@ export default function SpcPage() {
 
   // Modal state
   const { profile } = useProfile()
+  const isAdmin = profile?.role === 'admin'
   const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null)
   const [notes, setNotes] = useState<SpcMemberNote[]>([])
   const [noteText, setNoteText] = useState('')
@@ -1846,20 +1847,24 @@ export default function SpcPage() {
             })}
           </nav>
           <div className="pb-2 shrink-0 flex items-center gap-2">
-            <button
-              onClick={handleRecalculateScores}
-              disabled={recalculating}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
-            >
-              {recalculating ? 'Recalculating…' : '↻ Recalculate Scores'}
-            </button>
-            <button
-              onClick={handleBackfillNextPayment}
-              disabled={backfillingPayments}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
-            >
-              {backfillingPayments ? 'Backfilling…' : '↻ Backfill Payments'}
-            </button>
+            {isAdmin && (
+              <button
+                onClick={handleRecalculateScores}
+                disabled={recalculating}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+              >
+                {recalculating ? 'Recalculating…' : '↻ Recalculate Scores'}
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleBackfillNextPayment}
+                disabled={backfillingPayments}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+              >
+                {backfillingPayments ? 'Backfilling…' : '↻ Backfill Payments'}
+              </button>
+            )}
             <button
               onClick={() => { setZoomModalOpen(true); setZoomCsvContent(''); setZoomFileName(''); setZoomResult(null) }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 bg-violet-600"
@@ -1867,14 +1872,16 @@ export default function SpcPage() {
               <Upload className="h-3.5 w-3.5" />
               Upload Zoom Class
             </button>
-            <button
-              onClick={() => setCsvModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#185FA5' }}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Upload CSV
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setCsvModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#185FA5' }}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Upload CSV
+              </button>
+            )}
           </div>
           </div>
         </div>
