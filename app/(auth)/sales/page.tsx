@@ -29,6 +29,7 @@ import { AnimatedTableRow, rowVariants } from '@/components/motion/AnimatedTable
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
+import { usePreviewRole } from '@/contexts/PreviewRoleContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -179,7 +180,9 @@ const labelClass = 'block text-xs font-medium text-zinc-600 dark:text-zinc-400 m
 
 export default function SalesPage() {
   const { profile } = useProfile()
-  const isAdmin = profile?.role === 'admin'
+  const { previewRole } = usePreviewRole()
+  const effectiveRole = previewRole || profile?.role
+  const isRestrictedRole = effectiveRole === 'csm_spc' || effectiveRole === 'csm_ht'
   const supabase = useMemo(() => createClient(), [])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
@@ -598,7 +601,7 @@ export default function SalesPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        {isAdmin ? (
+        {!isRestrictedRole ? (
           <PageHeader title="Sales Report" description="Revenue and transaction analytics">
             <div className="flex flex-wrap items-center gap-2">
               {/* Date mode buttons */}
@@ -655,7 +658,7 @@ export default function SalesPage() {
           <PageHeader title="Purchase Recovery" description="Follow up on failed purchases to recover revenue" />
         )}
 
-        {isAdmin && <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-6">
+        {!isRestrictedRole && <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-6">
           {/* Total Revenue — custom card to fit gross/refund sub-line */}
           <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } } }}>
             <Card className="h-full">
@@ -807,7 +810,7 @@ export default function SalesPage() {
           </motion.div>
         )}
 
-        {isAdmin && <>
+        {!isRestrictedRole && <>
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-3 mb-6">
           <motion.div className="lg:col-span-2" variants={chartVariants} initial="hidden" animate="visible">
             <Card>
@@ -998,7 +1001,7 @@ export default function SalesPage() {
       </div>
 
       {/* ── CSV Import Modal ── */}
-      {isAdmin && csvModalOpen && (
+      {!isRestrictedRole && csvModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={resetCsvModal} />
           <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700 p-6">
@@ -1129,7 +1132,7 @@ export default function SalesPage() {
       )}
 
       {/* Confirmation dialog */}
-      {isAdmin && confirm && confirmMeta && (
+      {!isRestrictedRole && confirm && confirmMeta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setConfirm(null)} />
           <div className="relative bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-sm animate-in fade-in zoom-in-95 duration-150">
@@ -1310,7 +1313,7 @@ export default function SalesPage() {
       )}
 
       {/* Slide-over panel */}
-      {isAdmin && showForm && (
+      {!isRestrictedRole && showForm && (
         <div className="fixed inset-0 z-50 flex">
           <div
             className="flex-1 bg-black/30 backdrop-blur-sm"
