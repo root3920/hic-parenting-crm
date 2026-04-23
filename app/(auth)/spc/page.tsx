@@ -1735,29 +1735,69 @@ export default function SpcPage() {
     [activeMembers, growthRange] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
-  // ── Cancellation timeline (current month, daily) ─────────────────────────
+  // ── Cancellation timeline (scoped to growth period) ──────────────────────
   const cancelTimelineData = useMemo(() => {
-    const today = new Date()
-    const year = today.getFullYear()
-    const month = today.getMonth()
-    const dayCount = today.getDate()
-    const days: { date: string; paid: number; trial: number }[] = []
-    for (let d = 1; d <= dayCount; d++) {
-      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-      const label = new Date(year, month, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      let paid = 0
-      let trial = 0
-      for (const c of cancellations) {
-        if (!c.cancelled_at || c.cancelled_at.slice(0, 10) !== iso) continue
-        if (isPaidCancel(c)) paid++
-        else if (isTrialCancel(c)) trial++
-      }
-      days.push({ date: label, paid, trial })
-    }
-    return days
-  }, [cancellations])
+    const periodCancels = cancellations.filter((c) => c.cancelled_at && inGrowthPeriod(c.cancelled_at))
+    const start = growthRange.start ? new Date(growthRange.start + 'T12:00:00') : null
+    const end = new Date(growthRange.end + 'T12:00:00')
+    const diffDays = start ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0
 
-  // ── Growth tab calculations (baseline hardcoded from Mar 27 snapshot) ────
+    // Choose grouping: day (<= 60), week (<= 180), month (> 180 or all)
+    const groupBy = !start || diffDays > 180 ? 'month' : diffDays > 60 ? 'week' : 'day'
+
+    if (groupBy === 'day' && start) {
+      const result: { date: string; paid: number; trial: number }[] = []
+      for (let i = 0; i < diffDays; i++) {
+        const d = new Date(start)
+        d.setDate(d.getDate() + i)
+        const iso = d.toISOString().slice(0, 10)
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        let paid = 0, trial = 0
+        for (const c of periodCancels) {
+          if (c.cancelled_at!.slice(0, 10) !== iso) continue
+          if (isPaidCancel(c)) paid++; else if (isTrialCancel(c)) trial++
+        }
+        result.push({ date: label, paid, trial })
+      }
+      return result
+    }
+
+    if (groupBy === 'week' && start) {
+      const buckets: Record<string, { paid: number; trial: number }> = {}
+      for (let i = 0; i < diffDays; i += 7) {
+        const d = new Date(start)
+        d.setDate(d.getDate() + i)
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        const endOfWeek = new Date(d)
+        endOfWeek.setDate(endOfWeek.getDate() + 6)
+        const wStart = d.toISOString().slice(0, 10)
+        const wEnd = endOfWeek.toISOString().slice(0, 10)
+        let paid = 0, trial = 0
+        for (const c of periodCancels) {
+          const cd = c.cancelled_at!.slice(0, 10)
+          if (cd >= wStart && cd <= wEnd) {
+            if (isPaidCancel(c)) paid++; else if (isTrialCancel(c)) trial++
+          }
+        }
+        buckets[label] = { paid, trial }
+      }
+      return Object.entries(buckets).map(([date, v]) => ({ date, ...v }))
+    }
+
+    // month grouping
+    const monthBuckets: Record<string, { paid: number; trial: number }> = {}
+    for (const c of periodCancels) {
+      const m = c.cancelled_at!.slice(0, 7)
+      if (!monthBuckets[m]) monthBuckets[m] = { paid: 0, trial: 0 }
+      if (isPaidCancel(c)) monthBuckets[m].paid++; else if (isTrialCancel(c)) monthBuckets[m].trial++
+    }
+    return Object.entries(monthBuckets).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => ({
+      date: new Date(k + '-01T12:00:00').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+      ...v,
+    }))
+  }, [cancellations, growthRange]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Growth tab calculations ─────────────────────────────────────────────
   const mrrNowMonthly = activeMembers
     .filter((m) => m.plan === 'monthly')
     .reduce((s, m) => s + m.amount, 0)
@@ -1765,19 +1805,8 @@ export default function SpcPage() {
     .filter((m) => m.plan === 'annual')
     .reduce((s, m) => s + m.amount / 12, 0)
 
-  const newSpcMembers = [...activeMembers].sort((a, b) =>
-    b.created_at.localeCompare(a.created_at)
-  )
-
-  const deltaMembersCount = activeMembers.length - BASELINE.totalMembers
-  const deltaMembersPct = parseFloat(
-    ((deltaMembersCount / BASELINE.totalMembers) * 100).toFixed(1)
-  )
-  const deltaMrr = mrr - BASELINE.mrr
-  const deltaMrrPct = parseFloat(((deltaMrr / BASELINE.mrr) * 100).toFixed(1))
-  const deltaArr = arr - BASELINE.arr
-
-  const progressMax = Math.max(monthlyCount, BASELINE.monthlyMembers, 1)
+  const growthNewMembersCount = growthNewMembers.length
+  const progressMax = Math.max(monthlyCount, annualCount, 1)
 
   const mrrChartData = [
     {
@@ -2088,15 +2117,14 @@ export default function SpcPage() {
                     <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ) : (
                     <>
-                      <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-sm text-muted-foreground">{BASELINE.totalMembers}</span>
-                        <span className="text-sm text-zinc-400">→</span>
-                        <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-                          {activeMembers.length}
-                        </span>
-                      </div>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
-                        +{deltaMembersCount} new · ↑{deltaMembersPct}%
+                      <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
+                        {activeMembers.length}
+                      </p>
+                      <span className={cn(
+                        'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                        growthNewMembersCount > 0 ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-500'
+                      )}>
+                        +{growthNewMembersCount} new in period
                       </span>
                     </>
                   )}
@@ -2113,16 +2141,10 @@ export default function SpcPage() {
                     <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ) : (
                     <>
-                      <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-sm text-muted-foreground">{formatCurrency(BASELINE.mrr)}</span>
-                        <span className="text-sm text-zinc-400">→</span>
-                        <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-                          {formatCurrency(mrr)}
-                        </span>
-                      </div>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
-                        +{formatCurrency(deltaMrr)}/mo · ↑{deltaMrrPct}%
-                      </span>
+                      <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
+                        {formatCurrency(mrr)}
+                      </p>
+                      <p className="text-xs text-zinc-500">current monthly recurring</p>
                     </>
                   )}
                 </CardContent>
@@ -2138,16 +2160,10 @@ export default function SpcPage() {
                     <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ) : (
                     <>
-                      <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-sm text-muted-foreground">{formatCurrency(BASELINE.arr)}</span>
-                        <span className="text-sm text-zinc-400">→</span>
-                        <span className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-                          {formatCurrency(arr)}
-                        </span>
-                      </div>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
-                        +{formatCurrency(deltaArr)}/año
-                      </span>
+                      <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
+                        {formatCurrency(arr)}
+                      </p>
+                      <p className="text-xs text-zinc-500">projected annual</p>
                     </>
                   )}
                 </CardContent>
@@ -2349,7 +2365,7 @@ export default function SpcPage() {
             {/* Cancellations timeline */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Cancellations this month</CardTitle>
+                <CardTitle className="text-sm font-semibold">Cancellations Timeline</CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -2363,7 +2379,7 @@ export default function SpcPage() {
                         tick={{ fontSize: 10, fill: '#71717a' }}
                         axisLine={false}
                         tickLine={false}
-                        interval={2}
+                        interval={cancelTimelineData.length > 30 ? Math.floor(cancelTimelineData.length / 10) : cancelTimelineData.length > 15 ? 2 : 0}
                       />
                       <YAxis
                         tick={{ fontSize: 10, fill: '#71717a' }}
