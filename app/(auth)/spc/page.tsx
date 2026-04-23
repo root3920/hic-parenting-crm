@@ -88,11 +88,12 @@ type SelectedMember =
   | { kind: 'member'; data: SpcMember }
   | { kind: 'cancellation'; data: SpcCancellation }
 
-type Tab = 'growth' | 'overview' | 'active' | 'trials' | 'cancellations'
+type Tab = 'growth' | 'overview' | 'active' | 'trials' | 'expired' | 'cancellations'
 
 type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'score_desc' | 'last_note_desc'
 type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
 type CancelSort = 'cancelled_desc' | 'cancelled_asc' | 'subscribed_desc' | 'subscribed_asc' | 'days_active_desc'
+type ExpiredSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'score_desc' | 'days_expired_desc'
 
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -638,6 +639,11 @@ function MemberProfileModal({
         </div>
         {/* Quick actions */}
         <div className="flex items-center gap-1 shrink-0">
+          {selected.kind === 'member' && selected.data.status === 'expired' && !isEditing && (
+            <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 mr-1">
+              Expired
+            </span>
+          )}
           {selected.kind === 'member' && !isEditing && (
             <button
               onClick={startEdit}
@@ -664,6 +670,21 @@ function MemberProfileModal({
           </button>
         </div>
       </div>
+
+      {/* Recovery banner for expired members */}
+      {selected.kind === 'member' && selected.data.status === 'expired' && !isEditing && (
+        <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
+          <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-0.5">Recovery Opportunity</p>
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            This member&apos;s subscription has expired.{' '}
+            {(() => {
+              const lp = memberTransactions.filter((tx) => (tx.status ?? 'completed') === 'completed')[0]
+              return lp ? <>Last payment: <strong>{formatDate(lp.date)}</strong>. </> : null
+            })()}
+            Consider reaching out to re-activate.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -1262,6 +1283,8 @@ export default function SpcPage() {
   const [activeSort, setActiveSort] = useState<ActiveSort>('joined_desc')
   const [trialSort, setTrialSort] = useState<TrialSort>('trial_start_desc')
   const [cancelSort, setCancelSort] = useState<CancelSort>('cancelled_desc')
+  const [expiredSearch, setExpiredSearch] = useState('')
+  const [expiredSort, setExpiredSort] = useState<ExpiredSort>('days_expired_desc')
 
   // Cancellation filters
   const [cancelDateFrom, setCancelDateFrom] = useState('')
@@ -1409,6 +1432,10 @@ export default function SpcPage() {
     () => members.filter((m) => m.status === 'trial'),
     [members]
   )
+  const expiredMembers = useMemo(
+    () => [...members.filter((m) => m.status === 'expired')].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
+    [members]
+  )
 
   const mrr = activeMembers.reduce(
     (s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount),
@@ -1474,6 +1501,24 @@ export default function SpcPage() {
     }
     return list
   }, [sortedTrials, trialSearch, trialSort, lastNoteByEmail])
+
+  function daysExpired(m: SpcMember): number {
+    const npd = m.next_payment_date
+    if (!npd) return 0
+    return Math.max(0, Math.floor((Date.now() - new Date(npd).getTime()) / (1000 * 60 * 60 * 24)))
+  }
+
+  const filteredExpiredMembers = useMemo(() => {
+    let list = expiredMembers.filter((m) => matchesSearch(m.name, m.email, expiredSearch))
+    switch (expiredSort) {
+      case 'joined_desc': list.sort((a, b) => (b.joined_at ?? '').localeCompare(a.joined_at ?? '')); break
+      case 'joined_asc': list.sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? '')); break
+      case 'last_payment_desc': list.sort((a, b) => (lastPaymentByEmail[(b.email ?? '').toLowerCase()] ?? '').localeCompare(lastPaymentByEmail[(a.email ?? '').toLowerCase()] ?? '')); break
+      case 'score_desc': list.sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0)); break
+      case 'days_expired_desc': list.sort((a, b) => daysExpired(b) - daysExpired(a)); break
+    }
+    return list
+  }, [expiredMembers, expiredSearch, expiredSort, lastPaymentByEmail])
 
   const cancelFiltersActive = useMemo(() => {
     let count = 0
@@ -1744,6 +1789,7 @@ export default function SpcPage() {
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
+    { key: 'expired', label: `Expired${!loading ? ` (${expiredMembers.length})` : ''}` },
     { key: 'cancellations', label: `Cancellations${!loading ? ` (${cancellations.length})` : ''}` },
   ]
 
@@ -1812,7 +1858,7 @@ export default function SpcPage() {
         {activeTab === 'growth' && (
           <div className="space-y-6">
             {/* 1. KPI Comparison Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               {/* Total Members */}
               <Card>
                 <CardContent className="pt-5 pb-4">
@@ -1915,6 +1961,25 @@ export default function SpcPage() {
                           {unknownDateCancels} records without cancellation date excluded
                         </p>
                       )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Expired Members */}
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">
+                    Expired Members
+                  </p>
+                  {loading ? (
+                    <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <>
+                      <p className="text-2xl font-semibold text-amber-600 dark:text-amber-400">
+                        {expiredMembers.length}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">potential recovery leads</p>
                     </>
                   )}
                 </CardContent>
@@ -2249,7 +2314,10 @@ export default function SpcPage() {
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredActiveMembers.map((m, i) => (
+                      {filteredActiveMembers.map((m, i) => {
+                        const lp = lastPaymentByEmail[(m.email ?? '').toLowerCase()]
+                        const overdue = lp ? isPaymentOverdue(lp, m.plan) : false
+                        return (
                         <AnimatedTableRow
                           key={m.id}
                           variants={rowVariants}
@@ -2262,7 +2330,16 @@ export default function SpcPage() {
                           )}
                           onClick={() => openModal({ kind: 'member', data: m })}
                         >
-                          <TableCell className="font-medium text-sm">{m.name}</TableCell>
+                          <TableCell className="font-medium text-sm">
+                            <span className="inline-flex items-center gap-1.5">
+                              {m.name}
+                              {overdue && (
+                                <span className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                  Overdue
+                                </span>
+                              )}
+                            </span>
+                          </TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
                           <TableCell>
                             <StatusPill
@@ -2310,7 +2387,7 @@ export default function SpcPage() {
                             />
                           </TableCell>
                         </AnimatedTableRow>
-                      ))}
+                      )})}
                     </TableBody>
                   </Table>
                 </div>
@@ -2441,6 +2518,133 @@ export default function SpcPage() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* ── EXPIRED ───────────────────────────────────────────────────── */}
+        {activeTab === 'expired' && (
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <CardTitle className="text-sm font-semibold">{expiredMembers.length} Expired Members</CardTitle>
+                <div className="flex items-center gap-2 sm:ml-auto">
+                  <div className="relative flex-1 sm:flex-initial">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                    <input
+                      type="text"
+                      value={expiredSearch}
+                      onChange={(e) => setExpiredSearch(e.target.value)}
+                      placeholder="Search by name or email..."
+                      className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                  </div>
+                  <select
+                    value={expiredSort}
+                    onChange={(e) => setExpiredSort(e.target.value as ExpiredSort)}
+                    className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="days_expired_desc">Days Expired (most)</option>
+                    <option value="joined_desc">Joined (newest)</option>
+                    <option value="joined_asc">Joined (oldest)</option>
+                    <option value="last_payment_desc">Last Payment (newest)</option>
+                    <option value="score_desc">Score (highest)</option>
+                  </select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="p-6 space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ))}
+                </div>
+              ) : filteredExpiredMembers.length === 0 ? (
+                <EmptyState title={expiredSearch ? 'No matching members' : 'No expired members'} description={expiredSearch ? 'Try a different search term.' : 'Members with expired subscriptions will appear here.'} />
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="hidden md:table-cell">Email</TableHead>
+                        <TableHead>Plan</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="hidden md:table-cell">Provider</TableHead>
+                        <TableHead className="hidden md:table-cell">Joined</TableHead>
+                        <TableHead className="hidden md:table-cell">Last Payment</TableHead>
+                        <TableHead className="hidden md:table-cell">Next Payment</TableHead>
+                        <TableHead>Days Expired</TableHead>
+                        <TableHead className="hidden lg:table-cell">Score</TableHead>
+                        <TableHead className="hidden lg:table-cell">Last Note</TableHead>
+                      </AnimatedTableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredExpiredMembers.map((m, i) => {
+                        const de = daysExpired(m)
+                        const deCls = de > 30 ? 'text-red-600 dark:text-red-400' : de >= 7 ? 'text-amber-600 dark:text-amber-400' : 'text-yellow-600 dark:text-yellow-400'
+                        return (
+                          <AnimatedTableRow
+                            key={m.id}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="visible"
+                            custom={i}
+                            className={cn(
+                              i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
+                              'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
+                            )}
+                            onClick={() => openModal({ kind: 'member', data: m })}
+                          >
+                            <TableCell className="font-medium text-sm">{m.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
+                            <TableCell>
+                              <StatusPill
+                                label={m.plan === 'annual' ? 'Annual' : 'Monthly'}
+                                variant={m.plan === 'annual' ? 'success' : 'info'}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
+                              {formatCurrency(m.amount)}
+                            </TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
+                            <TableCell className="text-xs whitespace-nowrap hidden md:table-cell">
+                              {lastPaymentByEmail[(m.email ?? '').toLowerCase()]
+                                ? formatDate(lastPaymentByEmail[(m.email ?? '').toLowerCase()])
+                                : <span className="text-zinc-400">—</span>}
+                            </TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">
+                              {m.next_payment_date ? formatDate(m.next_payment_date) : '—'}
+                            </TableCell>
+                            <TableCell>
+                              <span className={cn('text-xs font-bold', deCls)}>{de}d</span>
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              {(() => {
+                                const cfg = leadScoreConfig(m.lead_score)
+                                return (
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <span className={cn('w-2 h-2 rounded-full shrink-0', cfg.dot)} />
+                                    <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{m.lead_score ?? 0}</span>
+                                  </span>
+                                )
+                              })()}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
+                              <LastNoteCell
+                                lastNoteAt={lastNoteByEmail[(m.email ?? '').toLowerCase()]}
+                                onClick={(e) => { e.stopPropagation(); openModal({ kind: 'member', data: m }, true) }}
+                              />
+                            </TableCell>
+                          </AnimatedTableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* ── CANCELACIONES ─────────────────────────────────────────────── */}
