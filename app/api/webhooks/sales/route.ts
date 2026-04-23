@@ -176,9 +176,15 @@ export async function POST(req: NextRequest) {
           .maybeSingle()
 
         if (!inCancellations) {
+          const plan: 'annual' | 'monthly' = costNum >= 400 ? 'annual' : 'monthly'
+          const txDate = new Date(date + 'T12:00:00')
+          if (plan === 'annual') txDate.setFullYear(txDate.getFullYear() + 1)
+          else txDate.setMonth(txDate.getMonth() + 1)
+          const nextPaymentDate = txDate.toISOString().slice(0, 10)
+
           const { data: existing } = await supabase
             .from('spc_members')
-            .select('id, status')
+            .select('id, status, plan')
             .eq('email', buyer_email)
             .maybeSingle()
 
@@ -188,13 +194,26 @@ export async function POST(req: NextRequest) {
               email: buyer_email,
               phone: buyer_phone ?? null,
               status: 'active',
-              plan: costNum >= 400 ? 'annual' : 'monthly',
+              plan,
               amount: costNum,
               provider: spcProvider,
               joined_at: date,
+              next_payment_date: nextPaymentDate,
             })
-          } else if (existing.status === 'trial') {
-            await supabase.from('spc_members').update({ status: 'active' }).eq('id', existing.id)
+          } else {
+            // Update next_payment_date for any existing member (trial→active or already active)
+            const memberPlan = existing.plan ?? plan
+            const npd = new Date(date + 'T12:00:00')
+            if (memberPlan === 'annual') npd.setFullYear(npd.getFullYear() + 1)
+            else npd.setMonth(npd.getMonth() + 1)
+
+            const updateFields: Record<string, unknown> = {
+              next_payment_date: npd.toISOString().slice(0, 10),
+            }
+            if (existing.status === 'trial' || existing.status === 'expired') {
+              updateFields.status = 'active'
+            }
+            await supabase.from('spc_members').update(updateFields).eq('id', existing.id)
           }
         }
       }
