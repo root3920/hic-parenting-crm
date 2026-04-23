@@ -2459,6 +2459,64 @@ export default function SpcPage() {
               </CardContent>
             </Card>
 
+            {/* Trial Conversion Scenarios */}
+            {!loading && trialMembers.length > 0 && (() => {
+              const ct = trialMembers.length
+              const scenarios = [
+                { rate: 0.3, label: '30%', cls: 'border-red-200 dark:border-red-800', badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+                { rate: 0.5, label: '50%', cls: 'border-amber-200 dark:border-amber-800', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+                { rate: 0.7, label: '70%', cls: 'border-blue-200 dark:border-blue-800', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+                { rate: 1.0, label: '100%', cls: 'border-green-200 dark:border-green-800', badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
+              ]
+              return (
+                <Card className="mb-6">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Trial Conversion Scenarios</CardTitle>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Projected impact if we improve trial to active conversion rate</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {/* Current state */}
+                      <div className="min-w-[180px] flex-1 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-4">
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 mb-2">
+                          Current
+                        </span>
+                        <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-1">{formatCurrency(mrr)}</p>
+                        <p className="text-[10px] text-zinc-400 uppercase font-medium">MRR</p>
+                        <p className="text-xs text-zinc-500 mt-2">{formatCurrency(arr)} ARR</p>
+                        <p className="text-xs text-zinc-500">{activeMembers.length} active members</p>
+                        <p className="text-xs text-zinc-500">{ct} trials pending</p>
+                      </div>
+                      {/* Scenario cards */}
+                      {scenarios.map(({ rate, label, cls, badge }) => {
+                        const converted = Math.floor(ct * rate)
+                        const newMrr = converted * 0.8 * 47 + converted * 0.2 * (470 / 12)
+                        const projMrr = mrr + newMrr
+                        const projArr = projMrr * 12
+                        const projMembers = activeMembers.length + converted
+                        return (
+                          <div key={label} className={cn('min-w-[180px] flex-1 rounded-xl border-2 p-4', cls)}>
+                            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold mb-2', badge)}>
+                              {label} conversion
+                            </span>
+                            <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-1">{formatCurrency(projMrr)}</p>
+                            <p className="text-[10px] text-zinc-400 uppercase font-medium">Projected MRR</p>
+                            <p className="text-xs text-zinc-500 mt-2">{formatCurrency(projArr)} ARR</p>
+                            <p className="text-xs text-zinc-500">{projMembers} total members</p>
+                            <p className="text-xs text-zinc-500">{converted} of {ct} converted</p>
+                            <p className="text-xs font-medium text-green-600 dark:text-green-400 mt-1">+{formatCurrency(newMrr)}/mo vs current</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-3 italic">
+                      * Projections assume 80% monthly ($47) and 20% annual ($470/12 per month) plans
+                    </p>
+                  </CardContent>
+                </Card>
+              )
+            })()}
+
             {/* 3. New Members List */}
             <Card>
               <CardHeader className="pb-3">
