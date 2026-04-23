@@ -360,11 +360,16 @@ function MemberProfileModal({
   function startEditCancellation() {
     if (selected.kind !== 'cancellation') return
     const c = selected.data
+    // Derive cancel_type from boolean flags for accuracy
+    const derivedType: CancelTypeOrReactivate =
+      c.trial_cancel === true ? 'trial_cancel' :
+      c.paid_cancel === true ? 'paid_cancel' :
+      c.cancel_type ?? 'paid_cancel'
     setCancelForm({
       name: c.name ?? '',
       email: c.email ?? '',
       customer_phone: c.customer_phone ?? '',
-      cancel_type: c.cancel_type ?? 'paid_cancel',
+      cancel_type: derivedType,
       offer_title: c.offer_title ?? '',
       amount: c.amount?.toString() ?? '',
       currency: c.currency ?? 'USD',
@@ -492,6 +497,8 @@ function MemberProfileModal({
         setIsCancelEditing(false)
       } else {
         // Normal cancellation update
+        const isPaid = cancelForm.cancel_type === 'paid_cancel'
+        const isTrial = cancelForm.cancel_type === 'trial_cancel'
         const { data, error } = await supabase
           .from('spc_cancellations')
           .update({
@@ -499,6 +506,8 @@ function MemberProfileModal({
             email: cancelForm.email || null,
             customer_phone: cancelForm.customer_phone || null,
             cancel_type: cancelForm.cancel_type as 'paid_cancel' | 'pending_cancel' | 'trial_cancel',
+            paid_cancel: isPaid,
+            trial_cancel: isTrial,
             offer_title: cancelForm.offer_title || null,
             amount: parseFloat(cancelForm.amount) || 0,
             currency: cancelForm.currency || null,
@@ -812,11 +821,11 @@ function MemberProfileModal({
                 </label>
                 <div className="grid grid-cols-3 gap-1.5">
                   {([
-                    ['paid_cancel',    'Cancelled',       STATUS_CONFIG.cancelled.cls],
-                    ['pending_cancel', 'Pending Cancel',  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'],
-                    ['trial_cancel',   'Trial Cancelled', STATUS_CONFIG.expired.cls],
-                    ['reactivate_active', 'Active',       STATUS_CONFIG.active.cls],
-                    ['reactivate_trial',  'Trial',        STATUS_CONFIG.trial.cls],
+                    ['paid_cancel',    'Paid Cancel',   STATUS_CONFIG.cancelled.cls],
+                    ['trial_cancel',   'Trial Cancel',  STATUS_CONFIG.trial.cls],
+                    ['pending_cancel', 'Pending',       'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'],
+                    ['reactivate_active', 'Active',     STATUS_CONFIG.active.cls],
+                    ['reactivate_trial',  'Trial',      STATUS_CONFIG.active.cls],
                   ] as [CancelEditForm['cancel_type'], string, string][]).map(([key, label, cls]) => (
                     <button
                       key={key}
