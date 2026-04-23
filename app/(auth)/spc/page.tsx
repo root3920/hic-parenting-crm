@@ -90,7 +90,7 @@ type SelectedMember =
   | { kind: 'member'; data: SpcMember }
   | { kind: 'cancellation'; data: SpcCancellation }
 
-type Tab = 'growth' | 'overview' | 'active' | 'trials' | 'expired' | 'cancellations'
+type Tab = 'overview' | 'active' | 'trials' | 'expired' | 'cancellations'
 
 type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'score_desc' | 'last_note_desc'
 type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
@@ -1197,7 +1197,7 @@ export default function SpcPage() {
   const [cancellations, setCancellations] = useState<SpcCancellation[]>([])
   const [spcTransactions, setSpcTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<Tab>('growth')
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   // Modal state
   const { profile } = useProfile()
@@ -2020,7 +2020,6 @@ export default function SpcPage() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'growth', label: 'Growth' },
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
@@ -2103,7 +2102,7 @@ export default function SpcPage() {
         </div>
 
         {/* ── CRECIMIENTO ───────────────────────────────────────────────── */}
-        {activeTab === 'growth' && (
+        {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Period filter */}
             <div>
@@ -2497,19 +2496,7 @@ export default function SpcPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        )}
-
-        {/* OVERVIEW */}
-        {activeTab === 'overview' && (
-          <div>
-            <KPICardGrid className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
-              <KPICard title="MRR" value={formatCurrency(mrr)} subtitle="monthly recurring" loading={loading} />
-              <KPICard title="ARR" value={formatCurrency(arr)} subtitle="annual recurring" loading={loading} />
-              <KPICard title="Active Members" value={activeMembers.length} loading={loading} />
-              <KPICard title="Free Trials" value={trialMembers.length} subtitle={`${formatCurrency(mrrPotential)}/mo potential`} loading={loading} />
-            </KPICardGrid>
-
+            {/* Membership & Cohort charts */}
             {!loading && urgentTrials.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
