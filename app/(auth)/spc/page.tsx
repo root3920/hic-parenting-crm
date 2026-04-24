@@ -1858,21 +1858,15 @@ export default function SpcPage() {
   const arrAddedInPeriod = growthNewMembers.reduce((s, m) =>
     s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
 
-  // Trial conversions from dedicated query: spc_members WHERE converted_from_trial = true
-  const totalVerifiedConversions = conversions.length
-
-  const totalTrialCancels = trialCancels.length
-  const allTimeConversionRate = (totalVerifiedConversions + totalTrialCancels) > 0
-    ? parseFloat(((totalVerifiedConversions / (totalVerifiedConversions + totalTrialCancels)) * 100).toFixed(1))
+  // Trial conversion rate: active trials / (active trials + trial cancels in period)
+  const currentTrials = trialMembers.length
+  const trialConvRate = (currentTrials + growthTrialCancelsCount) > 0
+    ? parseFloat(((currentTrials / (currentTrials + growthTrialCancelsCount)) * 100).toFixed(1))
     : 0
-
-  // Trial conversions filtered by converted_at within selected period
-  const verifiedConversionCount = useMemo(() => {
-    if (!growthRange.start) return conversions.length
-    return conversions.filter((c) => c.converted_at && inGrowthPeriod(c.converted_at)).length
-  }, [conversions, growthRange]) // eslint-disable-line react-hooks/exhaustive-deps
-  const growthConversionRate = (verifiedConversionCount + growthTrialCancelsCount) > 0
-    ? parseFloat(((verifiedConversionCount / (verifiedConversionCount + growthTrialCancelsCount)) * 100).toFixed(1))
+  // All-time rate for scenario projections
+  const totalTrialCancels = trialCancels.length
+  const allTimeConversionRate = (currentTrials + totalTrialCancels) > 0
+    ? parseFloat(((currentTrials / (currentTrials + totalTrialCancels)) * 100).toFixed(1))
     : 0
 
   const progressMax = Math.max(monthlyCount, annualCount, 1)
@@ -2299,20 +2293,11 @@ export default function SpcPage() {
                     <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
                   ) : (
                     <>
-                      <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
-                        {verifiedConversionCount}
+                      <p className={cn('text-2xl font-semibold', trialConvRate >= 50 ? 'text-green-600 dark:text-green-400' : trialConvRate >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>
+                        {trialConvRate}%
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">
-                        {growthRange.start ? 'in period' : 'all time'} · verified trial → paid
-                      </p>
-                      {(verifiedConversionCount + growthTrialCancelsCount) > 0 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                          {growthConversionRate}% conversion rate
-                        </span>
-                      )}
-                      {growthRange.start && totalVerifiedConversions > verifiedConversionCount && (
-                        <p className="text-[10px] text-zinc-400 mt-1">{totalVerifiedConversions} total all time</p>
-                      )}
+                      <p className="text-xs text-zinc-500 mt-1">of trials became paying members</p>
+                      <p className="text-[10px] text-zinc-400 mt-1.5">{currentTrials} active trials · {growthTrialCancelsCount} cancelled in period</p>
                     </>
                   )}
                 </CardContent>
@@ -2535,7 +2520,7 @@ export default function SpcPage() {
                         <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-1">{formatCurrency(mrr)}</p>
                         <p className="text-[10px] text-zinc-400 uppercase font-medium">MRR</p>
                         <p className="text-xs text-zinc-500 mt-2">{formatCurrency(arr)} ARR</p>
-                        <p className="text-xs text-zinc-500">{activeMembers.length} active · {totalVerifiedConversions} converted</p>
+                        <p className="text-xs text-zinc-500">{activeMembers.length} active · {conversions.length} converted</p>
                         <p className="text-xs text-zinc-500">{ct} trials pending</p>
                       </div>
                       {/* Scenario cards */}
