@@ -615,48 +615,6 @@ export default function CloserDashboardPage() {
               </Card>
             </div>
 
-            {/* ── Section 5: Closer Comparison (all closers only) ── */}
-            {selectedCloser === 'All' && closerComparison.length > 0 && (
-              <Card className="mb-6">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Closer comparison</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                          {['Closer', 'Meetings', 'Show%', 'Offer%', 'Close%', 'Won', 'Cash'].map((h) => (
-                            <th key={h} className="text-left py-2.5 px-3 font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {closerComparison.map((c) => {
-                          const showR = safeDiv(c.showed, c.meetings) * 100
-                          const offerR = safeDiv(c.offers, c.showed) * 100
-                          const closeR = safeDiv(c.won, c.offers) * 100
-                          return (
-                            <tr key={c.closer_name} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                              <td className="py-2.5 px-3 font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap">{c.closer_name}</td>
-                              <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{c.meetings}</td>
-                              <td className={cn('py-2.5 px-3 font-semibold', showRateColor(showR))}>{fmtPct(showR, 0)}</td>
-                              <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{fmtPct(offerR, 0)}</td>
-                              <td className={cn('py-2.5 px-3 font-semibold', closeRateColor(closeR))}>{fmtPct(closeR, 0)}</td>
-                              <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{c.won}</td>
-                              <td className={cn('py-2.5 px-3 font-bold', c.cash > 5000 ? 'text-green-600 dark:text-green-400' : 'text-zinc-700 dark:text-zinc-300')}>
-                                {fmtCash(c.cash)}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* ── Section 6: Historial ── */}
             <Card className="mb-8">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
