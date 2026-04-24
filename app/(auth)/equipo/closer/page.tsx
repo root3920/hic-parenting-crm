@@ -100,9 +100,9 @@ function showRateColor(v: number) {
 }
 
 function ReportDetail({ report, onClose }: { report: CloserDailyReport; onClose: () => void }) {
-  // Show rate = showed / total, Offer rate = offers / total, Close rate = won / showed
+  // Show rate = showed / total, Offer rate = offers / showed, Close rate = won / showed
   const showR = safeDiv(report.showed_meetings, report.total_meetings) * 100
-  const offerR = safeDiv(report.offers_proposed, report.total_meetings) * 100
+  const offerR = safeDiv(report.offers_proposed, report.showed_meetings) * 100
   const closeR = safeDiv(report.won_deals, report.showed_meetings) * 100
 
   function Row({ label, value }: { label: string; value: string | number | null | undefined }) {
@@ -257,11 +257,11 @@ export default function CloserDashboardPage() {
     const noShows  = callsFiltered.filter(c => effectiveStatus(c) === 'no show').length
     const cancelled = callsFiltered.filter(c => effectiveStatus(c) === 'cancelled').length
 
-    // Show rate = showed / totalMeetings (all scheduled, not just showed+noShows)
+    // Show Rate    = showed / totalMeetings  (did they show up to scheduled calls?)
+    // Cancel Rate  = cancelled / totalMeetings
+    // No-show Rate = noShow / totalMeetings
     const showRate = safeDiv(showedUp, totalMeetings) * 100
-    // Cancel rate = cancelled / totalMeetings
     const cancelRate = safeDiv(cancelled, totalMeetings) * 100
-    // No-show rate = noShows / totalMeetings
     const noShowRate = safeDiv(noShows, totalMeetings) * 100
     const callsPerWeek = safeDiv(totalMeetings, rangeDays / 7)
 
@@ -289,15 +289,15 @@ export default function CloserDashboardPage() {
     const wonDeals = s(filtered, 'won_deals')
     const cashCollected = s(filtered, 'cash_collected')
     const recurrentCash = s(filtered, 'recurrent_cash')
-    // Offer rate = offers / totalMeetings (measures conversion of all scheduled meetings to offers)
-    const offerRate = safeDiv(offersProposed, callKPIs.totalMeetings) * 100
-    // Close rate = won / showed (measures quality of calls that actually happened)
+    // Offer Rate   = offers / showed  (of calls that happened, did closer make an offer?)
+    // Close Rate   = won / showed     (of calls that happened, did closer close?)
+    // Close/Offer  = won / offers     (of offers made, how many closed?)
+    const offerRate = safeDiv(offersProposed, callKPIs.showedUp) * 100
     const closeRate = safeDiv(wonDeals, callKPIs.showedUp) * 100
+    const closeOfferRate = safeDiv(wonDeals, offersProposed) * 100
     const valuePerMeeting = safeDiv(cashCollected, callKPIs.totalMeetings)
 
-    console.log('Closing pipeline:', { offers: offersProposed, won: wonDeals, cash: cashCollected, offerRate: offerRate.toFixed(1), closeRate: closeRate.toFixed(1) })
-
-    return { offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, valuePerMeeting }
+    return { offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, closeOfferRate, valuePerMeeting }
   }, [filtered, callKPIs.totalMeetings, callKPIs.showedUp])
 
   // ── Revenue ──
@@ -511,7 +511,7 @@ export default function CloserDashboardPage() {
                 unit="%"
                 goal={GOALS.closing.closeRate}
               />
-              <VolumeCard label="Won Deals" value={reportKPIs.wonDeals} sub={`${fmtPct(reportKPIs.closeRate)} close rate`} />
+              <VolumeCard label="Won Deals" value={reportKPIs.wonDeals} sub={`${fmtPct(reportKPIs.closeRate)} of showed · ${fmtPct(reportKPIs.closeOfferRate)} of offers`} />
               <VolumeCard label="Cash Collected" value={fmtCash(reportKPIs.cashCollected)} sub="revenue this period" />
             </div>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-6">Based on closer reports</p>
