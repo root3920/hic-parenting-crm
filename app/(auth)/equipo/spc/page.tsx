@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 15
 
-type Preset = '7d' | '30d' | 'all'
+type Preset = '7d' | '30d' | 'all' | 'custom'
 
 // ── Score & metrics engine ────────────────────────────────────────────────────
 
@@ -254,6 +254,8 @@ export default function SpcPerfDashboard() {
   const [reports, setReports] = useState<SpcPerfReport[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('30d')
+  const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
   const [selectedRep, setSelectedRep] = useState('Todos')
   const [page, setPage] = useState(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -267,6 +269,7 @@ export default function SpcPerfDashboard() {
     const fmt = (d: Date) => d.toISOString().split('T')[0]
     if (p === '7d')  { const f = new Date(now); f.setDate(now.getDate() - 6); return { from: fmt(f), to: fmt(now) } }
     if (p === '30d') { const f = new Date(now); f.setDate(now.getDate() - 29); return { from: fmt(f), to: fmt(now) } }
+    if (p === 'custom') return { from: customFrom, to: customTo }
     return { from: '2020-01-01', to: fmt(now) }
   }
 
@@ -284,7 +287,7 @@ export default function SpcPerfDashboard() {
     setReports(data ?? [])
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, preset, selectedRep])
+  }, [supabase, preset, selectedRep, customFrom, customTo])
 
   useEffect(() => { fetchReports() }, [fetchReports])
   useEffect(() => { setPage(0) }, [preset, selectedRep])
@@ -461,7 +464,7 @@ export default function SpcPerfDashboard() {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', 'all'] as Preset[]).map((p) => (
+              {(['7d', '30d', 'all', 'custom'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPreset(p)}
@@ -470,10 +473,17 @@ export default function SpcPerfDashboard() {
                     preset === p ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'all' ? 'All' : p}
+                  {p === 'all' ? 'All' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>
+            {preset === 'custom' && (
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100" />
+                <span className="text-xs text-zinc-400">→</span>
+                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100" />
+              </div>
+            )}
             {/* Rep filter */}
             <select
               value={selectedRep}

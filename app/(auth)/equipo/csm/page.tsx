@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 10
 
-type Preset = '7d' | '30d' | '90d' | 'all'
+type Preset = '7d' | '30d' | '90d' | 'all' | 'custom'
 
 interface HtReport {
   id: string
@@ -64,8 +64,9 @@ function avg(arr: number[]): number {
   return arr.length > 0 ? arr.reduce((s, n) => s + n, 0) / arr.length : NaN
 }
 
-function getDateRange(preset: Preset): { from: string; to: string } | null {
+function getDateRange(preset: Preset, customFrom?: string, customTo?: string): { from: string; to: string } | null {
   if (preset === 'all') return null
+  if (preset === 'custom' && customFrom && customTo) return { from: customFrom, to: customTo }
   const today = new Date()
   const fmt = (d: Date) => d.toISOString().split('T')[0]
   const from = new Date(today)
@@ -552,6 +553,8 @@ export default function HtCsmDashboardPage() {
   const [reports, setReports] = useState<HtReport[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('30d')
+  const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingReport, setEditingReport] = useState<HtReport | null>(null)
   const [page, setPage] = useState(0)
@@ -571,7 +574,7 @@ export default function HtCsmDashboardPage() {
       .select('*')
       .order('date', { ascending: false })
 
-    const range = getDateRange(preset)
+    const range = getDateRange(preset, customFrom, customTo)
     if (range) {
       q = q.gte('date', range.from).lte('date', range.to)
     }
@@ -580,7 +583,7 @@ export default function HtCsmDashboardPage() {
     setReports(data ?? [])
     setPage(0)
     setLoading(false)
-  }, [supabase, preset])
+  }, [supabase, preset, customFrom, customTo])
 
   useEffect(() => { fetchReports() }, [fetchReports])
 
@@ -667,7 +670,7 @@ export default function HtCsmDashboardPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Date preset */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', '90d', 'all'] as Preset[]).map((p) => (
+              {(['7d', '30d', '90d', 'all', 'custom'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPreset(p)}
@@ -678,10 +681,17 @@ export default function HtCsmDashboardPage() {
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'all' ? 'All' : p}
+                  {p === 'all' ? 'All' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>
+            {preset === 'custom' && (
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100" />
+                <span className="text-xs text-zinc-400">→</span>
+                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100" />
+              </div>
+            )}
             <Link
               href="/equipo/csm/nuevo"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
