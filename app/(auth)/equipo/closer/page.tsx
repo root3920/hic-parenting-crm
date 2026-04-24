@@ -100,9 +100,10 @@ function showRateColor(v: number) {
 }
 
 function ReportDetail({ report, onClose }: { report: CloserDailyReport; onClose: () => void }) {
+  // Show rate = showed / total, Offer rate = offers / total, Close rate = won / showed
   const showR = safeDiv(report.showed_meetings, report.total_meetings) * 100
-  const offerR = safeDiv(report.offers_proposed, report.showed_meetings) * 100
-  const closeR = safeDiv(report.won_deals, report.offers_proposed) * 100
+  const offerR = safeDiv(report.offers_proposed, report.total_meetings) * 100
+  const closeR = safeDiv(report.won_deals, report.showed_meetings) * 100
 
   function Row({ label, value }: { label: string; value: string | number | null | undefined }) {
     if (value === null || value === undefined || value === '') return null
@@ -256,17 +257,17 @@ export default function CloserDashboardPage() {
     const noShows  = callsFiltered.filter(c => effectiveStatus(c) === 'no show').length
     const cancelled = callsFiltered.filter(c => effectiveStatus(c) === 'cancelled').length
 
-    // Debug: log unique status combos so mismatches are visible in the console
-    if (process.env.NODE_ENV !== 'production') {
-      const uniq = Array.from(new Set(callsFiltered.map(c => `status="${c.status}" call_status="${c.call_status}"`)))
-      console.debug('[Closer] Call status values:', uniq)
-      console.debug(`[Closer] showedUp=${showedUp} noShows=${noShows} cancelled=${cancelled} total=${totalMeetings}`)
-      console.debug(`[Closer] showRate=${showedUp}/(${showedUp}+${noShows}) = ${safeDiv(showedUp, showedUp + noShows) * 100}%`)
-    }
-
-    const showRate = safeDiv(showedUp, showedUp + noShows) * 100
+    // Show rate = showed / totalMeetings (all scheduled, not just showed+noShows)
+    const showRate = safeDiv(showedUp, totalMeetings) * 100
+    // Cancel rate = cancelled / totalMeetings
+    const cancelRate = safeDiv(cancelled, totalMeetings) * 100
+    // No-show rate = noShows / totalMeetings
+    const noShowRate = safeDiv(noShows, totalMeetings) * 100
     const callsPerWeek = safeDiv(totalMeetings, rangeDays / 7)
-    return { totalMeetings, showedUp, noShows, cancelled, showRate, callsPerWeek }
+
+    console.log('Closing metrics:', { totalMeetings, showed: showedUp, noShow: noShows, cancelled, showRate: showRate.toFixed(1), cancelRate: cancelRate.toFixed(1) })
+
+    return { totalMeetings, showedUp, noShows, cancelled, showRate, cancelRate, noShowRate, callsPerWeek }
   }, [callsFiltered, rangeDays])
 
   // ── Dynamic goal for showed calls ──
@@ -288,19 +289,25 @@ export default function CloserDashboardPage() {
     const wonDeals = s(filtered, 'won_deals')
     const cashCollected = s(filtered, 'cash_collected')
     const recurrentCash = s(filtered, 'recurrent_cash')
-    const offerRate = safeDiv(offersProposed, callKPIs.showedUp) * 100
-    const closeRate = safeDiv(wonDeals, offersProposed) * 100
-    return { offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate }
-  }, [filtered, callKPIs.showedUp])
+    // Offer rate = offers / totalMeetings (measures conversion of all scheduled meetings to offers)
+    const offerRate = safeDiv(offersProposed, callKPIs.totalMeetings) * 100
+    // Close rate = won / showed (measures quality of calls that actually happened)
+    const closeRate = safeDiv(wonDeals, callKPIs.showedUp) * 100
+    const valuePerMeeting = safeDiv(cashCollected, callKPIs.totalMeetings)
+
+    console.log('Closing pipeline:', { offers: offersProposed, won: wonDeals, cash: cashCollected, offerRate: offerRate.toFixed(1), closeRate: closeRate.toFixed(1) })
+
+    return { offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, valuePerMeeting }
+  }, [filtered, callKPIs.totalMeetings, callKPIs.showedUp])
 
   // ── Revenue ──
   const revenue = useMemo(() => {
     const cash = s(filtered, 'cash_collected')
     const recurrent = s(filtered, 'recurrent_cash')
-    const showed = s(filtered, 'showed_meetings')
     const won = s(filtered, 'won_deals')
-    return { cash, recurrent, perMeeting: safeDiv(cash, showed), won }
-  }, [filtered])
+    // Value per meeting = cash / totalMeetings (all scheduled)
+    return { cash, recurrent, perMeeting: safeDiv(cash, callKPIs.totalMeetings), won }
+  }, [filtered, callKPIs.totalMeetings])
 
   // ── Volume ──
   const volume = useMemo(() => ({
@@ -469,8 +476,14 @@ export default function CloserDashboardPage() {
                 unit="%"
                 goal={GOALS.closing.showRate}
               />
-              <VolumeCard label="No Shows" value={callKPIs.noShows} sub="missed calls" />
-              <VolumeCard label="Cancelled" value={callKPIs.cancelled} sub="of total scheduled" />
+              <VolumeCard label="No Shows" value={callKPIs.noShows} sub={`${fmtPct(callKPIs.noShowRate)} of ${callKPIs.totalMeetings} scheduled`} />
+              <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Cancelled</p>
+                <p className={cn('text-2xl font-bold', callKPIs.cancelRate < 20 ? 'text-green-600 dark:text-green-400' : callKPIs.cancelRate <= 35 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>
+                  {fmtPct(callKPIs.cancelRate)}
+                </p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{callKPIs.cancelled} of {callKPIs.totalMeetings} scheduled</p>
+              </div>
               <KpiGoalCard
                 label="Showed Calls"
                 description='Total "Showed Up" calls in selected period'
@@ -545,7 +558,7 @@ export default function CloserDashboardPage() {
               <VolumeCard
                 label="No-Shows"
                 value={callKPIs.noShows}
-                sub={`${fmtPct(safeDiv(callKPIs.noShows, callKPIs.totalMeetings) * 100)} of total`}
+                sub={`${fmtPct(callKPIs.noShowRate)} of total`}
               />
             </div>
 
