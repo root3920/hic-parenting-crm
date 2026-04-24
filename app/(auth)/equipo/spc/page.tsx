@@ -321,6 +321,12 @@ export default function SpcPerfDashboard() {
       trials_contacted: report.trials_contacted,
       cancellation_requests: report.cancellation_requests,
       cancellations_retained: report.cancellations_retained,
+      support_messages: report.support_messages ?? 0,
+      retention_contacts: report.retention_contacts ?? 0,
+      checkin_active_inactive: report.checkin_active_inactive ?? 0,
+      checkin_after_cancellation: report.checkin_after_cancellation ?? 0,
+      successfully_retained: report.successfully_retained ?? 0,
+      failed_purchase_contact: report.failed_purchase_contact ?? 0,
       questions_total: report.questions_total,
       questions_answered_24h: report.questions_answered_24h,
       referrals_generated: report.referrals_generated,
@@ -355,6 +361,12 @@ export default function SpcPerfDashboard() {
       trials_contacted:        Number(editForm.trials_contacted),
       cancellation_requests:   Number(editForm.cancellation_requests),
       cancellations_retained:  Number(editForm.cancellations_retained),
+      support_messages:        Number(editForm.support_messages ?? 0),
+      retention_contacts:      Number(editForm.retention_contacts ?? 0),
+      checkin_active_inactive:  Number(editForm.checkin_active_inactive ?? 0),
+      checkin_after_cancellation: Number(editForm.checkin_after_cancellation ?? 0),
+      successfully_retained:   Number(editForm.successfully_retained ?? 0),
+      failed_purchase_contact: Number(editForm.failed_purchase_contact ?? 0),
       questions_total:         Number(editForm.questions_total),
       questions_answered_24h:  Number(editForm.questions_answered_24h),
       referrals_generated:     Number(editForm.referrals_generated),
@@ -412,6 +424,13 @@ export default function SpcPerfDashboard() {
       avgResp:        avg(pctResp),
       totalRefs:      refs.reduce((s, v) => s + v, 0),
       avgEnergy:      (energy.reduce((s, v) => s + v, 0) / energy.length).toFixed(1),
+      // New fields
+      totalSupportMessages:     reports.reduce((s, r) => s + (r.support_messages ?? 0), 0),
+      totalRetentionContacts:   reports.reduce((s, r) => s + (r.retention_contacts ?? 0), 0),
+      totalSuccessfullyRetained: reports.reduce((s, r) => s + (r.successfully_retained ?? 0), 0),
+      totalFailedPurchaseContact: reports.reduce((s, r) => s + (r.failed_purchase_contact ?? 0), 0),
+      totalCheckinActiveInactive: reports.reduce((s, r) => s + (r.checkin_active_inactive ?? 0), 0),
+      totalCheckinAfterCancel:  reports.reduce((s, r) => s + (r.checkin_after_cancellation ?? 0), 0),
     }
   }, [allMetrics])
 
@@ -423,6 +442,11 @@ export default function SpcPerfDashboard() {
       engagement: m.pctEngagement,
       reactivacion: m.pctReactivacion,
       convTrial: m.pctConvTrial,
+      supportMessages: r.support_messages ?? 0,
+      retentionContacts: r.retention_contacts ?? 0,
+      successfullyRetained: r.successfully_retained ?? 0,
+      checkinAfterCancel: r.checkin_after_cancellation ?? 0,
+      checkinActiveInactive: r.checkin_active_inactive ?? 0,
       retencion: m.pctRetencion,
     }))
   }, [allMetrics])
@@ -561,6 +585,93 @@ export default function SpcPerfDashboard() {
                 sub="period average"
                 color={kpis && parseFloat(kpis.avgEnergy) >= 4 ? 'text-green-600 dark:text-green-400' : parseFloat(kpis?.avgEnergy ?? '0') >= 3 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}
               />
+            </div>
+
+            {/* ── Retention & Support KPIs ── */}
+            <div className="mb-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Retention & Support Activity</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+              <KpiCard
+                label="Support Messages"
+                value={kpis ? String(kpis.totalSupportMessages) : '—'}
+                sub="messages sent to community"
+                color="text-blue-600 dark:text-blue-400"
+              />
+              <KpiCard
+                label="Retention Contacts"
+                value={kpis ? String(kpis.totalRetentionContacts) : '—'}
+                sub="proactive retention outreach"
+                color="text-amber-600 dark:text-amber-400"
+              />
+              <KpiCard
+                label="Successfully Retained"
+                value={kpis ? String(kpis.totalSuccessfullyRetained) : '—'}
+                sub={kpis && kpis.totalRetentionContacts > 0 ? `${Math.round((kpis.totalSuccessfullyRetained / kpis.totalRetentionContacts) * 100)}% retention rate` : 'no contacts yet'}
+                color={kpis && kpis.totalRetentionContacts > 0 && (kpis.totalSuccessfullyRetained / kpis.totalRetentionContacts) >= 0.5 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+              />
+              <KpiCard
+                label="Failed Purchase Follow-up"
+                value={kpis ? String(kpis.totalFailedPurchaseContact) : '—'}
+                sub="contacts after failed payment"
+                color="text-blue-600 dark:text-blue-400"
+              />
+              <KpiCard
+                label="Check-ins (active/inactive)"
+                value={kpis ? String(kpis.totalCheckinActiveInactive) : '—'}
+                sub="member check-ins done"
+                color="text-teal-600 dark:text-teal-400"
+              />
+              <KpiCard
+                label="Post-cancel Check-ins"
+                value={kpis ? String(kpis.totalCheckinAfterCancel) : '—'}
+                sub="follow-ups after cancellation"
+                color="text-purple-600 dark:text-purple-400"
+              />
+            </div>
+
+            {/* ── New Charts ── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* Retention Activity */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Retention & Follow-up</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <Tooltip contentStyle={{ fontSize: 11 }} />
+                      <Legend formatter={(v) => <span className="text-xs">{v}</span>} iconSize={8} />
+                      <Line type="monotone" dataKey="retentionContacts" name="Retention Contacts" stroke="#F59E0B" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="successfullyRetained" name="Retained" stroke="#16A34A" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="checkinAfterCancel" name="Post-cancel" stroke="#8B5CF6" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Support Activity */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Support Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <Tooltip contentStyle={{ fontSize: 11 }} />
+                      <Legend formatter={(v) => <span className="text-xs">{v}</span>} iconSize={8} />
+                      <Bar dataKey="supportMessages" name="Support Messages" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                      <Bar dataKey="checkinActiveInactive" name="Check-ins" fill="#14B8A6" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
             </div>
 
             {/* ── Charts ── */}

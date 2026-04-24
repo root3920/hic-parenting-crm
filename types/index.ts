@@ -247,6 +247,12 @@ export interface SpcPerfReport {
   insights: string | null
   top_action: string | null
   community_energy: number
+  support_messages: number
+  retention_contacts: number
+  checkin_active_inactive: number
+  checkin_after_cancellation: number
+  successfully_retained: number
+  failed_purchase_contact: number
   created_at: string
 }
 

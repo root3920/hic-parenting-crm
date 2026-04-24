@@ -32,12 +32,20 @@ interface FormState {
   new_members_introduced: string
   checkins_sent: string
   checkins_responded: string
+  // new in engagement
+  support_messages: string
+  // new in activation
+  checkin_active_inactive: string
   // retención
   trials_expiring_today: string
   trials_converted: string
   trials_contacted: string
   cancellation_requests: string
   cancellations_retained: string
+  retention_contacts: string
+  successfully_retained: string
+  checkin_after_cancellation: string
+  failed_purchase_contact: string
   // operación
   questions_total: string
   questions_answered_24h: string
@@ -59,6 +67,8 @@ const initial: FormState = {
   new_members: '',
   welcome_sent: '',
   new_members_introduced: '',
+  support_messages: '',
+  checkin_active_inactive: '',
   checkins_sent: '',
   checkins_responded: '',
   trials_expiring_today: '',
@@ -66,6 +76,10 @@ const initial: FormState = {
   trials_contacted: '',
   cancellation_requests: '',
   cancellations_retained: '',
+  retention_contacts: '',
+  successfully_retained: '',
+  checkin_after_cancellation: '',
+  failed_purchase_contact: '',
   questions_total: '',
   questions_answered_24h: '',
   referrals_generated: '',
@@ -233,6 +247,12 @@ export default function NuevoSpcPerfPage() {
       trials_contacted:        n(form.trials_contacted),
       cancellation_requests:   n(form.cancellation_requests),
       cancellations_retained:  n(form.cancellations_retained),
+      support_messages:        n(form.support_messages),
+      retention_contacts:      n(form.retention_contacts),
+      checkin_active_inactive:  n(form.checkin_active_inactive),
+      checkin_after_cancellation: n(form.checkin_after_cancellation),
+      successfully_retained:   n(form.successfully_retained),
+      failed_purchase_contact: n(form.failed_purchase_contact),
       questions_total:         n(form.questions_total),
       questions_answered_24h:  n(form.questions_answered_24h),
       referrals_generated:     n(form.referrals_generated),
@@ -325,6 +345,11 @@ export default function NuevoSpcPerfPage() {
                 highLabel="5 = Fully organic"
               />
             </div>
+            <div className="mt-4">
+              <FieldLabel>Support/Group messages sent today</FieldLabel>
+              <NumberInput value={form.support_messages} onChange={(v) => set('support_messages', v)} />
+              <p className="text-[10px] text-zinc-400 mt-1">Total messages sent by CSM in community + WhatsApp</p>
+            </div>
           </SectionCard>
 
           {/* ── Sección 3: Activación ── */}
@@ -348,7 +373,7 @@ export default function NuevoSpcPerfPage() {
                 <NumberInput value={form.new_members_introduced} onChange={(v) => set('new_members_introduced', v)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <FieldLabel>Check-ins to inactive members +7 days</FieldLabel>
                 <NumberInput value={form.checkins_sent} onChange={(v) => set('checkins_sent', v)} />
@@ -356,6 +381,10 @@ export default function NuevoSpcPerfPage() {
               <div>
                 <FieldLabel>Check-ins that generated a response</FieldLabel>
                 <NumberInput value={form.checkins_responded} onChange={(v) => set('checkins_responded', v)} />
+              </div>
+              <div>
+                <FieldLabel>Check in active or inactive members</FieldLabel>
+                <NumberInput value={form.checkin_active_inactive} onChange={(v) => set('checkin_active_inactive', v)} />
               </div>
             </div>
           </SectionCard>
@@ -381,7 +410,7 @@ export default function NuevoSpcPerfPage() {
                 <NumberInput value={form.trials_contacted} onChange={(v) => set('trials_contacted', v)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <FieldLabel>Cancellation requests today</FieldLabel>
                 <NumberInput value={form.cancellation_requests} onChange={(v) => set('cancellation_requests', v)} />
@@ -389,6 +418,30 @@ export default function NuevoSpcPerfPage() {
               <div>
                 <FieldLabel>Members retained (avoided cancelling)</FieldLabel>
                 <NumberInput value={form.cancellations_retained} onChange={(v) => set('cancellations_retained', v)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <FieldLabel>Retention contacts (trial ending or want to cancel)</FieldLabel>
+                <NumberInput value={form.retention_contacts} onChange={(v) => set('retention_contacts', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">How many members did you contact proactively?</p>
+              </div>
+              <div>
+                <FieldLabel>Successfully retained</FieldLabel>
+                <NumberInput value={form.successfully_retained} onChange={(v) => set('successfully_retained', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">Members who confirmed they want to stay</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Check in after cancellation</FieldLabel>
+                <NumberInput value={form.checkin_after_cancellation} onChange={(v) => set('checkin_after_cancellation', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">Members checked in after they already cancelled</p>
+              </div>
+              <div>
+                <FieldLabel>After failed purchase contact</FieldLabel>
+                <NumberInput value={form.failed_purchase_contact} onChange={(v) => set('failed_purchase_contact', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">Members contacted after a failed payment</p>
               </div>
             </div>
           </SectionCard>
