@@ -57,7 +57,8 @@ export default function DashboardPage() {
     async function fetchStats() {
       const { from, to } = getMonthRange()
 
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const now = new Date()
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
         .toISOString()
         .slice(0, 10)
 
@@ -75,16 +76,17 @@ export default function DashboardPage() {
           supabase.from('closer_reports').select('won_deals, cash_collected').gte('date', from).lte('date', to),
           supabase
             .from('spc_cancellations')
-            .select('id')
-            .eq('cancel_type', 'paid_cancel')
-            .gte('cancelled_at', thirtyDaysAgo),
+            .select('id, trial_cancel, cancelled_at')
+            .not('cancelled_at', 'is', null)
+            .gte('cancelled_at', firstOfMonth),
         ])
 
       const transactions: Transaction[] = txResult.data ?? []
       const members: { status: string; plan: string; amount: number; created_at: string }[] = spcResult.data ?? []
       const setterReports: { qualified_calls: number }[] = setterResult.data ?? []
       const closerReports: { won_deals: number; cash_collected: number }[] = closerResult.data ?? []
-      const recentCancels: { id: string }[] = cancelsResult.data ?? []
+      const allCancelsThisMonth: { id: string; trial_cancel: boolean | null; cancelled_at: string | null }[] = cancelsResult.data ?? []
+      const paidCancelsThisMonth = allCancelsThisMonth.filter((c) => c.trial_cancel !== true)
 
       const totalRevenue = transactions.reduce((s, t) => s + t.cost, 0)
       const activeMembers = members.filter((m) => m.status === 'active').length
@@ -109,12 +111,12 @@ export default function DashboardPage() {
         (m) => (m.created_at?.slice(0, 10) ?? '') > SPC_CUTOFF
       ).length
 
-      const churnRate =
-        activeMembersList.length > 0
-          ? parseFloat(
-              ((recentCancels.length / activeMembersList.length) * 100).toFixed(1)
-            )
-          : 0
+      const membersAtStart = activeMembersList.length + paidCancelsThisMonth.length
+      const churnRate = membersAtStart > 0
+        ? parseFloat(
+            ((paidCancelsThisMonth.length / membersAtStart) * 100).toFixed(1)
+          )
+        : 0
 
       const dailyMap: Record<string, number> = {}
       transactions.forEach((t) => {
