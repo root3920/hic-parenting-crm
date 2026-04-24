@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
 import { SpcPerfReport } from '@/types'
-import { Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download, Pencil, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
@@ -500,8 +500,22 @@ export default function SpcPerfDashboard() {
               <Plus className="h-3.5 w-3.5" />
               New report
             </Link>
+            <button
+              onClick={() => { const t = document.title; const r = getRange(preset); document.title = `Client Success SPC — ${r.from} to ${r.to}`; window.print(); document.title = t }}
+              className="no-print inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export PDF
+            </button>
           </div>
         </PageHeader>
+
+        <div className="print-header">
+          <img src="/logo.png" width="120" alt="HIC Parenting" />
+          <h1 style={{ fontSize: '18px', marginTop: '8px', fontWeight: 600 }}>Client Success SPC — Performance Report</h1>
+          <p style={{ fontSize: '12px', color: '#666' }}>Period: {formatDate(getRange(preset).from)} — {formatDate(getRange(preset).to)}</p>
+          <p style={{ fontSize: '12px', color: '#666' }}>Generated: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+        </div>
 
         {loading ? (
           <div className="space-y-4">

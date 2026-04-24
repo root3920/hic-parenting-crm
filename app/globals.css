@@ -93,3 +93,48 @@
     animation: gentle-pulse 2.5s ease-in-out infinite;
   }
 }
+
+/* Print-only header — hidden on screen */
+.print-header {
+  display: none;
+  margin-bottom: 16px;
+}
+
+@media print {
+  /* Hide navigation and UI controls */
+  .no-print,
+  nav,
+  header,
+  [data-hide-print] {
+    display: none !important;
+  }
+
+  /* Full width, clean background */
+  body {
+    font-size: 11px;
+    color: #000;
+    background: white;
+  }
+
+  main {
+    padding-top: 0 !important;
+  }
+
+  /* Show print header */
+  .print-header {
+    display: block !important;
+  }
+
+  /* Cards print cleanly */
+  [class*="card"],
+  [class*="Card"] {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+
+  /* Charts stay together */
+  .recharts-wrapper {
+    break-inside: avoid;
+  }
+}

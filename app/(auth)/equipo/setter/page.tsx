@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { KpiGoalCard } from '@/components/shared/KpiGoalCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
-import { Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Download, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { GOALS } from '@/lib/goals'
@@ -383,8 +383,22 @@ export default function SetterDashboardPage() {
               <Plus className="h-3.5 w-3.5" />
               New Report
             </Link>
+            <button
+              onClick={() => { const t = document.title; document.title = `Setting Team — ${fromDate} to ${toDate}`; window.print(); document.title = t }}
+              className="no-print inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export PDF
+            </button>
           </div>
         </PageHeader>
+
+        <div className="print-header">
+          <img src="/logo.png" width="120" alt="HIC Parenting" />
+          <h1 style={{ fontSize: '18px', marginTop: '8px', fontWeight: 600 }}>Setting Team — Performance Report</h1>
+          <p style={{ fontSize: '12px', color: '#666' }}>Period: {fromDate} — {toDate}</p>
+          <p style={{ fontSize: '12px', color: '#666' }}>Generated: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+        </div>
 
         {loading ? (
           <div className="space-y-4">
