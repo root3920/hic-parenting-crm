@@ -191,10 +191,6 @@ function noteDotCls(dateStr: string): string {
   return 'bg-red-500'
 }
 
-function isPaymentOverdue(dateStr: string, plan: 'monthly' | 'annual'): boolean {
-  const days = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)
-  return plan === 'annual' ? days > 370 : days > 35
-}
 
 function leadScoreConfig(score: number | null | undefined): { dot: string; pill: string; label: string } {
   if (!score || score === 0) return { dot: 'bg-zinc-300 dark:bg-zinc-600', pill: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400', label: 'No data' }
@@ -1198,6 +1194,7 @@ export default function SpcPage() {
   const [spcTransactions, setSpcTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [conversions, setConversions] = useState<{ email: string; converted_at: string | null }[]>([])
 
   // Modal state
   const { profile } = useProfile()
@@ -1261,8 +1258,12 @@ export default function SpcPage() {
       toast.success(
         `Trial conversions: ${data.trial_emails_found} trials found, ${data.confirmed_conversions} converted, ${data.updated_in_db} updated in DB${data.already_marked ? `, ${data.already_marked} already marked` : ''}`
       )
-      const membersRes = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+      const [membersRes, convRes] = await Promise.all([
+        supabase.from('spc_members').select('*').order('joined_at', { ascending: false }),
+        supabase.from('spc_members').select('email, converted_from_trial, converted_at').eq('converted_from_trial', true),
+      ])
       if (membersRes.data) setMembers(membersRes.data)
+      if (convRes.data) setConversions(convRes.data as { email: string; converted_at: string | null }[])
     } catch (err) {
       console.error('[Backfill Conversions] Error:', err)
       toast.error('Backfill failed')
@@ -1405,7 +1406,7 @@ export default function SpcPage() {
 
   useEffect(() => {
     async function fetchData() {
-      const [membersResult, cancelsResult, txResult, notesResult] = await Promise.all([
+      const [membersResult, cancelsResult, txResult, notesResult, conversionsResult] = await Promise.all([
         supabase.from('spc_members').select('*').order('joined_at', { ascending: false }),
         supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false }),
         supabase
@@ -1414,9 +1415,11 @@ export default function SpcPage() {
           .ilike('offer_title', '%Secure Parent%')
           .order('date', { ascending: false }),
         supabase.from('spc_member_notes').select('member_id, created_at'),
+        supabase.from('spc_members').select('email, converted_from_trial, converted_at').eq('converted_from_trial', true),
       ])
       setMembers(membersResult.data ?? [])
       setCancellations(cancelsResult.data ?? [])
+      setConversions((conversionsResult.data ?? []) as { email: string; converted_at: string | null }[])
       setSpcTransactions(
         (txResult.data ?? []).filter(
           (tx: Transaction) => getCanonicalProduct(tx.offer_title ?? '') === 'Secure Parent Collective'
@@ -1855,29 +1858,19 @@ export default function SpcPage() {
   const arrAddedInPeriod = growthNewMembers.reduce((s, m) =>
     s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
 
-  // Verified trial conversions — all time
-  const totalVerifiedConversions = useMemo(() => {
-    const converted = members.filter((m) => m.converted_from_trial)
-    console.log('[SPC] Members with converted_from_trial:', converted.length,
-      '| Sample:', converted.slice(0, 3).map((m) => ({ email: m.email, status: m.status, converted_from_trial: m.converted_from_trial, converted_at: m.converted_at })),
-      '| Total members:', members.length,
-      '| Active members:', activeMembers.length
-    )
-    return converted.filter((m) => m.status === 'active').length
-  }, [members, activeMembers])
+  // Trial conversions from dedicated query: spc_members WHERE converted_from_trial = true
+  const totalVerifiedConversions = conversions.length
 
   const totalTrialCancels = trialCancels.length
   const allTimeConversionRate = (totalVerifiedConversions + totalTrialCancels) > 0
     ? parseFloat(((totalVerifiedConversions / (totalVerifiedConversions + totalTrialCancels)) * 100).toFixed(1))
     : 0
 
-  // Verified trial conversions in period
+  // Trial conversions filtered by converted_at within selected period
   const verifiedConversionCount = useMemo(() => {
-    if (!growthRange.start) return totalVerifiedConversions // "All time" → show all
-    return members.filter((m) =>
-      m.converted_from_trial && m.status === 'active' && m.converted_at && inGrowthPeriod(m.converted_at)
-    ).length
-  }, [members, growthRange, totalVerifiedConversions]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!growthRange.start) return conversions.length
+    return conversions.filter((c) => c.converted_at && inGrowthPeriod(c.converted_at)).length
+  }, [conversions, growthRange]) // eslint-disable-line react-hooks/exhaustive-deps
   const growthConversionRate = (verifiedConversionCount + growthTrialCancelsCount) > 0
     ? parseFloat(((verifiedConversionCount / (verifiedConversionCount + growthTrialCancelsCount)) * 100).toFixed(1))
     : 0
@@ -2800,17 +2793,10 @@ export default function SpcPage() {
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
-                          <TableCell className="text-xs whitespace-nowrap hidden md:table-cell">
-                            {(() => {
-                              const lp = lastPaymentByEmail[(m.email ?? '').toLowerCase()]
-                              if (!lp) return <span className="text-zinc-400">—</span>
-                              const overdue = isPaymentOverdue(lp, m.plan)
-                              return (
-                                <span className={overdue ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-zinc-500'}>
-                                  {formatDate(lp)}
-                                </span>
-                              )
-                            })()}
+                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">
+                            {lastPaymentByEmail[(m.email ?? '').toLowerCase()]
+                              ? formatDate(lastPaymentByEmail[(m.email ?? '').toLowerCase()])
+                              : '—'}
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">
                             {m.next_payment_date
