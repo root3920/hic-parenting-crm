@@ -1855,20 +1855,22 @@ export default function SpcPage() {
   const arrAddedInPeriod = growthNewMembers.reduce((s, m) =>
     s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
 
-  // Verified trial conversions in period
-  const verifiedConversions = useMemo(() =>
-    activeMembers.filter((m) => m.converted_from_trial === true && inGrowthPeriod(m.converted_at)),
-    [activeMembers, growthRange] // eslint-disable-line react-hooks/exhaustive-deps
-  )
-  const verifiedConversionCount = verifiedConversions.length
-  const growthConversionRate = (verifiedConversionCount + growthTrialCancelsCount) > 0
-    ? parseFloat(((verifiedConversionCount / (verifiedConversionCount + growthTrialCancelsCount)) * 100).toFixed(1))
-    : 0
-  // All-time verified conversion rate for scenarios
+  // Verified trial conversions — all time
   const totalVerifiedConversions = activeMembers.filter((m) => m.converted_from_trial === true).length
   const totalTrialCancels = trialCancels.length
   const allTimeConversionRate = (totalVerifiedConversions + totalTrialCancels) > 0
     ? parseFloat(((totalVerifiedConversions / (totalVerifiedConversions + totalTrialCancels)) * 100).toFixed(1))
+    : 0
+
+  // Verified trial conversions in period
+  const verifiedConversionCount = useMemo(() => {
+    if (!growthRange.start) return totalVerifiedConversions // "All time" → show all
+    return activeMembers.filter((m) =>
+      m.converted_from_trial === true && m.converted_at && inGrowthPeriod(m.converted_at)
+    ).length
+  }, [activeMembers, growthRange, totalVerifiedConversions]) // eslint-disable-line react-hooks/exhaustive-deps
+  const growthConversionRate = (verifiedConversionCount + growthTrialCancelsCount) > 0
+    ? parseFloat(((verifiedConversionCount / (verifiedConversionCount + growthTrialCancelsCount)) * 100).toFixed(1))
     : 0
 
   const progressMax = Math.max(monthlyCount, annualCount, 1)
@@ -2298,11 +2300,16 @@ export default function SpcPage() {
                       <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
                         {verifiedConversionCount}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">verified trial → paid</p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {growthRange.start ? 'in period' : 'all time'} · verified trial → paid
+                      </p>
                       {(verifiedConversionCount + growthTrialCancelsCount) > 0 && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
                           {growthConversionRate}% conversion rate
                         </span>
+                      )}
+                      {growthRange.start && totalVerifiedConversions > verifiedConversionCount && (
+                        <p className="text-[10px] text-zinc-400 mt-1">{totalVerifiedConversions} total all time</p>
                       )}
                     </>
                   )}
