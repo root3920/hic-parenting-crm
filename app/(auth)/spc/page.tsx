@@ -2774,10 +2774,7 @@ export default function SpcPage() {
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredActiveMembers.map((m, i) => {
-                        const lp = lastPaymentByEmail[(m.email ?? '').toLowerCase()]
-                        const overdue = lp ? isPaymentOverdue(lp, m.plan) : false
-                        return (
+                      {filteredActiveMembers.map((m, i) => (
                         <AnimatedTableRow
                           key={m.id}
                           variants={rowVariants}
@@ -2790,16 +2787,7 @@ export default function SpcPage() {
                           )}
                           onClick={() => openModal({ kind: 'member', data: m })}
                         >
-                          <TableCell className="font-medium text-sm">
-                            <span className="inline-flex items-center gap-1.5">
-                              {m.name}
-                              {overdue && (
-                                <span className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                  Overdue
-                                </span>
-                              )}
-                            </span>
-                          </TableCell>
+                          <TableCell className="font-medium text-sm">{m.name}</TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
                           <TableCell>
                             <StatusPill
@@ -2847,7 +2835,7 @@ export default function SpcPage() {
                             />
                           </TableCell>
                         </AnimatedTableRow>
-                      )})}
+                      ))}
                     </TableBody>
                   </Table>
                 </div>

@@ -189,6 +189,18 @@ export async function POST(req: NextRequest) {
             .maybeSingle()
 
           if (!existing) {
+            // Check if this new member had a prior trial
+            const { data: priorTrial } = await supabase
+              .from('transactions')
+              .select('id')
+              .ilike('buyer_email', buyer_email)
+              .eq('status', 'completed')
+              .ilike('offer_title', '%Secure Parent%')
+              .eq('cost', 0)
+              .lt('date', date)
+              .limit(1)
+
+            const hadTrial = priorTrial && priorTrial.length > 0
             await supabase.from('spc_members').insert({
               name: buyer_fullname || 'Unknown',
               email: buyer_email,
@@ -199,7 +211,9 @@ export async function POST(req: NextRequest) {
               provider: spcProvider,
               joined_at: date,
               next_payment_date: nextPaymentDate,
+              ...(hadTrial ? { converted_from_trial: true, converted_at: date } : {}),
             })
+            if (hadTrial) console.log(`[SPC Webhook] New member from trial conversion: ${buyer_email}`)
           } else {
             // Update next_payment_date for any existing member
             const memberPlan = existing.plan ?? plan
@@ -218,10 +232,10 @@ export async function POST(req: NextRequest) {
               const { data: trialTx } = await supabase
                 .from('transactions')
                 .select('id')
-                .eq('buyer_email', buyer_email)
+                .ilike('buyer_email', buyer_email)
                 .eq('status', 'completed')
                 .ilike('offer_title', '%Secure Parent%')
-                .lte('cost', 0)
+                .eq('cost', 0)
                 .lt('date', date)
                 .limit(1)
 
