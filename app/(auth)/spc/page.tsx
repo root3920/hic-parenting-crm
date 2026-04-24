@@ -1856,7 +1856,16 @@ export default function SpcPage() {
     s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
 
   // Verified trial conversions — all time
-  const totalVerifiedConversions = activeMembers.filter((m) => m.converted_from_trial === true).length
+  const totalVerifiedConversions = useMemo(() => {
+    const converted = members.filter((m) => m.converted_from_trial)
+    console.log('[SPC] Members with converted_from_trial:', converted.length,
+      '| Sample:', converted.slice(0, 3).map((m) => ({ email: m.email, status: m.status, converted_from_trial: m.converted_from_trial, converted_at: m.converted_at })),
+      '| Total members:', members.length,
+      '| Active members:', activeMembers.length
+    )
+    return converted.filter((m) => m.status === 'active').length
+  }, [members, activeMembers])
+
   const totalTrialCancels = trialCancels.length
   const allTimeConversionRate = (totalVerifiedConversions + totalTrialCancels) > 0
     ? parseFloat(((totalVerifiedConversions / (totalVerifiedConversions + totalTrialCancels)) * 100).toFixed(1))
@@ -1865,10 +1874,10 @@ export default function SpcPage() {
   // Verified trial conversions in period
   const verifiedConversionCount = useMemo(() => {
     if (!growthRange.start) return totalVerifiedConversions // "All time" → show all
-    return activeMembers.filter((m) =>
-      m.converted_from_trial === true && m.converted_at && inGrowthPeriod(m.converted_at)
+    return members.filter((m) =>
+      m.converted_from_trial && m.status === 'active' && m.converted_at && inGrowthPeriod(m.converted_at)
     ).length
-  }, [activeMembers, growthRange, totalVerifiedConversions]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [members, growthRange, totalVerifiedConversions]) // eslint-disable-line react-hooks/exhaustive-deps
   const growthConversionRate = (verifiedConversionCount + growthTrialCancelsCount) > 0
     ? parseFloat(((verifiedConversionCount / (verifiedConversionCount + growthTrialCancelsCount)) * 100).toFixed(1))
     : 0
