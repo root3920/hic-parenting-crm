@@ -735,6 +735,47 @@ function MemberProfileModal({
                   <span className={rowLabel}>Payment Method</span>
                   <span className={rowValue}>{displayProvider}</span>
                 </div>
+                {selected.kind === 'member' && (
+                  <div className="flex items-center justify-between">
+                    <span className={rowLabel}>Origin</span>
+                    {selected.data.converted_from_trial ? (
+                      <button
+                        onClick={async () => {
+                          if (!confirm('Remove trial conversion tag?')) return
+                          const res = await fetch(`/api/spc/members/${selected.data.id}/trial-conversion`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ converted_from_trial: false }),
+                          })
+                          const data = await res.json()
+                          if (data.error) { toast.error(data.error); return }
+                          toast.success('Removed')
+                          onMemberUpdate(data.member as SpcMember)
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:opacity-80 transition-opacity"
+                      >
+                        ✓ Converted from Trial
+                      </button>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          const res = await fetch(`/api/spc/members/${selected.data.id}/trial-conversion`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ converted_from_trial: true }),
+                          })
+                          const data = await res.json()
+                          if (data.error) { toast.error(data.error); return }
+                          toast.success('Updated')
+                          onMemberUpdate(data.member as SpcMember)
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        + Mark as Trial Convert
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Days Left</span>
                   {selected.kind === 'member' && selected.data.trial_end_date
@@ -1858,15 +1899,19 @@ export default function SpcPage() {
   const arrAddedInPeriod = growthNewMembers.reduce((s, m) =>
     s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
 
-  // Trial conversion rate: active trials / (active trials + trial cancels in period)
+  // Trial conversion counts from converted_from_trial column
   const currentTrials = trialMembers.length
-  const trialConvRate = (currentTrials + growthTrialCancelsCount) > 0
-    ? parseFloat(((currentTrials / (currentTrials + growthTrialCancelsCount)) * 100).toFixed(1))
+  const conversionsInPeriod = useMemo(() => {
+    if (!growthRange.start) return conversions.length
+    return conversions.filter((c) => c.converted_at && inGrowthPeriod(c.converted_at)).length
+  }, [conversions, growthRange]) // eslint-disable-line react-hooks/exhaustive-deps
+  const trialConvRate = (conversionsInPeriod + growthTrialCancelsCount) > 0
+    ? parseFloat(((conversionsInPeriod / (conversionsInPeriod + growthTrialCancelsCount)) * 100).toFixed(1))
     : 0
   // All-time rate for scenario projections
   const totalTrialCancels = trialCancels.length
-  const allTimeConversionRate = (currentTrials + totalTrialCancels) > 0
-    ? parseFloat(((currentTrials / (currentTrials + totalTrialCancels)) * 100).toFixed(1))
+  const allTimeConversionRate = (conversions.length + totalTrialCancels) > 0
+    ? parseFloat(((conversions.length / (conversions.length + totalTrialCancels)) * 100).toFixed(1))
     : 0
 
   const progressMax = Math.max(monthlyCount, annualCount, 1)
@@ -2294,10 +2339,16 @@ export default function SpcPage() {
                   ) : (
                     <>
                       <p className={cn('text-2xl font-semibold', trialConvRate >= 50 ? 'text-green-600 dark:text-green-400' : trialConvRate >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>
-                        {trialConvRate}%
+                        {conversionsInPeriod}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-1">of trials became paying members</p>
-                      <p className="text-[10px] text-zinc-400 mt-1.5">{currentTrials} active trials · {growthTrialCancelsCount} cancelled in period</p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {growthRange.start ? 'in period' : 'all time'} · trial → paid
+                      </p>
+                      {(conversionsInPeriod + growthTrialCancelsCount) > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                          {trialConvRate}% conversion rate
+                        </span>
+                      )}
                     </>
                   )}
                 </CardContent>
