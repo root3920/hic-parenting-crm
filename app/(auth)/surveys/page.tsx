@@ -12,6 +12,10 @@ import {
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
 
 export const dynamic = 'force-dynamic'
 
@@ -218,6 +222,118 @@ export default function SurveysPage() {
     return { total, qualified, disqualified, qualRate, dqRate, topDQ }
   }, [surveys])
 
+  // ── Analytics ──
+  const analytics = useMemo(() => {
+    // Q7 breakdown
+    const q7Labels = [
+      { key: 'canInvest', match: 'I can invest', qual: true },
+      { key: 'partnerDecides', match: 'partner is the financial', qual: false },
+      { key: 'cantPay', match: "can't pay", qual: false },
+    ]
+    const q7Stats = q7Labels.map(({ key, match, qual }) => {
+      const count = surveys.filter(s => s.q7_investment?.toLowerCase().includes(match.toLowerCase())).length
+      return { key, label: match === 'I can invest' ? 'Can invest in coaching' : match === 'partner is the financial' ? 'Partner decides finances' : "Can't pay for coaching", count, qual }
+    })
+
+    // Q8 breakdown
+    const q8Labels = [
+      { label: 'Single parent / sole decision-maker', match: 'single parent', qual: true },
+      { label: 'Both can join Google Meet', match: 'both join', qual: true },
+      { label: 'Spouse can\'t attend', match: 'no way possible', qual: false },
+    ]
+    const q8Stats = q8Labels.map(({ label, match, qual }) => ({
+      label, qual,
+      count: surveys.filter(s => s.q8_spouse?.toLowerCase().includes(match.toLowerCase())).length,
+    }))
+
+    // Q9 breakdown
+    const q9Labels = [
+      { label: 'Single stay-at-home', match: 'single stay-at-home', qual: false },
+      { label: 'Married stay-at-home', match: 'married stay-at-home', qual: true },
+      { label: 'Work from home + caregiver', match: 'work from home', qual: true },
+      { label: 'Single working parent', match: 'single working parent', qual: true },
+      { label: 'Married working parent', match: 'married working parent', qual: true },
+      { label: 'Both stay-at-home, no jobs', match: 'no jobs outside', qual: false },
+    ]
+    const q9Stats = q9Labels.map(({ label, match, qual }) => ({
+      label, qual,
+      count: surveys.filter(s => s.q9_situation?.toLowerCase().includes(match.toLowerCase())).length,
+    }))
+
+    // Submissions over time (by day)
+    const byDateMap: Record<string, { date: string; total: number; qualified: number; disqualified: number }> = {}
+    for (const s of surveys) {
+      const day = s.submitted_at.split('T')[0]
+      if (!byDateMap[day]) byDateMap[day] = { date: formatDate(day), total: 0, qualified: 0, disqualified: 0 }
+      byDateMap[day].total++
+      if (s.is_qualified) byDateMap[day].qualified++
+      else byDateMap[day].disqualified++
+    }
+    const timelineData = Object.values(byDateMap).reverse()
+
+    // By source (Q4) — top 8
+    const sourceMap: Record<string, { total: number; qualified: number }> = {}
+    for (const s of surveys) {
+      const src = (s.q4_source ?? '').trim()
+      if (!src) continue
+      const key = src.length > 20 ? src.slice(0, 20) + '…' : src
+      if (!sourceMap[key]) sourceMap[key] = { total: 0, qualified: 0 }
+      sourceMap[key].total++
+      if (s.is_qualified) sourceMap[key].qualified++
+    }
+    const sourceData = Object.entries(sourceMap)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 8)
+      .map(([name, { total, qualified }]) => ({
+        name, qualified, disqualified: total - qualified,
+        pct: total > 0 ? Math.round((qualified / total) * 100) : 0,
+      }))
+
+    // DQ reasons distribution (for pie chart)
+    const dqPieMap: Record<string, number> = {}
+    for (const s of surveys) {
+      if (s.is_qualified) continue
+      if (s.q7_qualified === false && s.q7_investment?.includes("partner")) dqPieMap['Partner decides'] = (dqPieMap['Partner decides'] ?? 0) + 1
+      else if (s.q7_qualified === false) dqPieMap["Can't invest"] = (dqPieMap["Can't invest"] ?? 0) + 1
+      if (s.q8_qualified === false) dqPieMap["Spouse can't attend"] = (dqPieMap["Spouse can't attend"] ?? 0) + 1
+      if (s.q9_qualified === false && s.q9_situation?.toLowerCase().includes('single stay')) dqPieMap['Single stay-at-home'] = (dqPieMap['Single stay-at-home'] ?? 0) + 1
+      else if (s.q9_qualified === false) dqPieMap['Both stay-at-home'] = (dqPieMap['Both stay-at-home'] ?? 0) + 1
+    }
+    const dqPieData = Object.entries(dqPieMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+
+    // By setter
+    const setterMap: Record<string, { total: number; qualified: number; dqSum: number }> = {}
+    for (const s of surveys) {
+      const key = s.setter ?? 'Direct / Unknown'
+      if (!setterMap[key]) setterMap[key] = { total: 0, qualified: 0, dqSum: 0 }
+      setterMap[key].total++
+      if (s.is_qualified) setterMap[key].qualified++
+      setterMap[key].dqSum += s.disqualifying_count
+    }
+    const setterData = Object.entries(setterMap)
+      .map(([setter, { total, qualified, dqSum }]) => ({
+        setter, total, qualified, disqualified: total - qualified,
+        qualPct: total > 0 ? Math.round((qualified / total) * 100) : 0,
+        avgDq: total > 0 ? (dqSum / total).toFixed(1) : '0',
+      }))
+      .sort((a, b) => b.total - a.total)
+
+    // Top sources list (top 10)
+    const topSources = Object.entries(sourceMap)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 10)
+      .map(([name, { total, qualified }]) => ({
+        name, total,
+        qualPct: total > 0 ? Math.round((qualified / total) * 100) : 0,
+      }))
+
+    return { q7Stats, q8Stats, q9Stats, timelineData, sourceData, dqPieData, setterData, topSources }
+  }, [surveys])
+
+  const DQ_PIE_COLORS = ['#DC2626', '#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2']
+
   // Filtered data
   const filtered = useMemo(() => {
     let data = surveys
@@ -350,6 +466,237 @@ export default function SurveysPage() {
                 </p>
               </div>
             </div>
+
+            {/* ── ROW 1: Qualification Breakdown Cards ── */}
+            {surveys.length > 0 && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {/* Q7 — Investment */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Q7 — Investment Readiness</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2.5">
+                      {analytics.q7Stats.map(({ label, count, qual }) => {
+                        const p = kpis.total > 0 ? (count / kpis.total) * 100 : 0
+                        return (
+                          <div key={label}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-zinc-600 dark:text-zinc-400">
+                                <span className={qual ? 'text-green-600' : 'text-red-500'}>{qual ? '✓' : '✗'}</span>{' '}{label}
+                              </span>
+                              <span className="font-semibold text-zinc-700 dark:text-zinc-300">{count} ({p.toFixed(0)}%)</span>
+                            </div>
+                            <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full">
+                              <div className={cn('h-full rounded-full transition-all', qual ? 'bg-green-500' : 'bg-red-400')} style={{ width: `${p}%` }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </CardContent>
+                  </Card>
+
+                  {/* Q8 — Spouse */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Q8 — Spouse Availability</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2.5">
+                      {analytics.q8Stats.map(({ label, count, qual }) => {
+                        const p = kpis.total > 0 ? (count / kpis.total) * 100 : 0
+                        return (
+                          <div key={label}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-zinc-600 dark:text-zinc-400">
+                                <span className={qual ? 'text-green-600' : 'text-red-500'}>{qual ? '✓' : '✗'}</span>{' '}{label}
+                              </span>
+                              <span className="font-semibold text-zinc-700 dark:text-zinc-300">{count} ({p.toFixed(0)}%)</span>
+                            </div>
+                            <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full">
+                              <div className={cn('h-full rounded-full transition-all', qual ? 'bg-green-500' : 'bg-red-400')} style={{ width: `${p}%` }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </CardContent>
+                  </Card>
+
+                  {/* Q9 — Situation */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Q9 — Life Situation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {analytics.q9Stats.map(({ label, count, qual }) => {
+                        const p = kpis.total > 0 ? (count / kpis.total) * 100 : 0
+                        return (
+                          <div key={label}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-zinc-600 dark:text-zinc-400">
+                                <span className={qual ? 'text-green-600' : 'text-red-500'}>{qual ? '✓' : '✗'}</span>{' '}{label}
+                              </span>
+                              <span className="font-semibold text-zinc-700 dark:text-zinc-300">{count} ({p.toFixed(0)}%)</span>
+                            </div>
+                            <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full">
+                              <div className={cn('h-full rounded-full transition-all', qual ? 'bg-green-500' : 'bg-red-400')} style={{ width: `${p}%` }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* ── ROW 2: Applications Over Time ── */}
+                {analytics.timelineData.length > 1 && (
+                  <Card className="mb-6">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Applications Over Time</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <LineChart data={analytics.timelineData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                          <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                          <Tooltip contentStyle={{ fontSize: 11 }} />
+                          <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
+                          <Line type="monotone" dataKey="total" stroke="#185FA5" strokeWidth={2} dot={{ r: 2 }} name="Total" />
+                          <Line type="monotone" dataKey="qualified" stroke="#22C55E" strokeWidth={2} dot={{ r: 2 }} name="Qualified" />
+                          <Line type="monotone" dataKey="disqualified" stroke="#EF4444" strokeWidth={2} dot={{ r: 2 }} name="Disqualified" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* ── ROW 3: Source bar chart + DQ pie ── */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {analytics.sourceData.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold">Qualification Rate by Source (Q4)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart data={analytics.sourceData} margin={{ top: 16, right: 4, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} interval={0} angle={-20} textAnchor="end" height={50} />
+                            <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{ fontSize: 11 }} />
+                            <Legend formatter={(v) => <span className="text-xs">{v}</span>} />
+                            <Bar dataKey="qualified" stackId="a" fill="#22C55E" name="Qualified" maxBarSize={32} />
+                            <Bar dataKey="disqualified" stackId="a" fill="#EF4444" name="Disqualified" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {analytics.dqPieData.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold">DQ Reasons Distribution</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <PieChart>
+                            <Pie
+                              data={analytics.dqPieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={45}
+                              outerRadius={75}
+                              dataKey="value"
+                              paddingAngle={2}
+                            >
+                              {analytics.dqPieData.map((_, i) => (
+                                <Cell key={i} fill={DQ_PIE_COLORS[i % DQ_PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(v, name) => [`${v} submissions`, name]} contentStyle={{ fontSize: 11 }} />
+                            <Legend formatter={(v) => <span className="text-xs">{v}</span>} iconType="circle" iconSize={8} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* ── ROW 4: Setter Performance Table ── */}
+                {analytics.setterData.length > 0 && (
+                  <Card className="mb-6">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Performance by Setter / Calendar</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-zinc-200 dark:border-zinc-800">
+                              {['Setter', 'Total', 'Qualified', 'Disqualified', 'Qual%', 'Avg DQs'].map(h => (
+                                <th key={h} className="text-left py-2 px-3 font-semibold text-zinc-500 dark:text-zinc-400">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {analytics.setterData.map(s => (
+                              <tr key={s.setter} className="border-b border-zinc-100 dark:border-zinc-800">
+                                <td className="py-2 px-3 font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap">{s.setter}</td>
+                                <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400">{s.total}</td>
+                                <td className="py-2 px-3 text-green-600 dark:text-green-400 font-medium">{s.qualified}</td>
+                                <td className="py-2 px-3 text-red-600 dark:text-red-400 font-medium">{s.disqualified}</td>
+                                <td className="py-2 px-3">
+                                  <span className={cn('inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold',
+                                    s.qualPct >= 60 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                    : s.qualPct >= 40 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                  )}>
+                                    {s.qualPct}%
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400">{s.avgDq}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* ── ROW 5: Top Traffic Sources ── */}
+                {analytics.topSources.length > 0 && (
+                  <Card className="mb-6">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Top Traffic Sources</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {analytics.topSources.map((src, i) => (
+                          <div key={src.name} className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-zinc-400 w-5">{i + 1}.</span>
+                              <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">{src.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400">{src.total}</span>
+                              <span className={cn('inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold',
+                                src.qualPct >= 60 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                : src.qualPct >= 40 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                              )}>
+                                {src.qualPct}% qual
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
 
             {/* Copy Link Section */}
             <div className="flex items-center gap-2 mb-6 flex-wrap">
