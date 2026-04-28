@@ -559,7 +559,6 @@ export default function HtCsmDashboardPage() {
   const [editingReport, setEditingReport] = useState<HtReport | null>(null)
   const [page, setPage] = useState(0)
   const [totalGraduates, setTotalGraduates] = useState(0)
-  const [graduatesContacted, setGraduatesContacted] = useState(0)
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from('ht_csm_reports').delete().eq('id', id)
@@ -581,37 +580,16 @@ export default function HtCsmDashboardPage() {
       q = q.gte('date', range.from).lte('date', range.to)
     }
 
-    // Fetch reports, total graduates, and notes in period in parallel
+    // Fetch reports and total graduates count in parallel
     const gradCountQ = supabase
       .from('pwu_students')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'graduated')
 
-    let notesQ = supabase
-      .from('student_notes')
-      .select('student_id')
-    if (range) {
-      notesQ = notesQ.gte('created_at', range.from).lte('created_at', range.to + 'T23:59:59')
-    }
-
-    const [reportsRes, gradRes, notesRes] = await Promise.all([q, gradCountQ, notesQ])
+    const [reportsRes, gradRes] = await Promise.all([q, gradCountQ])
 
     setReports(reportsRes.data ?? [])
     setTotalGraduates(gradRes.count ?? 0)
-
-    // Get graduated student IDs to intersect with notes
-    if (notesRes.data && notesRes.data.length > 0) {
-      const noteStudentIds = Array.from(new Set(notesRes.data.map((n: { student_id: string }) => n.student_id)))
-      // Check which of these are actually graduates
-      const { data: gradStudents } = await supabase
-        .from('pwu_students')
-        .select('id')
-        .eq('status', 'graduated')
-        .in('id', noteStudentIds)
-      setGraduatesContacted(gradStudents?.length ?? 0)
-    } else {
-      setGraduatesContacted(0)
-    }
 
     setPage(0)
     setLoading(false)
@@ -642,6 +620,7 @@ export default function HtCsmDashboardPage() {
       sumCalls,
       avgScore,
       totalClosed: totClosed,
+      totContacted,
     }
   }, [reports])
 
@@ -825,11 +804,11 @@ export default function HtCsmDashboardPage() {
               />
               <KpiCard
                 label="Graduates Contacted"
-                value={`${graduatesContacted} of ${totalGraduates}`}
-                sub={`${fmtPct(pct(graduatesContacted, totalGraduates))} reached`}
+                value={`${kpis.totContacted} of ${totalGraduates}`}
+                sub={`${fmtPct(pct(kpis.totContacted, totalGraduates))} reached`}
                 goal="Goal: contact all"
-                barPct={totalGraduates > 0 ? (graduatesContacted / totalGraduates) * 100 : 0}
-                status={rateStatus(pct(graduatesContacted, totalGraduates), 50, 30)}
+                barPct={totalGraduates > 0 ? (kpis.totContacted / totalGraduates) * 100 : 0}
+                status={rateStatus(pct(kpis.totContacted, totalGraduates), 50, 30)}
               />
             </div>
 
