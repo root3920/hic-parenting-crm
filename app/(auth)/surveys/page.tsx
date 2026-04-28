@@ -175,13 +175,23 @@ export default function SurveysPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('survey_responses')
-      .select('*')
-      .gte('submitted_at', fromDate)
-      .lte('submitted_at', toDate + 'T23:59:59')
-      .order('submitted_at', { ascending: false })
-    setSurveys((data ?? []) as SurveyResponse[])
+    const BATCH = 1000
+    let all: SurveyResponse[] = []
+    let from = 0
+    while (true) {
+      const { data } = await supabase
+        .from('survey_responses')
+        .select('*')
+        .gte('submitted_at', fromDate)
+        .lte('submitted_at', toDate + 'T23:59:59')
+        .order('submitted_at', { ascending: false })
+        .range(from, from + BATCH - 1)
+      if (!data || data.length === 0) break
+      all = all.concat(data as SurveyResponse[])
+      if (data.length < BATCH) break
+      from += BATCH
+    }
+    setSurveys(all)
     setLoading(false)
   }, [supabase, fromDate, toDate])
 
