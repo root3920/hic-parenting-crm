@@ -263,7 +263,7 @@ function ApplyForm() {
           q9_qualified: q9Qualified,
           is_qualified: isQualified,
           disqualifying_count: dqCount,
-          setter: calendarName,
+          setter: calendarName === 'Marcela' ? 'Valentina Llano' : (calendarName || null),
           utm_source: utmSource,
           utm_medium: utmMedium,
           utm_campaign: utmCampaign,

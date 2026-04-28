@@ -7,7 +7,7 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  Search, ChevronLeft, ChevronRight, Eye, Copy, Check, Trash2,
+  Search, ChevronLeft, ChevronRight, Eye, Copy, Check, Trash2, Pencil,
   ClipboardList, CheckCircle, XCircle, AlertTriangle,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
@@ -154,6 +154,8 @@ export default function SurveysPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(0)
   const [detail, setDetail] = useState<SurveyResponse | null>(null)
+  const [editingSetterId, setEditingSetterId] = useState<string | null>(null)
+  const [editingSetterValue, setEditingSetterValue] = useState('')
 
   // Copy link
   const [linkCalendar, setLinkCalendar] = useState('')
@@ -220,6 +222,15 @@ export default function SurveysPage() {
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const pageRows = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+  async function handleSetterSave(id: string) {
+    const val = editingSetterValue.trim() || null
+    setSurveys(prev => prev.map(s => s.id === id ? { ...s, setter: val } : s))
+    setEditingSetterId(null)
+    const { error } = await supabase.from('survey_responses').update({ setter: val }).eq('id', id)
+    if (error) { toast.error('Error updating setter'); return }
+    toast.success('Setter updated')
+  }
 
   async function handleDeleteSurvey(id: string) {
     if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) return
@@ -392,7 +403,31 @@ export default function SurveysPage() {
                               <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                                 {s.phone ? `${countryFlag(s.country)} ${s.phone}` : '—'}
                               </td>
-                              <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{s.setter ?? '—'}</td>
+                              <td className="py-2.5 px-3 whitespace-nowrap">
+                                {editingSetterId === s.id ? (
+                                  <input
+                                    type="text"
+                                    value={editingSetterValue}
+                                    onChange={(e) => setEditingSetterValue(e.target.value)}
+                                    onBlur={() => handleSetterSave(s.id)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSetterSave(s.id)
+                                      if (e.key === 'Escape') setEditingSetterId(null)
+                                    }}
+                                    autoFocus
+                                    className="text-xs border border-blue-400 dark:border-blue-500 rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 w-32"
+                                  />
+                                ) : (
+                                  <button
+                                    onClick={() => { setEditingSetterId(s.id); setEditingSetterValue(s.setter ?? '') }}
+                                    className="group flex items-center gap-1 text-left rounded px-1 py-0.5 -mx-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400 cursor-pointer"
+                                    title="Click to edit setter"
+                                  >
+                                    {s.setter ?? <span className="text-zinc-400">—</span>}
+                                    <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
+                                  </button>
+                                )}
+                              </td>
                               <td className="py-2.5 px-3"><QualBadge qualified={s.is_qualified} /></td>
                               <td className="py-2.5 px-3">
                                 {s.disqualifying_count > 0 ? (
