@@ -71,6 +71,7 @@ const QUESTIONS: Question[] = [
     id: 'q7_investment',
     title: 'What to expect from our time together:',
     type: 'mc',
+    required: true,
     description: `You'll meet with one of our HIC Parenting Advisors (Marcela is one of them) on Google Meet for about 45 minutes. This is not a free coaching session; this is an assessment where we learn about your family's unique dynamics, understand where you are now, help you envision where you want to be, and then determine together if our HIC Parenting Program is the perfect fit for your family.\n\nPlease select the option that best describes your situation:`,
     options: [
       { label: 'I can invest in coaching with Marcela and her team if I am 100% sure that\'s what I need to bring peace to my parenting and have a great relationship with my children.', qualified: true },
@@ -82,6 +83,7 @@ const QUESTIONS: Question[] = [
     id: 'q8_spouse',
     title: 'Is your spouse or relative available to join the call?',
     type: 'mc',
+    required: true,
     description: 'If you parent with someone else, it is important you choose a time and a date both can join so our HIC Parenting advisor can perform an accurate assessment of your whole parenting dynamic. Then, together, you can decide if you want to continue with us.',
     options: [
       { label: 'I am a single parent and the sole decision-maker.', qualified: true },
@@ -93,6 +95,7 @@ const QUESTIONS: Question[] = [
     id: 'q9_situation',
     title: 'Which of the following best describes your current situation in terms of work and caregiving responsibilities?',
     type: 'mc',
+    required: true,
     options: [
       { label: 'I am a single stay-at-home parent and the primary caregiver.', qualified: false },
       { label: 'I am a married stay-at-home parent and the primary caregiver.', qualified: true },
@@ -137,8 +140,16 @@ function ApplyForm() {
 
   const q = QUESTIONS[step]
   const answer = answers[q.id] ?? ''
-  const isValid = q.required ? answer.trim().length > 0 : true
   const isLast = step === TOTAL - 1
+
+  const isValid = (() => {
+    const val = answer.trim()
+    if (!val) return false
+    if (q.type === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+    if (q.type === 'phone') return val.length >= 7
+    if (q.type === 'mc') return q.options?.some(o => o.label === answer) ?? false
+    return val.length > 0
+  })()
 
   const setAnswer = useCallback((val: string) => {
     setAnswers(prev => ({ ...prev, [QUESTIONS[step].id]: val }))
@@ -412,8 +423,11 @@ function ApplyForm() {
           <button
             onClick={goNext}
             disabled={!isValid}
-            className="px-8 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ backgroundColor: '#185FA5' }}
+            className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white transition-all ${
+              isValid
+                ? 'bg-[#185FA5] hover:bg-[#144d8a] cursor-pointer'
+                : 'bg-blue-300 dark:bg-blue-900/40 opacity-50 cursor-not-allowed'
+            }`}
           >
             {isLast ? 'Submit' : 'Next \u2192'}
           </button>
