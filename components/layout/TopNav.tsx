@@ -18,6 +18,7 @@ import {
   BarChart2,
   TrendingUp,
   Eye,
+  ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -46,6 +47,7 @@ const ALL_NAV_ITEMS = [
   { href: '/equipo/csm',   label: 'Team',         icon: UsersRound,      roles: ['admin', 'csm_ht'] as UserRole[] },
   { href: '/equipo/spc',   label: 'Team',         icon: UsersRound,      roles: ['csm_spc'] as UserRole[] },
   { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },
+  { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin'] as UserRole[] },
 ]
 
 // Quick-action menu items filtered by role

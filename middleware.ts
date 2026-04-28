@@ -15,6 +15,7 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/equipo/closer':      ['admin', 'closer'],
   '/equipo/profiles':    ['admin'],
   '/goals':              ['admin'],
+  '/surveys':            ['admin'],
   '/settings':           ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'],
 }
 
@@ -53,10 +54,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes — no auth required
-  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback']
+  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback', '/apply']
   if (
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/invite') ||
+    pathname.startsWith('/api/surveys') ||
     pathname === '/api/sales/backfill' ||
     pathname === '/api/spc/backfill-csv' ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
