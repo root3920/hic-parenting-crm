@@ -212,6 +212,8 @@ export default function LlamadasPage() {
   } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Call | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [editingDateId, setEditingDateId] = useState<string | null>(null)
+  const [editingDateValue, setEditingDateValue] = useState('')
 
   // New call modal
   const [showNewCall, setShowNewCall] = useState(false)
@@ -391,6 +393,50 @@ export default function LlamadasPage() {
     setUpcomingCalls(prev => prev.filter(c => c.id !== deleteTarget.id))
     setDeleteTarget(null)
     toast.success('Call deleted')
+  }
+
+  // Convert UTC ISO string to datetime-local value in the user's timezone
+  function toDatetimeLocal(isoStr: string): string {
+    const d = new Date(isoStr)
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(d)
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
+    return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+  }
+
+  // Convert datetime-local value back to UTC ISO using the user's timezone
+  function datetimeLocalToUTC(localStr: string): string {
+    const [datePart, timePart = '00:00'] = localStr.split('T')
+    const [yr, mo, dy] = datePart.split('-').map(Number)
+    const [hr, mn] = timePart.split(':').map(Number)
+    const testDate = new Date(Date.UTC(yr, mo - 1, dy, hr, mn, 0))
+    const fmtParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(testDate)
+    const get = (type: string) => Number(fmtParts.find(p => p.type === type)?.value ?? 0)
+    const tzAsUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+    const offsetMs = testDate.getTime() - tzAsUTC
+    return new Date(testDate.getTime() + offsetMs).toISOString()
+  }
+
+  async function handleDateSave(callId: string) {
+    setEditingDateId(null)
+    if (!editingDateValue) return
+    const newISO = datetimeLocalToUTC(editingDateValue)
+    setCalls(prev => prev.map(c => c.id === callId ? { ...c, start_date: newISO } : c))
+    setUpcomingCalls(prev => prev.map(c => c.id === callId ? { ...c, start_date: newISO } : c))
+    setDetailCall(prev => prev?.id === callId ? { ...prev, start_date: newISO } : prev)
+    const { error } = await supabase.from('calls').update({ start_date: newISO }).eq('id', callId)
+    if (error) {
+      toast.error('Error updating date')
+      return
+    }
+    toast.success('Date updated')
   }
 
   function resetNewCallForm() {
@@ -718,9 +764,32 @@ export default function LlamadasPage() {
                               >
                                 {/* Fecha */}
                                 <td className="py-2.5 px-3 whitespace-nowrap">
-                                  <span className={cn('font-medium', showBlue ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400')}>
-                                    {formatDateShort(call.start_date, timezone)} {tzAbbr}
-                                  </span>
+                                  {editingDateId === call.id ? (
+                                    <input
+                                      type="datetime-local"
+                                      value={editingDateValue}
+                                      onChange={(e) => setEditingDateValue(e.target.value)}
+                                      onBlur={() => handleDateSave(call.id)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleDateSave(call.id)
+                                        if (e.key === 'Escape') setEditingDateId(null)
+                                      }}
+                                      autoFocus
+                                      className="text-xs border border-blue-400 dark:border-blue-500 rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 w-44"
+                                    />
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setEditingDateId(call.id)
+                                        setEditingDateValue(toDatetimeLocal(call.start_date))
+                                      }}
+                                      className={cn('font-medium text-left group flex items-center gap-1 rounded px-1 py-0.5 -mx-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer', showBlue ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400')}
+                                      title="Click to edit date/time"
+                                    >
+                                      {formatDateShort(call.start_date, timezone)} {tzAbbr}
+                                      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
+                                    </button>
+                                  )}
                                 </td>
                                 {/* Nombre */}
                                 <td className="py-2.5 px-3">
