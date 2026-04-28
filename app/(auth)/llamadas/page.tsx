@@ -43,6 +43,7 @@ const STATUS_STYLES: Record<string, string> = {
   'Cancelled':   'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
   'No show':     'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   'Rescheduled': 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  'Follow-up':   'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
 }
 
 const CALL_TYPE_STYLES: Record<string, string> = {
@@ -60,7 +61,7 @@ const PIE_COLORS: Record<string, string> = {
   'Scheduled':   '#185FA5',
 }
 
-const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show'] as const
+const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show', 'Follow-up'] as const
 
 const CLOSERS = [
   'Marcela HIC Parenting',
@@ -78,6 +79,7 @@ const STATUS_DOT: Record<string, string> = {
   'Rescheduled': 'bg-purple-500',
   'Cancelled':   'bg-red-500',
   'No show':     'bg-amber-500',
+  'Follow-up':   'bg-cyan-500',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

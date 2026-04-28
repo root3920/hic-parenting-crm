@@ -58,6 +58,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
+    console.log('=== CALLS WEBHOOK RAW BODY ===')
+    console.log(JSON.stringify(body, null, 2))
+    console.log('==============================')
+
     // Extract key fields
     const appointmentId  = body?.calendar?.appointmentId
     const appStatus      = body?.calendar?.appoinmentStatus  // GHL typo — one 'i'
@@ -104,12 +108,71 @@ export async function POST(req: NextRequest) {
     // Check if this appointment already exists
     const { data: existing } = await supabase
       .from('calls')
-      .select('id, status')
+      .select('id, status, start_date, call_type, closer_name, setter_name')
       .eq('external_id', appointmentId)
       .single()
 
     if (existing) {
-      // UPDATE — appointment exists, update status and time fields only
+      // If GHL sends "rescheduled" for the same appointmentId with a new time,
+      // mark the old row as Rescheduled and INSERT a new Scheduled row
+      const isReschedule = status === 'Rescheduled' && startUTC && existing.start_date !== startUTC
+
+      if (isReschedule) {
+        // Mark old row as Rescheduled (preserve it as historical record)
+        await supabase
+          .from('calls')
+          .update({ status: 'Rescheduled', appointment_status: appStatus, activity_type: 'Rescheduled Meeting' })
+          .eq('id', existing.id)
+
+        console.log(`RESCHEDULED (same appointmentId): old call ${existing.id} (${existing.start_date}) → Rescheduled`)
+
+        // Insert new Scheduled row with the new time
+        const { data: newCall, error: insertErr } = await supabase
+          .from('calls')
+          .insert({
+            start_date:         startUTC,
+            end_date:           endUTC,
+            full_name:          fullName,
+            first_name:         firstName,
+            last_name:          lastName,
+            email,
+            phone,
+            meeting_url:        meetingUrl,
+            activity_type:      'Rescheduled Meeting',
+            status:             'Scheduled',
+            call_type:          existing.call_type ?? callType,
+            calendar:           calendarName,
+            closer_name:        existing.closer_name ?? closerName,
+            setter_name:        existing.setter_name ?? setterName,
+            utm_source:         utmSource,
+            utm_medium:         utmMedium,
+            utm_campaign:       utmCampaign,
+            external_id:        appointmentId,
+            appointment_status: appStatus,
+            source_timezone:    sourceTimezone,
+          })
+          .select()
+          .single()
+
+        if (insertErr) {
+          console.error('Reschedule insert error:', insertErr)
+          return NextResponse.json({ error: insertErr.message }, { status: 500 })
+        }
+
+        console.log(`INSERTED (rescheduled): ${appointmentId} | Scheduled | ${fullName} at ${startUTC}`)
+
+        return NextResponse.json({
+          success:         true,
+          action:          'rescheduled',
+          old_call_id:     existing.id,
+          new_call_id:     newCall?.id,
+          appointment_id:  appointmentId,
+          name:            fullName,
+          start_utc:       startUTC,
+        })
+      }
+
+      // Normal UPDATE — same time or non-reschedule status change
       const { data, error } = await supabase
         .from('calls')
         .update({
@@ -143,25 +206,30 @@ export async function POST(req: NextRequest) {
       })
     } else {
       // Auto-mark previous future call as "Rescheduled" if same contact has one
+      // (handles case where GHL creates a NEW appointmentId for the reschedule)
       if (email && startUTC) {
-        const { data: previousCall } = await supabase
+        console.log(`AUTO-RESCHEDULE CHECK: email=${email}, newTime=${startUTC}`)
+
+        const { data: previousCalls, error: findErr } = await supabase
           .from('calls')
-          .select('id, start_date')
+          .select('id, start_date, status, full_name')
           .eq('email', email)
           .in('status', ['Scheduled', 'Rescheduled'])
           .gt('start_date', new Date().toISOString())
           .neq('start_date', startUTC)
           .order('start_date', { ascending: true })
-          .limit(1)
-          .single()
+          .limit(5)
 
-        if (previousCall) {
-          await supabase
+        console.log(`AUTO-RESCHEDULE: found ${previousCalls?.length ?? 0} future calls for ${email}`, findErr ?? '', previousCalls)
+
+        if (previousCalls && previousCalls.length > 0) {
+          const toMark = previousCalls[0]
+          const { error: markErr } = await supabase
             .from('calls')
             .update({ status: 'Rescheduled' })
-            .eq('id', previousCall.id)
+            .eq('id', toMark.id)
 
-          console.log(`AUTO-RESCHEDULED: call ${previousCall.id} (${previousCall.start_date}) → Rescheduled (new call for ${email} at ${startUTC})`)
+          console.log(`AUTO-RESCHEDULED: call ${toMark.id} (${toMark.full_name} @ ${toMark.start_date}) → Rescheduled`, markErr ?? '')
         }
       }
 
