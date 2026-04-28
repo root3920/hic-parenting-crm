@@ -7,7 +7,7 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  Search, ChevronLeft, ChevronRight, Eye, Copy, Check,
+  Search, ChevronLeft, ChevronRight, Eye, Copy, Check, Trash2,
   ClipboardList, CheckCircle, XCircle, AlertTriangle,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
@@ -221,6 +221,18 @@ export default function SurveysPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const pageRows = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
+  async function handleDeleteSurvey(id: string) {
+    if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) return
+    const { error } = await supabase.from('survey_responses').delete().eq('id', id)
+    if (error) {
+      toast.error('Error deleting submission')
+      return
+    }
+    setSurveys(prev => prev.filter(s => s.id !== id))
+    if (detail?.id === id) setDetail(null)
+    toast.success('Submission deleted')
+  }
+
   function copyLink() {
     const base = typeof window !== 'undefined' ? window.location.origin : 'https://dashboard.hicparenting.com'
     const url = linkCalendar ? `${base}/apply?calendarName=${encodeURIComponent(linkCalendar)}` : `${base}/apply`
@@ -410,6 +422,13 @@ export default function SurveysPage() {
                                   title="View details"
                                 >
                                   <Eye className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSurvey(s.id)}
+                                  className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Delete submission"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </td>
                             </tr>
