@@ -25,6 +25,8 @@ const CALL_TYPE_STYLES: Record<string, string> = {
   'Interview':    'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300',
 }
 
+const CALL_TYPE_OPTIONS = ['Qualified', 'Disqualified', 'Onboarding', 'Interview'] as const
+
 function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]?.toUpperCase() ?? '').join('')
 }
@@ -32,9 +34,10 @@ function initials(name: string) {
 interface Props {
   call: Call
   onDetailClick: () => void
+  onTypeChange?: (callId: string, newType: string) => void
 }
 
-export function UpcomingCallCard({ call, onDetailClick }: Props) {
+export function UpcomingCallCard({ call, onDetailClick, onTypeChange }: Props) {
   const [expanded, setExpanded] = useState(false)
   const { timezone } = useUserTimezone()
   const tzAbbr = US_TIMEZONES.find(t => t.value === timezone)?.abbr ?? 'EST'
@@ -73,15 +76,22 @@ export function UpcomingCallCard({ call, onDetailClick }: Props) {
             {call.setter_name && <span>Setter: <span className="font-medium text-zinc-700 dark:text-zinc-300">{call.setter_name}</span></span>}
           </p>
         )}
-        {call.call_type && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-400">📱 Tipo:</span>
-            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', CALL_TYPE_STYLES[call.call_type] ?? 'bg-zinc-100 text-zinc-600')}>
-              {call.call_type}
-            </span>
-            {call.activity_type && <span className="text-xs text-zinc-400">{call.activity_type}</span>}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-400">📱 Tipo:</span>
+          <select
+            value={call.call_type ?? ''}
+            onChange={(e) => onTypeChange?.(call.id, e.target.value)}
+            className={cn(
+              'appearance-none inline-flex items-center pl-2 pr-5 py-0.5 rounded-full text-xs font-medium cursor-pointer border-0 outline-none transition-opacity hover:opacity-80 bg-[length:12px] bg-[right_4px_center] bg-no-repeat',
+              call.call_type ? (CALL_TYPE_STYLES[call.call_type] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400') : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500'
+            )}
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+          >
+            <option value="">— None</option>
+            {CALL_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          {call.activity_type && <span className="text-xs text-zinc-400">{call.activity_type}</span>}
+        </div>
       </div>
 
       {/* Expand/detail row */}

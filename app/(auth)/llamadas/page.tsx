@@ -127,12 +127,22 @@ function StatusPill({ status }: { status: string }) {
   )
 }
 
-function CallTypePill({ type }: { type: string | null }) {
-  if (!type) return null
+const CALL_TYPE_OPTIONS = ['Qualified', 'Disqualified', 'Onboarding', 'Interview'] as const
+
+function CallTypeSelect({ type, onChange }: { type: string | null; onChange: (v: string) => void }) {
   return (
-    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', CALL_TYPE_STYLES[type] ?? 'bg-zinc-100 text-zinc-600')}>
-      {type}
-    </span>
+    <select
+      value={type ?? ''}
+      onChange={(e) => onChange(e.target.value)}
+      className={cn(
+        'appearance-none inline-flex items-center pl-2 pr-5 py-0.5 rounded-full text-xs font-medium cursor-pointer border-0 outline-none transition-opacity hover:opacity-80 bg-[length:12px] bg-[right_4px_center] bg-no-repeat',
+        type ? (CALL_TYPE_STYLES[type] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400') : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500'
+      )}
+      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+    >
+      <option value="">— None</option>
+      {CALL_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+    </select>
   )
 }
 
@@ -335,6 +345,19 @@ export default function LlamadasPage() {
     setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus } : c))
     setDetailCall(prev => prev?.id === callId ? { ...prev, status: newStatus } : prev)
     toast.success(`Status updated to ${newStatus}`)
+  }
+
+  async function updateCallType(callId: string, newType: string) {
+    const val = (newType || null) as Call['call_type']
+    setCalls(prev => prev.map(c => c.id === callId ? { ...c, call_type: val } : c))
+    setUpcomingCalls(prev => prev.map(c => c.id === callId ? { ...c, call_type: val } : c))
+    setDetailCall(prev => prev?.id === callId ? { ...prev, call_type: val } : prev)
+    const { error } = await supabase.from('calls').update({ call_type: val }).eq('id', callId)
+    if (error) {
+      toast.error('Error updating type')
+      return
+    }
+    toast.success('Type updated')
   }
 
   async function handleDelete() {
@@ -551,6 +574,7 @@ export default function LlamadasPage() {
                       key={call.id}
                       call={call}
                       onDetailClick={() => setDetailCall(call)}
+                      onTypeChange={updateCallType}
                     />
                   ))}
                 </div>
@@ -612,7 +636,7 @@ export default function LlamadasPage() {
                                 </td>
                                 {/* Tipo */}
                                 <td className="py-2.5 px-3">
-                                  <CallTypePill type={call.call_type} />
+                                  <CallTypeSelect type={call.call_type} onChange={(v) => updateCallType(call.id, v)} />
                                 </td>
                                 {/* Estado */}
                                 <td className="py-2.5 px-3">
