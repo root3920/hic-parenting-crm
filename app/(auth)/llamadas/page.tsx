@@ -10,10 +10,12 @@ import { Call } from '@/types'
 import { CallDetailModal } from '@/components/llamadas/CallDetailModal'
 import { UpcomingCallCard } from '@/components/llamadas/UpcomingCallCard'
 import {
-  Calendar, CheckCircle, XCircle, UserX, RefreshCw,
+  Calendar as CalendarIcon, CheckCircle, XCircle, UserX, RefreshCw,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
   Eye, ExternalLink, Search, Loader2, Check, Pencil, Trash2, Plus, X,
+  List, CalendarDays,
 } from 'lucide-react'
+import { CallsCalendar } from '@/components/calls/CallsCalendar'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { US_TIMEZONES, formatDateTimeInTimezone } from '@/lib/timezones'
@@ -158,7 +160,7 @@ interface KpiCardDef {
 }
 
 const KPI_CARDS: KpiCardDef[] = [
-  { key: 'scheduled_future', label: 'Upcoming',    icon: Calendar,   iconColor: 'text-blue-500',   borderActive: 'border-blue-500',   borderIdle: 'border-zinc-200 dark:border-zinc-800' },
+  { key: 'scheduled_future', label: 'Upcoming',    icon: CalendarIcon, iconColor: 'text-blue-500',   borderActive: 'border-blue-500',   borderIdle: 'border-zinc-200 dark:border-zinc-800' },
   { key: 'Showed Up',        label: 'Showed Up',  icon: CheckCircle, iconColor: 'text-green-500', borderActive: 'border-green-500',  borderIdle: 'border-zinc-200 dark:border-zinc-800' },
   { key: 'Cancelled',        label: 'Cancelled',  icon: XCircle,     iconColor: 'text-red-500',   borderActive: 'border-red-500',    borderIdle: 'border-zinc-200 dark:border-zinc-800' },
   { key: 'No show',          label: 'No Show',    icon: UserX,       iconColor: 'text-amber-500', borderActive: 'border-amber-500',  borderIdle: 'border-zinc-200 dark:border-zinc-800' },
@@ -214,6 +216,7 @@ export default function LlamadasPage() {
   } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Call | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [calView, setCalView] = useState<'list' | 'calendar'>('list')
   const [editingDateId, setEditingDateId] = useState<string | null>(null)
   const [editingDateValue, setEditingDateValue] = useState('')
 
@@ -640,6 +643,24 @@ export default function LlamadasPage() {
               />
             </div>
 
+            {/* View toggle */}
+            <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
+              <button
+                onClick={() => setCalView('list')}
+                className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', calView === 'list' ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200')}
+              >
+                <List className="h-3.5 w-3.5" />
+                List
+              </button>
+              <button
+                onClick={() => setCalView('calendar')}
+                className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', calView === 'calendar' ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200')}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                Calendar
+              </button>
+            </div>
+
             {/* New call button */}
             <button
               onClick={() => setShowNewCall(true)}
@@ -700,6 +721,18 @@ export default function LlamadasPage() {
                 )
               })}
             </div>
+
+            {/* ── Calendar View ── */}
+            {calView === 'calendar' && (
+              <CallsCalendar
+                calls={calls}
+                timezone={timezone}
+                onCallClick={(call) => setDetailCall(call)}
+              />
+            )}
+
+            {/* ── List View ── */}
+            {calView === 'list' && <>
 
             {/* ── Section 2: Upcoming Calls ── */}
             {upcomingCalls.length > 0 && (
@@ -1066,6 +1099,7 @@ export default function LlamadasPage() {
                 </Card>
               </div>
             )}
+          </>}
           </>
         )}
       </div>
