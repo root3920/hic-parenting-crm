@@ -156,8 +156,13 @@ export default function SurveysPage() {
   const [detail, setDetail] = useState<SurveyResponse | null>(null)
 
   // Copy link
-  const [linkSetter, setLinkSetter] = useState('')
+  const [linkCalendar, setLinkCalendar] = useState('')
   const [copied, setCopied] = useState(false)
+
+  const CALENDAR_OPTIONS = [
+    'Free Coaching Session', 'VCT', 'VCT_MT', 'Interview', 'Use Class',
+    'Spanish', 'Stop Reaction', 'Marcela', 'Jessica', 'Valentina',
+  ]
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
@@ -218,7 +223,7 @@ export default function SurveysPage() {
 
   function copyLink() {
     const base = typeof window !== 'undefined' ? window.location.origin : 'https://dashboard.hicparenting.com'
-    const url = linkSetter ? `${base}/apply?setter=${encodeURIComponent(linkSetter)}` : `${base}/apply`
+    const url = linkCalendar ? `${base}/apply?calendarName=${encodeURIComponent(linkCalendar)}` : `${base}/apply`
     navigator.clipboard.writeText(url)
     setCopied(true)
     toast.success('Link copied!')
@@ -317,13 +322,12 @@ export default function SurveysPage() {
             <div className="flex items-center gap-2 mb-6 flex-wrap">
               <span className="text-xs text-zinc-500 dark:text-zinc-400">Share link:</span>
               <select
-                value={linkSetter}
-                onChange={(e) => setLinkSetter(e.target.value)}
+                value={linkCalendar}
+                onChange={(e) => setLinkCalendar(e.target.value)}
                 className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
               >
-                <option value="">No setter</option>
-                <option value="Valentina Llano">Valentina Llano</option>
-                <option value="Marcela Collier">Marcela Collier</option>
+                <option value="">Default calendar</option>
+                {CALENDAR_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <button
                 onClick={copyLink}
@@ -333,8 +337,13 @@ export default function SurveysPage() {
                 {copied ? 'Copied!' : 'Copy Link'}
               </button>
               <span className="text-xs text-zinc-400 dark:text-zinc-500 font-mono truncate max-w-xs">
-                /apply{linkSetter ? `?setter=${encodeURIComponent(linkSetter)}` : ''}
+                /apply{linkCalendar ? `?calendarName=${encodeURIComponent(linkCalendar)}` : ''}
               </span>
+              {linkCalendar && (
+                <span className="text-xs text-blue-500 dark:text-blue-400">
+                  &rarr; {linkCalendar}&apos;s Calendar
+                </span>
+              )}
             </div>
 
             {/* Table */}

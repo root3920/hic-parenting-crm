@@ -109,6 +109,23 @@ const QUESTIONS: Question[] = [
 
 const TOTAL = QUESTIONS.length
 
+// ─── Calendar routing ───────────────────────────────────────────────────────
+
+const CALENDAR_MAP: Record<string, string> = {
+  'Free Coaching Session': 'https://api.hicparenting.com/widget/bookings/calendar-qajacy3nlaswyr',
+  'VCT':                   'https://api.hicparenting.com/widget/bookings/calendar-qa',
+  'VCT_MT':                'https://api.hicparenting.com/widget/bookings/calendar-qan9sc3g',
+  'Interview':             'https://api.hicparenting.com/widget/bookings/calendar-qaheoz1y3z26sul95pds',
+  'Use Class':             'https://api.hicparenting.com/widget/bookings/calendar-qa13wwmx',
+  'Spanish':               'https://api.hicparenting.com/widget/bookings/calendar-gn238uf8kt2ju4b413',
+  'Stop Reaction':         'https://api.hicparenting.com/widget/bookings/calendar-qajacy3n',
+  'Marcela':               'https://api.hicparenting.com/widget/bookings/calendar-gn238uf8kt2j',
+  'Jessica':               'https://api.hicparenting.com/widget/bookings/calendar-gn238u',
+  'Valentina':             'https://api.hicparenting.com/widget/bookings/calendar-gn238u18k0ib',
+}
+
+const DEFAULT_CALENDAR = 'https://api.hicparenting.com/widget/bookings/calendar-qa'
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function ApplyPage() {
@@ -132,8 +149,8 @@ function ApplyForm() {
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
   const [error, setError] = useState('')
 
-  // UTM params
-  const setter = searchParams.get('setter') ?? ''
+  // URL params
+  const calendarName = searchParams.get('calendarName') ?? ''
   const utmSource = searchParams.get('utm_source') ?? ''
   const utmMedium = searchParams.get('utm_medium') ?? ''
   const utmCampaign = searchParams.get('utm_campaign') ?? ''
@@ -235,7 +252,7 @@ function ApplyForm() {
           q9_qualified: q9Qualified,
           is_qualified: isQualified,
           disqualifying_count: dqCount,
-          setter: setter,
+          setter: calendarName,
           utm_source: utmSource,
           utm_medium: utmMedium,
           utm_campaign: utmCampaign,
@@ -249,7 +266,8 @@ function ApplyForm() {
     await new Promise(r => setTimeout(r, 1500))
 
     if (isQualified) {
-      window.location.href = 'https://api.hicparenting.com/widget/bookings/calendar-qa'
+      const calendarUrl = CALENDAR_MAP[calendarName] ?? DEFAULT_CALENDAR
+      window.location.href = calendarUrl
     } else {
       window.location.href = 'https://enroll.hicparenting.com/confirmation-setter-dq'
     }
@@ -435,9 +453,9 @@ function ApplyForm() {
       </div>
 
       {/* Setter info if present */}
-      {setter && (
+      {calendarName && (
         <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-500">
-          Referred by: {setter}
+          Calendar: {calendarName}
         </p>
       )}
 
