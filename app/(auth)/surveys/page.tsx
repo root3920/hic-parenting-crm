@@ -354,9 +354,12 @@ export default function SurveysPage() {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                            {['Date', 'Name', 'Email', 'Phone', 'Setter', 'Result', 'DQs', ''].map(h => (
+                            {['Date', 'Name', 'Email', 'Phone', 'Setter', 'Result'].map(h => (
                               <th key={h} className="text-left py-2.5 px-3 font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{h}</th>
                             ))}
+                            <th className="text-left py-2.5 px-3 font-semibold text-red-500 dark:text-red-400 whitespace-nowrap">DQs</th>
+                            <th className="text-left py-2.5 px-3 font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">Qs</th>
+                            <th className="text-left py-2.5 px-3 font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -378,6 +381,18 @@ export default function SurveysPage() {
                                 ) : (
                                   <span className="text-zinc-400">—</span>
                                 )}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                {(() => {
+                                  const qCount = (s.q7_qualified === true ? 1 : 0) + (s.q8_qualified === true ? 1 : 0) + (s.q9_qualified === true ? 1 : 0)
+                                  return qCount > 0 ? (
+                                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                      {qCount}
+                                    </span>
+                                  ) : (
+                                    <span className="text-zinc-400">—</span>
+                                  )
+                                })()}
                               </td>
                               <td className="py-2.5 px-3">
                                 <button
