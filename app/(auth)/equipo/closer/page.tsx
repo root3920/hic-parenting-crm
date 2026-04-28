@@ -289,20 +289,22 @@ export default function CloserDashboardPage() {
 
   // ── KPIs from closer_daily_reports ──
   const reportKPIs = useMemo(() => {
+    const showedMeetings = s(filtered, 'showed_meetings')
     const offersProposed = s(filtered, 'offers_proposed')
     const wonDeals = s(filtered, 'won_deals')
     const cashCollected = s(filtered, 'cash_collected')
     const recurrentCash = s(filtered, 'recurrent_cash')
+    // Both numerator and denominator from the same source (closer_daily_reports)
     // Offer Rate   = offers / showed  (of calls that happened, did closer make an offer?)
     // Close Rate   = won / showed     (of calls that happened, did closer close?)
     // Close/Offer  = won / offers     (of offers made, how many closed?)
-    const offerRate = safeDiv(offersProposed, callKPIs.showedUp) * 100
-    const closeRate = safeDiv(wonDeals, callKPIs.showedUp) * 100
+    const offerRate = safeDiv(offersProposed, showedMeetings) * 100
+    const closeRate = safeDiv(wonDeals, showedMeetings) * 100
     const closeOfferRate = safeDiv(wonDeals, offersProposed) * 100
     const valuePerMeeting = safeDiv(cashCollected, callKPIs.totalMeetings)
 
-    return { offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, closeOfferRate, valuePerMeeting }
-  }, [filtered, callKPIs.totalMeetings, callKPIs.showedUp])
+    return { showedMeetings, offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, closeOfferRate, valuePerMeeting }
+  }, [filtered, callKPIs.totalMeetings])
 
   // ── Revenue ──
   const revenue = useMemo(() => {
