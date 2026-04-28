@@ -142,6 +142,29 @@ export async function POST(req: NextRequest) {
         start_utc:       startUTC,
       })
     } else {
+      // Auto-mark previous future call as "Rescheduled" if same contact has one
+      if (email && startUTC) {
+        const { data: previousCall } = await supabase
+          .from('calls')
+          .select('id, start_date')
+          .eq('email', email)
+          .in('status', ['Scheduled', 'Rescheduled'])
+          .gt('start_date', new Date().toISOString())
+          .neq('start_date', startUTC)
+          .order('start_date', { ascending: true })
+          .limit(1)
+          .single()
+
+        if (previousCall) {
+          await supabase
+            .from('calls')
+            .update({ status: 'Rescheduled' })
+            .eq('id', previousCall.id)
+
+          console.log(`AUTO-RESCHEDULED: call ${previousCall.id} (${previousCall.start_date}) → Rescheduled (new call for ${email} at ${startUTC})`)
+        }
+      }
+
       // INSERT — new appointment
       const { data, error } = await supabase
         .from('calls')
