@@ -40,7 +40,11 @@
       "Bash(curl -s \"https://nlrxlikkhkdxrncqvxht.supabase.co/rest/v1/transactions?select=date,buyer_email,offer_title,transaction_id,cost&date=gte.2026-04-02&date=lte.2026-04-16&order=date.desc&limit=500\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5scnhsaWtraGtkeHJuY3F2eGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4OTgwNjEsImV4cCI6MjA5MDQ3NDA2MX0.IURcFl7p_LYNtfTbFerkD-BnYfBGQegwMQ8S7ggv3Es\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5scnhsaWtraGtkeHJuY3F2eGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4OTgwNjEsImV4cCI6MjA5MDQ3NDA2MX0.IURcFl7p_LYNtfTbFerkD-BnYfBGQegwMQ8S7ggv3Es\")",
       "Bash(curl:*)",
       "Bash(gh repo:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(for file:*)",
+      "Bash(do echo:*)",
+      "Read(//Users/federicoalarconu/hic-dashboard/**)",
+      "Bash(done)"
     ]
   }
 }
