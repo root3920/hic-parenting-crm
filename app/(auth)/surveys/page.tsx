@@ -104,7 +104,7 @@ function SurveyDetail({ survey, onClose }: { survey: SurveyResponse; onClose: ()
   }
 
   return (
-    <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-6">
       <DialogHeader>
         <DialogTitle className="text-base flex items-center gap-2">
           {survey.name}
