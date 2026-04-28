@@ -610,6 +610,8 @@ export default function HtCsmDashboardPage() {
       sumCalls,
       avgScore,
       totalClosed: totClosed,
+      totContacted,
+      totGraduates,
     }
   }, [reports])
 
@@ -790,6 +792,14 @@ export default function HtCsmDashboardPage() {
                 sub="closed in period"
                 barPct={Math.min(100, kpis.totalClosed * 20)}
                 status={kpis.totalClosed > 0 ? 'good' : 'warn'}
+              />
+              <KpiCard
+                label="Graduates Contacted"
+                value={`${kpis.totContacted} of ${kpis.totGraduates}`}
+                sub={`${fmtPct(pct(kpis.totContacted, kpis.totGraduates))} reached`}
+                goal="Goal: contact all"
+                barPct={kpis.totGraduates > 0 ? (kpis.totContacted / kpis.totGraduates) * 100 : 0}
+                status={rateStatus(pct(kpis.totContacted, kpis.totGraduates), 50, 30)}
               />
             </div>
 
