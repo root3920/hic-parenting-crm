@@ -12,7 +12,7 @@ import { UpcomingCallCard } from '@/components/llamadas/UpcomingCallCard'
 import {
   Calendar, CheckCircle, XCircle, UserX, RefreshCw,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
-  Eye, ExternalLink, Search, Loader2, Check, Pencil, Trash2,
+  Eye, ExternalLink, Search, Loader2, Check, Pencil, Trash2, Plus, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -213,6 +213,24 @@ export default function LlamadasPage() {
   const [deleteTarget, setDeleteTarget] = useState<Call | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
+  // New call modal
+  const [showNewCall, setShowNewCall] = useState(false)
+  const [newCallSaving, setNewCallSaving] = useState(false)
+  const [newCallErrors, setNewCallErrors] = useState<Record<string, boolean>>({})
+  const [newCall, setNewCall] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    start_date: '',
+    timezone: 'America/Denver',
+    closer_name: '',
+    setter_name: '',
+    call_type: 'Qualified',
+    status: 'Scheduled',
+    activity_type: 'Appointment Booked',
+    notes: '',
+  })
+
   // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
@@ -375,6 +393,77 @@ export default function LlamadasPage() {
     toast.success('Call deleted')
   }
 
+  function resetNewCallForm() {
+    setNewCall({
+      full_name: '', email: '', phone: '', start_date: '',
+      timezone: 'America/Denver', closer_name: '', setter_name: '',
+      call_type: 'Qualified', status: 'Scheduled',
+      activity_type: 'Appointment Booked', notes: '',
+    })
+    setNewCallErrors({})
+  }
+
+  async function handleNewCallSave() {
+    // Validate required fields
+    const errors: Record<string, boolean> = {}
+    if (!newCall.full_name.trim()) errors.full_name = true
+    if (!newCall.email.trim()) errors.email = true
+    if (!newCall.start_date) errors.start_date = true
+    if (!newCall.closer_name) errors.closer_name = true
+    if (!newCall.call_type) errors.call_type = true
+    if (!newCall.status) errors.status = true
+    if (Object.keys(errors).length > 0) {
+      setNewCallErrors(errors)
+      return
+    }
+
+    setNewCallSaving(true)
+
+    // Convert local datetime to UTC using the selected timezone
+    // datetime-local gives us "YYYY-MM-DDTHH:mm" in local time
+    const [datePart, timePart = '00:00'] = newCall.start_date.split('T')
+    const [yr, mo, dy] = datePart.split('-').map(Number)
+    const [hr, mn] = timePart.split(':').map(Number)
+    // Build a Date in UTC, then calculate offset for the chosen timezone
+    const testDate = new Date(Date.UTC(yr, mo - 1, dy, hr, mn, 0))
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: newCall.timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(testDate)
+    const get = (type: string) => Number(parts.find(p => p.type === type)?.value ?? 0)
+    const tzAsUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+    const offsetMs = testDate.getTime() - tzAsUTC
+    const startUTC = new Date(testDate.getTime() + offsetMs).toISOString()
+
+    const { error } = await supabase.from('calls').insert({
+      start_date: startUTC,
+      full_name: newCall.full_name.trim(),
+      email: newCall.email.trim(),
+      phone: newCall.phone.trim() || null,
+      closer_name: newCall.closer_name,
+      setter_name: newCall.setter_name || null,
+      call_type: newCall.call_type,
+      status: newCall.status,
+      activity_type: newCall.activity_type,
+      notes: newCall.notes.trim() || null,
+      source_timezone: newCall.timezone,
+    })
+
+    setNewCallSaving(false)
+
+    if (error) {
+      toast.error(`Error creating call: ${error.message}`)
+      return
+    }
+
+    toast.success('Call added')
+    setShowNewCall(false)
+    resetNewCallForm()
+    fetchCalls()
+    fetchUpcoming()
+  }
+
   // ── Analytics: donut data ──
   const donutData = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -502,6 +591,15 @@ export default function LlamadasPage() {
                 className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-7 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 w-48"
               />
             </div>
+
+            {/* New call button */}
+            <button
+              onClick={() => setShowNewCall(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#185FA5] text-[#185FA5] dark:text-blue-400 dark:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Call
+            </button>
 
             {/* New report button */}
             <Link
@@ -900,6 +998,187 @@ export default function LlamadasPage() {
           </>
         )}
       </div>
+
+      {/* New Call modal */}
+      {showNewCall && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => { setShowNewCall(false); resetNewCallForm() }} />
+          <div className="relative bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900 z-10 rounded-t-xl">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Add Call Manually</h3>
+              <button onClick={() => { setShowNewCall(false); resetNewCallForm() }} className="p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 space-y-5">
+              {/* Contact Info */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-3">Contact Info</p>
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Full name <span className="text-red-400">*</span></label>
+                    <input
+                      type="text"
+                      value={newCall.full_name}
+                      onChange={(e) => { setNewCall(p => ({ ...p, full_name: e.target.value })); setNewCallErrors(p => ({ ...p, full_name: false })) }}
+                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.full_name ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                      placeholder="Jane Doe"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Email <span className="text-red-400">*</span></label>
+                    <input
+                      type="email"
+                      value={newCall.email}
+                      onChange={(e) => { setNewCall(p => ({ ...p, email: e.target.value })); setNewCallErrors(p => ({ ...p, email: false })) }}
+                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.email ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                      placeholder="jane@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Phone</label>
+                    <input
+                      type="tel"
+                      value={newCall.phone}
+                      onChange={(e) => setNewCall(p => ({ ...p, phone: e.target.value }))}
+                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                      placeholder="+1 555 123 4567"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Call Details */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-green-600 dark:text-green-400 mb-3">Call Details</p>
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Date & Time <span className="text-red-400">*</span></label>
+                      <input
+                        type="datetime-local"
+                        value={newCall.start_date}
+                        onChange={(e) => { setNewCall(p => ({ ...p, start_date: e.target.value })); setNewCallErrors(p => ({ ...p, start_date: false })) }}
+                        className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.start_date ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Timezone</label>
+                      <select
+                        value={newCall.timezone}
+                        onChange={(e) => setNewCall(p => ({ ...p, timezone: e.target.value }))}
+                        className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                      >
+                        {US_TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                        <option value="America/Bogota">COT — Colombia</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Closer <span className="text-red-400">*</span></label>
+                      <select
+                        value={newCall.closer_name}
+                        onChange={(e) => { setNewCall(p => ({ ...p, closer_name: e.target.value })); setNewCallErrors(p => ({ ...p, closer_name: false })) }}
+                        className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.closer_name ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                      >
+                        <option value="">Select closer...</option>
+                        {CLOSERS.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Setter</label>
+                      <select
+                        value={newCall.setter_name}
+                        onChange={(e) => setNewCall(p => ({ ...p, setter_name: e.target.value }))}
+                        className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                      >
+                        <option value="">None</option>
+                        {SETTERS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Classification */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-3">Classification</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Type <span className="text-red-400">*</span></label>
+                    <select
+                      value={newCall.call_type}
+                      onChange={(e) => { setNewCall(p => ({ ...p, call_type: e.target.value })); setNewCallErrors(p => ({ ...p, call_type: false })) }}
+                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.call_type ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                    >
+                      <option value="Qualified">Qualified</option>
+                      <option value="Disqualified">Disqualified</option>
+                      <option value="Onboarding">Onboarding</option>
+                      <option value="Interview">Interview</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Status <span className="text-red-400">*</span></label>
+                    <select
+                      value={newCall.status}
+                      onChange={(e) => { setNewCall(p => ({ ...p, status: e.target.value })); setNewCallErrors(p => ({ ...p, status: false })) }}
+                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.status ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                    >
+                      {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Source</label>
+                    <select
+                      value={newCall.activity_type}
+                      onChange={(e) => setNewCall(p => ({ ...p, activity_type: e.target.value }))}
+                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                    >
+                      <option value="Appointment Booked">Appointment Booked</option>
+                      <option value="Manual">Manual</option>
+                      <option value="Rescheduled Meeting">Rescheduled Meeting</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">Notes</p>
+                <textarea
+                  value={newCall.notes}
+                  onChange={(e) => setNewCall(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Notes or summary..."
+                  rows={3}
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-2 justify-end px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 sticky bottom-0 bg-white dark:bg-zinc-900 rounded-b-xl">
+              <button
+                onClick={() => { setShowNewCall(false); resetNewCallForm() }}
+                className="px-3 py-1.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleNewCallSave}
+                disabled={newCallSaving}
+                className="px-4 py-1.5 text-xs rounded-md font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                style={{ backgroundColor: '#185FA5' }}
+              >
+                {newCallSaving ? 'Saving...' : 'Save Call'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation dialog */}
       {deleteTarget && (
