@@ -47,7 +47,7 @@ const ALL_NAV_ITEMS = [
   { href: '/equipo/csm',   label: 'Team',         icon: UsersRound,      roles: ['admin', 'csm_ht'] as UserRole[] },
   { href: '/equipo/spc',   label: 'Team',         icon: UsersRound,      roles: ['csm_spc'] as UserRole[] },
   { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },
-  { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin'] as UserRole[] },
+  { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
 ]
 
 // Quick-action menu items filtered by role
