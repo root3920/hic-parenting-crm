@@ -360,14 +360,25 @@ export default function SurveysPage() {
 
   async function handleDeleteSurvey(id: string) {
     if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) return
-    const { error } = await supabase.from('survey_responses').delete().eq('id', id)
-    if (error) {
-      toast.error('Error deleting submission')
-      return
-    }
     setSurveys(prev => prev.filter(s => s.id !== id))
     if (detail?.id === id) setDetail(null)
-    toast.success('Submission deleted')
+    try {
+      const res = await fetch('/api/surveys', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        toast.error('Delete failed: ' + (data.error ?? 'Unknown error'))
+        fetchData()
+        return
+      }
+      toast.success('Submission deleted')
+    } catch {
+      toast.error('Delete failed')
+      fetchData()
+    }
   }
 
   function copyLink() {
