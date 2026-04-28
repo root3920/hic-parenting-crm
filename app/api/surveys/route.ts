@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
         email: body.email,
         phone: body.phone || null,
         country: body.country || null,
+        preferred_language: body.preferred_language || null,
         q4_source: body.q4_source || null,
         q5_children_struggle: body.q5_children_struggle || null,
         q6_why_now: body.q6_why_now || null,

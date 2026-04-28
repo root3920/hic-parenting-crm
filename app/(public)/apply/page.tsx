@@ -47,6 +47,16 @@ const QUESTIONS: Question[] = [
     required: true,
   },
   {
+    id: 'preferred_language',
+    title: 'What is your preferred language?',
+    type: 'mc',
+    required: true,
+    options: [
+      { label: 'English', qualified: true },
+      { label: 'Spanish', qualified: true },
+    ],
+  },
+  {
     id: 'q4_source',
     title: 'Where did you see the invitation to book a call?',
     type: 'text',
@@ -211,9 +221,9 @@ function ApplyForm() {
     setEvaluating(true)
 
     // Evaluate qualification
-    const q7Option = QUESTIONS[6].options?.find(o => o.label === answers.q7_investment)
-    const q8Option = QUESTIONS[7].options?.find(o => o.label === answers.q8_spouse)
-    const q9Option = QUESTIONS[8].options?.find(o => o.label === answers.q9_situation)
+    const q7Option = QUESTIONS[7].options?.find(o => o.label === answers.q7_investment)
+    const q8Option = QUESTIONS[8].options?.find(o => o.label === answers.q8_spouse)
+    const q9Option = QUESTIONS[9].options?.find(o => o.label === answers.q9_situation)
 
     const q7Qualified = q7Option?.qualified ?? true
     const q8Qualified = q8Option?.qualified ?? true
@@ -241,6 +251,7 @@ function ApplyForm() {
           email: answers.email,
           phone: answers.phone ?? '',
           country: countryName,
+          preferred_language: answers.preferred_language ?? '',
           q4_source: answers.q4_source,
           q5_children_struggle: answers.q5_children_struggle,
           q6_why_now: answers.q6_why_now,
@@ -265,11 +276,13 @@ function ApplyForm() {
     // Delay for "evaluating" screen, then redirect
     await new Promise(r => setTimeout(r, 1500))
 
-    if (isQualified) {
+    if (!isQualified) {
+      window.location.href = 'https://enroll.hicparenting.com/confirmation-setter-dq'
+    } else if (answers.preferred_language === 'Spanish') {
+      window.location.href = 'https://api.hicparenting.com/widget/bookings/calendar-gn238uf8kt2ju4b413'
+    } else {
       const calendarUrl = CALENDAR_MAP[calendarName] ?? DEFAULT_CALENDAR
       window.location.href = calendarUrl
-    } else {
-      window.location.href = 'https://enroll.hicparenting.com/confirmation-setter-dq'
     }
   }
 
