@@ -29,6 +29,7 @@ interface CallSummary {
   id: string
   status: string
   call_status: string | null
+  call_type: string | null
   start_date: string
   closer_name: string
 }
@@ -204,7 +205,7 @@ export default function CloserDashboardPage() {
         .order('date', { ascending: false }),
       supabase
         .from('calls')
-        .select('id, status, call_status, start_date, closer_name')
+        .select('id, status, call_status, call_type, start_date, closer_name')
         .gte('start_date', fromDate)
         .lte('start_date', toDate + 'T23:59:59'),
     ])
@@ -265,9 +266,12 @@ export default function CloserDashboardPage() {
     const noShowRate = safeDiv(noShows, totalMeetings) * 100
     const callsPerWeek = safeDiv(totalMeetings, rangeDays / 7)
 
-    console.log('Closing metrics:', { totalMeetings, showed: showedUp, noShow: noShows, cancelled, showRate: showRate.toFixed(1), cancelRate: cancelRate.toFixed(1) })
+    const disqualified = callsFiltered.filter(c => (c.call_type ?? '').toLowerCase() === 'disqualified').length
+    const disqualifiedRate = safeDiv(disqualified, showedUp) * 100
 
-    return { totalMeetings, showedUp, noShows, cancelled, showRate, cancelRate, noShowRate, callsPerWeek }
+    console.log('Closing metrics:', { totalMeetings, showed: showedUp, noShow: noShows, cancelled, disqualified, showRate: showRate.toFixed(1), cancelRate: cancelRate.toFixed(1) })
+
+    return { totalMeetings, showedUp, noShows, cancelled, disqualified, disqualifiedRate, showRate, cancelRate, noShowRate, callsPerWeek }
   }, [callsFiltered, rangeDays])
 
   // ── Dynamic goal for showed calls ──
@@ -468,7 +472,7 @@ export default function CloserDashboardPage() {
         ) : (
           <>
             {/* ── Section 1a: KPI Goal Cards — from calls table ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-1">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-1">
               <KpiGoalCard
                 label={GOALS.closing.showRate.label}
                 description={GOALS.closing.showRate.description}
@@ -492,6 +496,7 @@ export default function CloserDashboardPage() {
                 goal={showedCallsGoal}
                 decimals={0}
               />
+              <VolumeCard label="Disqualified" value={callKPIs.disqualified} sub={`${fmtPct(callKPIs.disqualifiedRate)} of showed calls`} />
             </div>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on actual calls</p>
 

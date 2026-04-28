@@ -33,6 +33,7 @@ const PAGE_SIZE = 20
 type Preset = '7d' | '30d' | '90d' | 'todo'
 type SortKey = 'start_date' | 'full_name' | 'status' | 'closer_name'
 type StatusFilter = 'all' | 'scheduled_future' | 'Showed Up' | 'Cancelled' | 'No show' | 'Rescheduled'
+type CallTypeFilter = 'all' | 'Qualified' | 'Disqualified' | 'Onboarding' | 'Interview'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,7 @@ export default function LlamadasPage() {
   const [selectedCloser, setSelectedCloser] = useState('all')
   const [selectedSetter, setSelectedSetter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [callTypeFilter, setCallTypeFilter] = useState<CallTypeFilter>('all')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('start_date')
@@ -247,7 +249,7 @@ export default function LlamadasPage() {
   useEffect(() => { fetchUpcoming() }, [fetchUpcoming])
 
   // Reset page on filter change
-  useEffect(() => { setPage(0) }, [preset, selectedCloser, selectedSetter, statusFilter, debouncedSearch, sortKey, sortDir])
+  useEffect(() => { setPage(0) }, [preset, selectedCloser, selectedSetter, statusFilter, callTypeFilter, debouncedSearch, sortKey, sortDir])
 
   // ── Derived filter options ──
   const closerNames = useMemo(() => {
@@ -285,6 +287,11 @@ export default function LlamadasPage() {
       }
     }
 
+    // Call type filter
+    if (callTypeFilter !== 'all') {
+      data = data.filter(c => c.call_type === callTypeFilter)
+    }
+
     // Search
     if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase()
@@ -300,7 +307,7 @@ export default function LlamadasPage() {
       const bv = (b[sortKey] ?? '') as string
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
     })
-  }, [calls, statusFilter, debouncedSearch, sortKey, sortDir])
+  }, [calls, statusFilter, callTypeFilter, debouncedSearch, sortKey, sortDir])
 
   const totalPages = Math.ceil(tableData.length / PAGE_SIZE)
   const pageRows = tableData.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
@@ -446,6 +453,19 @@ export default function LlamadasPage() {
               <option value="Cancelled">Cancelled</option>
               <option value="No show">No Show</option>
               <option value="Rescheduled">Rescheduled</option>
+            </select>
+
+            {/* Call type filter */}
+            <select
+              value={callTypeFilter}
+              onChange={(e) => setCallTypeFilter(e.target.value as CallTypeFilter)}
+              className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+            >
+              <option value="all">All types</option>
+              <option value="Qualified">Qualified</option>
+              <option value="Disqualified">Disqualified</option>
+              <option value="Onboarding">Onboarding</option>
+              <option value="Interview">Interview</option>
             </select>
 
             {/* Search */}

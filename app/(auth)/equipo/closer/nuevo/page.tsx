@@ -57,6 +57,7 @@ interface DayCall {
 interface CallReport {
   call_id: string
   call_status: 'No Show' | 'Showed Up' | 'Cancelled' | 'Rescheduled' | ''
+  call_type: 'Qualified' | 'Disqualified' | 'Onboarding' | 'Interview' | ''
   next_step: 'Follow Up' | 'Cancelled' | 'Rescheduled' | ''
   call_summary: string
 }
@@ -237,6 +238,20 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
           </select>
         </div>
         <div>
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Call type</label>
+          <select
+            value={report?.call_type ?? ''}
+            onChange={(e) => onUpdate('call_type', e.target.value)}
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+          >
+            <option value="">── Select ──</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Disqualified">Disqualified</option>
+            <option value="Onboarding">Onboarding</option>
+            <option value="Interview">Interview</option>
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Next step</label>
           <select
             value={report?.next_step ?? ''}
@@ -321,9 +336,12 @@ export default function NuevoReporteCloserPage() {
         for (const call of calls) {
           const validNextSteps: Array<CallReport['next_step']> = ['Follow Up', 'Cancelled', 'Rescheduled', '']
           const rawNext = call.next_step ?? ''
+          const validCallTypes: Array<CallReport['call_type']> = ['Qualified', 'Disqualified', 'Onboarding', 'Interview', '']
+          const rawType = call.call_type ?? ''
           initialReports[call.id] = {
             call_id: call.id,
             call_status: mapStatusToCallStatus(call.status),
+            call_type: validCallTypes.includes(rawType as CallReport['call_type']) ? (rawType as CallReport['call_type']) : '',
             next_step: validNextSteps.includes(rawNext as CallReport['next_step']) ? (rawNext as CallReport['next_step']) : '',
             call_summary: call.call_summary ?? '',
           }
@@ -394,6 +412,7 @@ export default function NuevoReporteCloserPage() {
         reportsToUpdate.map(r =>
           supabase.from('calls').update({
             call_status:  r.call_status,
+            call_type:    r.call_type || null,
             next_step:    r.next_step || null,
             call_summary: r.call_summary || null,
             reported_at:  now,
