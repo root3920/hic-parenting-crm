@@ -104,7 +104,7 @@ export default function FinancePage() {
   // Data
   const [commissions, setCommissions] = useState<FinanceCommission[]>([])
   const [monthly, setMonthly] = useState<FinanceMonthly[]>([])
-  const [transactions, setTransactions] = useState<{ date: string; cost: number; status: string }[]>([])
+  const [transactions, setTransactions] = useState<{ date: string; cost: number; status: string; offer_title: string }[]>([])
 
   // P&L state
   const [plYear, setPlYear] = useState(new Date().getFullYear())
@@ -127,7 +127,7 @@ export default function FinancePage() {
     const [commRes, monthRes, txRes] = await Promise.all([
       supabase.from('finance_commissions').select('*').order('date', { ascending: false }),
       supabase.from('finance_monthly').select('*').order('month', { ascending: true }),
-      supabase.from('transactions').select('date, cost, status').order('date', { ascending: false }),
+      supabase.from('transactions').select('date, cost, status, offer_title').order('date', { ascending: false }),
     ])
     setCommissions(commRes.data ?? [])
     setMonthly(monthRes.data ?? [])
@@ -141,22 +141,32 @@ export default function FinancePage() {
 
   const now = new Date()
   const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const startOfMonth = `${curMonth}-01`
+  const endOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
 
+  // FIX 1: Total Revenue — directly from transactions (case-insensitive status check)
   const currentMonthTx = useMemo(() =>
-    transactions.filter(t => t.date?.startsWith(curMonth) && t.status !== 'refunded'),
-    [transactions, curMonth]
+    transactions.filter(t => t.date >= startOfMonth && t.date <= endOfMonth && t.status?.toLowerCase() !== 'refunded'),
+    [transactions, startOfMonth, endOfMonth]
   )
 
   const totalRevenue = useMemo(() => currentMonthTx.reduce((s, t) => s + (t.cost || 0), 0), [currentMonthTx])
 
-  const currentMonthCommissions = useMemo(() =>
-    commissions.filter(c => c.date?.startsWith(curMonth)),
-    [commissions, curMonth]
+  // FIX 2: Program Revenue — from transactions filtered by High Ticket (PWU/Program) offer titles
+  const totalProgramRevenue = useMemo(() =>
+    currentMonthTx
+      .filter(t => {
+        const title = (t.offer_title || '').toLowerCase()
+        return title.includes('parenting with understanding') || title.includes('program')
+      })
+      .reduce((s, t) => s + (t.cost || 0), 0),
+    [currentMonthTx]
   )
 
-  const totalProgramRevenue = useMemo(() =>
-    currentMonthCommissions.reduce((s, c) => s + (c.amount || 0), 0),
-    [currentMonthCommissions]
+  // FIX 3: Commissions — from finance_commissions filtered by current month date
+  const currentMonthCommissions = useMemo(() =>
+    commissions.filter(c => c.date >= startOfMonth && c.date <= endOfMonth),
+    [commissions, startOfMonth, endOfMonth]
   )
 
   const totalCommissionsPaid = useMemo(() =>
@@ -196,14 +206,28 @@ export default function FinancePage() {
 
   // ── Chart data ────────────────────────────────────────────────────────────
 
+  // FIX 4: Build monthly sales from transactions, not finance_monthly.sales_actual
+  const salesByMonth = useMemo(() => {
+    const map: Record<string, number> = {}
+    transactions.forEach(t => {
+      if (t.status?.toLowerCase() === 'refunded') return
+      const key = t.date?.substring(0, 7) // "YYYY-MM"
+      if (key) map[key] = (map[key] || 0) + (t.cost || 0)
+    })
+    return map
+  }, [transactions])
+
   const revenueVsNetData = useMemo(() =>
-    monthly.map(m => ({
-      month: MONTHS[parseInt(m.month?.slice(5, 7) || '1') - 1] + ' ' + m.month?.slice(2, 4),
-      'Sales Actual': m.sales_actual || 0,
-      'Net Income': m.net_income_actual || 0,
-      'Expenses': m.expenses_total || 0,
-    })),
-    [monthly]
+    monthly.map(m => {
+      const monthKey = m.month?.slice(0, 7) || ''
+      return {
+        month: MONTHS[parseInt(m.month?.slice(5, 7) || '1') - 1] + ' ' + m.month?.slice(2, 4),
+        'Sales Actual': salesByMonth[monthKey] || 0,
+        'Net Income': m.net_income_actual || 0,
+        'Expenses': m.expenses_total || 0,
+      }
+    }),
+    [monthly, salesByMonth]
   )
 
   const commissionsByCloser = useMemo(() => {
@@ -229,12 +253,15 @@ export default function FinancePage() {
   }, [commissions])
 
   const revenueByMonth = useMemo(() =>
-    monthly.map(m => ({
-      month: MONTHS[parseInt(m.month?.slice(5, 7) || '1') - 1] + ' ' + m.month?.slice(2, 4),
-      Forecast: m.sales_forecast || 0,
-      Actual: m.sales_actual || 0,
-    })),
-    [monthly]
+    monthly.map(m => {
+      const monthKey = m.month?.slice(0, 7) || ''
+      return {
+        month: MONTHS[parseInt(m.month?.slice(5, 7) || '1') - 1] + ' ' + m.month?.slice(2, 4),
+        Forecast: m.sales_forecast || 0,
+        Actual: salesByMonth[monthKey] || 0,
+      }
+    }),
+    [monthly, salesByMonth]
   )
 
   const commissionStatusData = useMemo(() => {
@@ -317,16 +344,14 @@ export default function FinancePage() {
 
   // ── P&L logic ─────────────────────────────────────────────────────────────
 
+  // FIX 6: P&L sales_actual ALWAYS computed from transactions, never from finance_monthly
   const plMonths = useMemo(() => {
     const yearMonths = monthly.filter(m => m.year === plYear)
-    // Merge with actual sales from transactions
     return yearMonths.map(m => {
-      const monthStr = m.month?.slice(0, 7)
-      const monthTx = transactions.filter(t => t.date?.startsWith(monthStr || '') && t.status !== 'refunded')
-      const salesActual = monthTx.reduce((s, t) => s + (t.cost || 0), 0)
-      return { ...m, sales_actual: salesActual || m.sales_actual || 0 }
+      const monthKey = m.month?.slice(0, 7) || ''
+      return { ...m, sales_actual: salesByMonth[monthKey] || 0 }
     })
-  }, [monthly, plYear, transactions])
+  }, [monthly, plYear, salesByMonth])
 
   const plTotals = useMemo(() => {
     const t = {
