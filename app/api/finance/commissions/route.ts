@@ -36,6 +36,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from('finance_commissions')
       .select('*')
+      .ilike('payment_description', '%Parenting With Understanding%')
       .order('payment_date', { ascending: false })
       .range(page * pageSize, (page + 1) * pageSize - 1)
     if (error) {

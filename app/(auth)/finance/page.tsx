@@ -855,7 +855,7 @@ export default function FinancePage() {
 
             {/* Record count */}
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {filteredCommissions.length} records found
+              {filteredCommissions.length} of {commissions.length} PWU commissions
             </p>
 
             {/* Table */}
