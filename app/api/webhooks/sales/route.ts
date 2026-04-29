@@ -274,20 +274,23 @@ export async function POST(req: NextRequest) {
       const setterName = callMatch?.setter_name || null
       const closerComm = closerName ? costNum * 0.15 : null
       const setterComm = setterName ? costNum * 0.05 : null
+      const totalComm = (closerComm || 0) + (setterComm || 0)
 
       await supabase.from('finance_commissions').insert({
-        date,
-        client_name: buyer_fullname || 'Unknown',
-        client_email: buyer_email,
-        product: canonical,
+        payment_date: date,
+        client: buyer_fullname || 'Unknown',
+        payment_description: canonical,
         amount: costNum,
-        closer_name: closerName,
+        closer: closerName,
         closer_commission: closerComm,
-        closer_status: closerName ? 'Pending' : 'N/A',
-        setter_name: setterName,
+        closer_commission_status: closerName ? 'Pending' : 'N/A',
+        setter: setterName,
         setter_commission: setterComm,
-        setter_status: setterName ? 'Pending' : 'N/A',
-        transaction_id,
+        setter_commission_status: setterName ? 'Pending' : 'N/A',
+        total_commission: totalComm,
+        commission_paid: 0,
+        commission_pending: totalComm,
+        net_total: costNum - totalComm,
       })
     }
 

@@ -47,7 +47,10 @@
       "Bash(done)",
       "Bash(vercel --version)",
       "Bash(npx vercel:*)",
-      "Bash(grep -r \"finance_commissions\\\\|finance_monthly\" /Users/federicoalarconu/hic-dashboard --include=*.ts --include=*.tsx --include=*.sql --include=*.json)"
+      "Bash(grep -r \"finance_commissions\\\\|finance_monthly\" /Users/federicoalarconu/hic-dashboard --include=*.ts --include=*.tsx --include=*.sql --include=*.json)",
+      "Bash(grep -r \"payment_date\\\\|closer_commission_status\\\\|setter_commission_status\\\\|commission_paid\\\\|commission_pending\" /Users/federicoalarconu/hic-dashboard --include=*.ts --include=*.tsx --include=*.sql ! -path */node_modules/* ! -path */.next/*)",
+      "Bash(grep:*)",
+      "Bash(git show:*)"
     ]
   }
 }

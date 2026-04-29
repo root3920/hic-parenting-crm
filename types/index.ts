@@ -288,18 +288,20 @@ export interface SpcReport {
 
 export interface FinanceCommission {
   id: string
-  date: string
-  client_name: string
-  client_email: string
-  product: string
+  payment_date: string
+  client: string
+  payment_description: string | null
   amount: number
-  closer_name: string | null
+  closer: string | null
   closer_commission: number | null
-  closer_status: 'Paid' | 'Pending' | 'N/A' | 'Refunded'
-  setter_name: string | null
+  closer_commission_status: 'Paid' | 'Pending' | 'N/A' | 'Refunded'
+  setter: string | null
   setter_commission: number | null
-  setter_status: 'Paid' | 'Pending' | 'N/A' | 'Refunded'
-  transaction_id: string | null
+  setter_commission_status: 'Paid' | 'Pending' | 'N/A' | 'Refunded'
+  total_commission: number | null
+  commission_paid: number | null
+  commission_pending: number | null
+  net_total: number | null
   created_at: string
 }
 

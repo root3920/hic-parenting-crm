@@ -120,11 +120,12 @@ export default function FinancePage() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
-  // ── Fetch data (paginated to handle >1000 rows) ────────────────────────────
+  // ── Fetch data ────────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
 
+    // Paginated helper for tables accessed via browser client
     async function fetchPaginated<T>(
       table: string,
       select: string,
@@ -152,8 +153,24 @@ export default function FinancePage() {
       return all
     }
 
+    // Commissions fetched via API route (bypasses RLS with service role)
+    async function fetchCommissions(): Promise<FinanceCommission[]> {
+      try {
+        const res = await fetch('/api/finance/commissions')
+        if (!res.ok) {
+          console.error('[Finance] Commissions API error:', res.status, await res.text())
+          return []
+        }
+        const data = await res.json()
+        return data as FinanceCommission[]
+      } catch (err) {
+        console.error('[Finance] Commissions fetch failed:', err)
+        return []
+      }
+    }
+
     const [comm, mon, tx] = await Promise.all([
-      fetchPaginated<FinanceCommission>('finance_commissions', '*', 'date', false),
+      fetchCommissions(),
       fetchPaginated<FinanceMonthly>('finance_monthly', '*', 'month', true),
       fetchPaginated<{ date: string; cost: number; status: string; offer_title: string }>(
         'transactions', 'date, cost, status, offer_title', 'date', false,
@@ -195,17 +212,17 @@ export default function FinancePage() {
     [currentMonthTx]
   )
 
-  // FIX 3: Commissions — from finance_commissions filtered by current month date
+  // Commissions — from finance_commissions filtered by current month payment_date
   const currentMonthCommissions = useMemo(() =>
-    commissions.filter(c => c.date >= startOfMonth && c.date <= endOfMonth),
+    commissions.filter(c => c.payment_date >= startOfMonth && c.payment_date <= endOfMonth),
     [commissions, startOfMonth, endOfMonth]
   )
 
   const totalCommissionsPaid = useMemo(() =>
     currentMonthCommissions.reduce((s, c) => {
       let amt = 0
-      if (c.closer_status === 'Paid') amt += c.closer_commission || 0
-      if (c.setter_status === 'Paid') amt += c.setter_commission || 0
+      if (c.closer_commission_status === 'Paid') amt += c.closer_commission || 0
+      if (c.setter_commission_status === 'Paid') amt += c.setter_commission || 0
       return s + amt
     }, 0),
     [currentMonthCommissions]
@@ -214,8 +231,8 @@ export default function FinancePage() {
   const totalCommissionsPending = useMemo(() =>
     currentMonthCommissions.reduce((s, c) => {
       let amt = 0
-      if (c.closer_status === 'Pending') amt += c.closer_commission || 0
-      if (c.setter_status === 'Pending') amt += c.setter_commission || 0
+      if (c.closer_commission_status === 'Pending') amt += c.closer_commission || 0
+      if (c.setter_commission_status === 'Pending') amt += c.setter_commission || 0
       return s + amt
     }, 0),
     [currentMonthCommissions]
@@ -231,8 +248,8 @@ export default function FinancePage() {
   const expensesTotal = currentMonthPL?.expenses_total ?? 0
 
   const commissionRate = useMemo(() => {
-    const totalAmt = commissions.reduce((s, c) => s + (c.amount || 0), 0)
-    const totalComm = commissions.reduce((s, c) => s + (c.closer_commission || 0) + (c.setter_commission || 0), 0)
+    const totalAmt = commissions.reduce((s, c) => s + (Number(c.amount) || 0), 0)
+    const totalComm = commissions.reduce((s, c) => s + (Number(c.total_commission) || 0), 0)
     return totalAmt > 0 ? (totalComm / totalAmt * 100) : 0
   }, [commissions])
 
@@ -265,10 +282,10 @@ export default function FinancePage() {
   const commissionsByCloser = useMemo(() => {
     const map: Record<string, { paid: number; pending: number }> = {}
     commissions.forEach(c => {
-      if (!c.closer_name) return
-      if (!map[c.closer_name]) map[c.closer_name] = { paid: 0, pending: 0 }
-      if (c.closer_status === 'Paid') map[c.closer_name].paid += c.closer_commission || 0
-      else if (c.closer_status === 'Pending') map[c.closer_name].pending += c.closer_commission || 0
+      if (!c.closer) return
+      if (!map[c.closer]) map[c.closer] = { paid: 0, pending: 0 }
+      if (c.closer_commission_status === 'Paid') map[c.closer].paid += Number(c.closer_commission) || 0
+      else if (c.closer_commission_status === 'Pending') map[c.closer].pending += Number(c.closer_commission) || 0
     })
     return Object.entries(map).map(([name, v]) => ({ name, ...v }))
   }, [commissions])
@@ -276,10 +293,10 @@ export default function FinancePage() {
   const commissionsBySetter = useMemo(() => {
     const map: Record<string, { paid: number; pending: number }> = {}
     commissions.forEach(c => {
-      if (!c.setter_name) return
-      if (!map[c.setter_name]) map[c.setter_name] = { paid: 0, pending: 0 }
-      if (c.setter_status === 'Paid') map[c.setter_name].paid += c.setter_commission || 0
-      else if (c.setter_status === 'Pending') map[c.setter_name].pending += c.setter_commission || 0
+      if (!c.setter) return
+      if (!map[c.setter]) map[c.setter] = { paid: 0, pending: 0 }
+      if (c.setter_commission_status === 'Paid') map[c.setter].paid += Number(c.setter_commission) || 0
+      else if (c.setter_commission_status === 'Pending') map[c.setter].pending += Number(c.setter_commission) || 0
     })
     return Object.entries(map).map(([name, v]) => ({ name, ...v }))
   }, [commissions])
@@ -297,10 +314,12 @@ export default function FinancePage() {
   )
 
   const commissionStatusData = useMemo(() => {
-    const counts = { Paid: 0, Pending: 0, 'N/A': 0, Refunded: 0 }
+    const counts: Record<string, number> = { Paid: 0, Pending: 0, 'N/A': 0, Refunded: 0 }
     commissions.forEach(c => {
-      counts[c.closer_status] = (counts[c.closer_status] || 0) + 1
-      counts[c.setter_status] = (counts[c.setter_status] || 0) + 1
+      const cs = c.closer_commission_status || 'N/A'
+      const ss = c.setter_commission_status || 'N/A'
+      counts[cs] = (counts[cs] || 0) + 1
+      counts[ss] = (counts[ss] || 0) + 1
     })
     return [
       { name: 'Paid', value: counts.Paid, color: '#10b981' },
@@ -314,64 +333,59 @@ export default function FinancePage() {
 
   const filteredCommissions = useMemo(() => {
     let data = [...commissions]
-    // Date range
+    // Date range filter on payment_date
     const today = new Date()
     if (dateRange === '7d') {
       const d = new Date(today); d.setDate(d.getDate() - 7)
-      data = data.filter(c => new Date(c.date) >= d)
+      data = data.filter(c => new Date(c.payment_date) >= d)
     } else if (dateRange === '30d') {
       const d = new Date(today); d.setDate(d.getDate() - 30)
-      data = data.filter(c => new Date(c.date) >= d)
+      data = data.filter(c => new Date(c.payment_date) >= d)
     } else if (dateRange === '90d') {
       const d = new Date(today); d.setDate(d.getDate() - 90)
-      data = data.filter(c => new Date(c.date) >= d)
+      data = data.filter(c => new Date(c.payment_date) >= d)
     } else if (dateRange === 'year') {
       const yr = today.getFullYear()
-      data = data.filter(c => c.date?.startsWith(String(yr)))
+      data = data.filter(c => c.payment_date?.startsWith(String(yr)))
     } else if (dateRange === 'custom' && customFrom && customTo) {
-      data = data.filter(c => c.date >= customFrom && c.date <= customTo)
+      data = data.filter(c => c.payment_date >= customFrom && c.payment_date <= customTo)
     }
-    if (closerFilter !== 'All') data = data.filter(c => c.closer_name === closerFilter)
-    if (setterFilter !== 'All') data = data.filter(c => c.setter_name === setterFilter)
-    if (statusFilter !== 'All') data = data.filter(c => c.closer_status === statusFilter || c.setter_status === statusFilter)
+    if (closerFilter !== 'All') data = data.filter(c => c.closer === closerFilter)
+    if (setterFilter !== 'All') data = data.filter(c => c.setter === setterFilter)
+    if (statusFilter !== 'All') data = data.filter(c => c.closer_commission_status === statusFilter || c.setter_commission_status === statusFilter)
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      data = data.filter(c => c.client_name?.toLowerCase().includes(q))
+      data = data.filter(c => c.client?.toLowerCase().includes(q))
     }
     return data
   }, [commissions, dateRange, closerFilter, setterFilter, statusFilter, searchQuery, customFrom, customTo])
 
-  const uniqueClosers = useMemo(() => Array.from(new Set(commissions.map(c => c.closer_name).filter(Boolean))) as string[], [commissions])
-  const uniqueSetters = useMemo(() => Array.from(new Set(commissions.map(c => c.setter_name).filter(Boolean))) as string[], [commissions])
+  const uniqueClosers = useMemo(() => Array.from(new Set(commissions.map(c => c.closer).filter(Boolean))) as string[], [commissions])
+  const uniqueSetters = useMemo(() => Array.from(new Set(commissions.map(c => c.setter).filter(Boolean))) as string[], [commissions])
 
-  const summaryTotal = useMemo(() => filteredCommissions.reduce((s, c) => s + (c.amount || 0), 0), [filteredCommissions])
-  const summaryCommissions = useMemo(() => filteredCommissions.reduce((s, c) => s + (c.closer_commission || 0) + (c.setter_commission || 0), 0), [filteredCommissions])
-  const summaryPaid = useMemo(() => filteredCommissions.reduce((s, c) => {
-    let a = 0
-    if (c.closer_status === 'Paid') a += c.closer_commission || 0
-    if (c.setter_status === 'Paid') a += c.setter_commission || 0
-    return s + a
-  }, 0), [filteredCommissions])
-  const summaryPending = useMemo(() => filteredCommissions.reduce((s, c) => {
-    let a = 0
-    if (c.closer_status === 'Pending') a += c.closer_commission || 0
-    if (c.setter_status === 'Pending') a += c.setter_commission || 0
-    return s + a
-  }, 0), [filteredCommissions])
+  const summaryTotal = useMemo(() => filteredCommissions.reduce((s, c) => s + (Number(c.amount) || 0), 0), [filteredCommissions])
+  const summaryCommissions = useMemo(() => filteredCommissions.reduce((s, c) => s + (Number(c.total_commission) || 0), 0), [filteredCommissions])
+  const summaryPaid = useMemo(() => filteredCommissions.reduce((s, c) => s + (Number(c.commission_paid) || 0), 0), [filteredCommissions])
+  const summaryPending = useMemo(() => filteredCommissions.reduce((s, c) => s + (Number(c.commission_pending) || 0), 0), [filteredCommissions])
 
-  // ── Commission status update ──────────────────────────────────────────────
+  // ── Commission status update (via API to bypass RLS) ──────────────────────
 
-  async function updateCommissionStatus(id: string, field: 'closer_status' | 'setter_status', value: string) {
-    const { error } = await supabase
-      .from('finance_commissions')
-      .update({ [field]: value })
-      .eq('id', id)
-    if (error) {
+  async function updateCommissionStatus(id: string, field: 'closer_commission_status' | 'setter_commission_status', value: string) {
+    try {
+      const res = await fetch('/api/finance/commissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, field, value }),
+      })
+      if (!res.ok) {
+        toast.error('Failed to update status')
+        return
+      }
+      setCommissions(prev => prev.map(c => c.id === id ? { ...c, [field]: value } as FinanceCommission : c))
+      toast.success('Status updated')
+    } catch {
       toast.error('Failed to update status')
-      return
     }
-    setCommissions(prev => prev.map(c => c.id === id ? { ...c, [field]: value } as FinanceCommission : c))
-    toast.success('Status updated')
   }
 
   // ── P&L logic ─────────────────────────────────────────────────────────────
@@ -540,7 +554,7 @@ export default function FinancePage() {
 
   // ── Inline status dropdown ────────────────────────────────────────────────
 
-  function StatusDropdown({ commissionId, field, currentStatus }: { commissionId: string; field: 'closer_status' | 'setter_status'; currentStatus: string }) {
+  function StatusDropdown({ commissionId, field, currentStatus }: { commissionId: string; field: 'closer_commission_status' | 'setter_commission_status'; currentStatus: string }) {
     const [open, setOpen] = useState(false)
     if (!open) {
       return (
@@ -794,6 +808,11 @@ export default function FinancePage() {
               <KPICard title="Pending" value={fmtCompact(summaryPending)} loading={loading} />
             </KPICardGrid>
 
+            {/* Record count */}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {filteredCommissions.length} records found
+            </p>
+
             {/* Table */}
             <Card>
               <CardContent className="p-0">
@@ -803,7 +822,7 @@ export default function FinancePage() {
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0} className="bg-zinc-50 dark:bg-zinc-900/50">
                         <TableHead className="text-xs">Date</TableHead>
                         <TableHead className="text-xs">Client</TableHead>
-                        <TableHead className="text-xs">Product</TableHead>
+                        <TableHead className="text-xs">Description</TableHead>
                         <TableHead className="text-xs text-right">Amount</TableHead>
                         <TableHead className="text-xs">Closer</TableHead>
                         <TableHead className="text-xs text-right">Closer Comm. (15%)</TableHead>
@@ -815,31 +834,33 @@ export default function FinancePage() {
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredCommissions.map((c, i) => {
-                        const netTotal = (c.amount || 0) - (c.closer_commission || 0) - (c.setter_commission || 0)
+                      {loading ? (
+                        <tr><td colSpan={11} className="text-center py-12 text-sm text-zinc-400">Loading...</td></tr>
+                      ) : filteredCommissions.length === 0 ? (
+                        <tr><td colSpan={11} className="text-center py-12 text-sm text-zinc-400">No commissions found</td></tr>
+                      ) : filteredCommissions.map((c, i) => {
+                        const desc = c.payment_description || '—'
+                        const truncDesc = desc.length > 40 ? desc.slice(0, 40) + '...' : desc
                         return (
                           <AnimatedTableRow key={c.id} variants={rowVariants} initial="hidden" animate="visible" custom={i + 1} className="group even:bg-zinc-50/50 dark:even:bg-zinc-900/20">
-                            <TableCell className="text-xs whitespace-nowrap">{c.date ? new Date(c.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</TableCell>
-                            <TableCell className="text-xs font-medium">{c.client_name || '—'}</TableCell>
-                            <TableCell className="text-xs">{c.product || '—'}</TableCell>
-                            <TableCell className="text-xs text-right font-medium">{fmtCurrency(c.amount)}</TableCell>
-                            <TableCell className="text-xs">{c.closer_name || '—'}</TableCell>
-                            <TableCell className="text-xs text-right">{c.closer_commission != null ? fmtCurrency(c.closer_commission) : '—'}</TableCell>
+                            <TableCell className="text-xs whitespace-nowrap">{c.payment_date ? new Date(c.payment_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</TableCell>
+                            <TableCell className="text-xs font-medium">{c.client || '—'}</TableCell>
+                            <TableCell className="text-xs" title={desc}>{truncDesc}</TableCell>
+                            <TableCell className="text-xs text-right font-medium">{fmtCurrency(Number(c.amount))}</TableCell>
+                            <TableCell className="text-xs">{c.closer || '—'}</TableCell>
+                            <TableCell className="text-xs text-right">{c.closer_commission != null ? fmtCurrency(Number(c.closer_commission)) : '—'}</TableCell>
                             <TableCell className="text-xs">
-                              <StatusDropdown commissionId={c.id} field="closer_status" currentStatus={c.closer_status} />
+                              <StatusDropdown commissionId={c.id} field="closer_commission_status" currentStatus={c.closer_commission_status || 'N/A'} />
                             </TableCell>
-                            <TableCell className="text-xs">{c.setter_name || '—'}</TableCell>
-                            <TableCell className="text-xs text-right">{c.setter_commission != null ? fmtCurrency(c.setter_commission) : '—'}</TableCell>
+                            <TableCell className="text-xs">{c.setter || '—'}</TableCell>
+                            <TableCell className="text-xs text-right">{c.setter_commission != null ? fmtCurrency(Number(c.setter_commission)) : '—'}</TableCell>
                             <TableCell className="text-xs">
-                              <StatusDropdown commissionId={c.id} field="setter_status" currentStatus={c.setter_status} />
+                              <StatusDropdown commissionId={c.id} field="setter_commission_status" currentStatus={c.setter_commission_status || 'N/A'} />
                             </TableCell>
-                            <TableCell className="text-xs text-right font-semibold">{fmtCurrency(netTotal)}</TableCell>
+                            <TableCell className="text-xs text-right font-semibold">{fmtCurrency(Number(c.net_total))}</TableCell>
                           </AnimatedTableRow>
                         )
                       })}
-                      {filteredCommissions.length === 0 && (
-                        <tr><td colSpan={11} className="text-center py-12 text-sm text-zinc-400">No commissions found</td></tr>
-                      )}
                     </TableBody>
                   </Table>
                 </div>
