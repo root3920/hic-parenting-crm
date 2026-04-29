@@ -404,11 +404,11 @@ export default function FinancePage() {
 
     if (field === 'closer') {
       updates.closer_commission = value ? amount * 0.15 : 0
-      updates.closer_commission_status = value ? 'Pending' : 'N/A'
+      updates.closer_commission_status = value ? (row.closer_commission_status === 'Paid' ? 'Paid' : 'Pending') : 'N/A'
     }
     if (field === 'setter') {
       updates.setter_commission = value ? amount * 0.05 : 0
-      updates.setter_commission_status = value ? 'Pending' : 'N/A'
+      updates.setter_commission_status = value ? (row.setter_commission_status === 'Paid' ? 'Paid' : 'Pending') : 'N/A'
     }
 
     const newCloserComm = field === 'closer' ? (value ? amount * 0.15 : 0) : (Number(row.closer_commission) || 0)
