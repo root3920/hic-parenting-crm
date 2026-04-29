@@ -70,8 +70,8 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { id, field, value } = body
-  if (!id || !field) {
-    return NextResponse.json({ error: 'Missing id or field' }, { status: 400 })
+  if (!id) {
+    return NextResponse.json({ error: 'Missing id' }, { status: 400 })
   }
 
   const allowedFields = [
@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest) {
     'total_commission', 'commission_paid', 'commission_pending', 'net_total',
   ]
 
-  // Support multi-field updates
+  // Support multi-field updates ({ id, updates: {...} }) or single-field ({ id, field, value })
   const updates: Record<string, unknown> = {}
   if (body.updates && typeof body.updates === 'object') {
     for (const [k, v] of Object.entries(body.updates)) {
