@@ -73,15 +73,30 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Missing id or field' }, { status: 400 })
   }
 
-  const allowedFields = ['closer_commission_status', 'setter_commission_status']
-  if (!allowedFields.includes(field)) {
-    return NextResponse.json({ error: 'Field not allowed' }, { status: 400 })
+  const allowedFields = [
+    'closer_commission_status', 'setter_commission_status',
+    'closer', 'setter', 'closer_commission', 'setter_commission',
+    'total_commission', 'commission_paid', 'commission_pending', 'net_total',
+  ]
+
+  // Support multi-field updates
+  const updates: Record<string, unknown> = {}
+  if (body.updates && typeof body.updates === 'object') {
+    for (const [k, v] of Object.entries(body.updates)) {
+      if (allowedFields.includes(k)) updates[k] = v
+    }
+  } else if (field && allowedFields.includes(field)) {
+    updates[field] = value
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No allowed fields to update' }, { status: 400 })
   }
 
   const supabase = getServiceClient()
   const { error } = await supabase
     .from('finance_commissions')
-    .update({ [field]: value })
+    .update(updates)
     .eq('id', id)
 
   if (error) {

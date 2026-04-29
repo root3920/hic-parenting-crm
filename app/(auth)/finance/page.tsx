@@ -108,8 +108,12 @@ export default function FinancePage() {
 
   // P&L state
   const [plYear, setPlYear] = useState(new Date().getFullYear())
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null)
-  const [editValue, setEditValue] = useState('')
+  const [plEditingCell, setPlEditingCell] = useState<{ id: string; field: string } | null>(null)
+  const [plEditValue, setPlEditValue] = useState('')
+
+  // Commissions inline edit (closer/setter)
+  const [commEditingCell, setCommEditingCell] = useState<{ id: string; field: 'closer' | 'setter' } | null>(null)
+  const [commEditValue, setCommEditValue] = useState('')
 
   // Commissions filters
   const [dateRange, setDateRange] = useState('all')
@@ -388,6 +392,47 @@ export default function FinancePage() {
     }
   }
 
+  // ── Inline closer/setter edit ─────────────────────────────────────────────
+
+  async function handleSaveCommEdit(id: string, field: 'closer' | 'setter', value: string) {
+    setCommEditingCell(null)
+    const row = commissions.find(c => c.id === id)
+    if (!row) return
+
+    const amount = Number(row.amount) || 0
+    const updates: Record<string, unknown> = { [field]: value || null }
+
+    if (field === 'closer') {
+      updates.closer_commission = value ? amount * 0.15 : 0
+      updates.closer_commission_status = value ? 'Pending' : 'N/A'
+    }
+    if (field === 'setter') {
+      updates.setter_commission = value ? amount * 0.05 : 0
+      updates.setter_commission_status = value ? 'Pending' : 'N/A'
+    }
+
+    const newCloserComm = field === 'closer' ? (value ? amount * 0.15 : 0) : (Number(row.closer_commission) || 0)
+    const newSetterComm = field === 'setter' ? (value ? amount * 0.05 : 0) : (Number(row.setter_commission) || 0)
+    updates.total_commission = newCloserComm + newSetterComm
+    updates.commission_pending = newCloserComm + newSetterComm
+    updates.net_total = amount - (newCloserComm + newSetterComm)
+
+    // Optimistic update
+    setCommissions(prev => prev.map(c => c.id === id ? { ...c, ...updates } as FinanceCommission : c))
+
+    try {
+      const res = await fetch('/api/finance/commissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates }),
+      })
+      if (!res.ok) toast.error('Error saving')
+      else toast.success('Updated')
+    } catch {
+      toast.error('Error saving')
+    }
+  }
+
   // ── P&L logic ─────────────────────────────────────────────────────────────
 
   // FIX 6: P&L sales_actual ALWAYS computed from transactions, never from finance_monthly
@@ -457,7 +502,7 @@ export default function FinancePage() {
       return
     }
     setMonthly(prev => prev.map(m => m.id === id ? { ...m, [field]: numVal } as FinanceMonthly : m))
-    setEditingCell(null)
+    setPlEditingCell(null)
     toast.success('Saved')
   }
 
@@ -471,7 +516,7 @@ export default function FinancePage() {
       return
     }
     setMonthly(prev => prev.map(m => m.id === id ? { ...m, expenses_notes: value } as FinanceMonthly : m))
-    setEditingCell(null)
+    setPlEditingCell(null)
   }
 
   function exportCSV() {
@@ -511,17 +556,17 @@ export default function FinancePage() {
   // ── Editable cell component ───────────────────────────────────────────────
 
   function EditableCell({ id, field, value, isNotes }: { id: string; field: string; value: number | string | null; isNotes?: boolean }) {
-    const isEditing = editingCell?.id === id && editingCell?.field === field
+    const isEditing = plEditingCell?.id === id && plEditingCell?.field === field
     if (isEditing) {
       return (
         <input
           autoFocus
           className="w-full text-xs border border-blue-400 rounded px-1.5 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
-          defaultValue={editValue}
+          defaultValue={plEditValue}
           onBlur={(e) => isNotes ? saveNotesCell(id, e.target.value) : savePlCell(id, field, e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') isNotes ? saveNotesCell(id, (e.target as HTMLInputElement).value) : savePlCell(id, field, (e.target as HTMLInputElement).value)
-            if (e.key === 'Escape') setEditingCell(null)
+            if (e.key === 'Escape') setPlEditingCell(null)
           }}
         />
       )
@@ -529,7 +574,7 @@ export default function FinancePage() {
     return (
       <button
         className="w-full text-left text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded px-1.5 py-1 transition-colors cursor-pointer"
-        onClick={() => { setEditingCell({ id, field }); setEditValue(String(value ?? (isNotes ? '' : 0))) }}
+        onClick={() => { setPlEditingCell({ id, field }); setPlEditValue(String(value ?? (isNotes ? '' : 0))) }}
       >
         {isNotes ? (value || '—') : fmtCurrency(value as number)}
       </button>
@@ -847,12 +892,58 @@ export default function FinancePage() {
                             <TableCell className="text-xs font-medium">{c.client || '—'}</TableCell>
                             <TableCell className="text-xs" title={desc}>{truncDesc}</TableCell>
                             <TableCell className="text-xs text-right font-medium">{fmtCurrency(Number(c.amount))}</TableCell>
-                            <TableCell className="text-xs">{c.closer || '—'}</TableCell>
+                            <TableCell className="text-xs">
+                              {commEditingCell?.id === c.id && commEditingCell?.field === 'closer' ? (
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={commEditValue}
+                                  onChange={(e) => setCommEditValue(e.target.value)}
+                                  onBlur={() => handleSaveCommEdit(c.id, 'closer', commEditValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveCommEdit(c.id, 'closer', commEditValue)
+                                    if (e.key === 'Escape') setCommEditingCell(null)
+                                  }}
+                                  className="border border-blue-400 rounded px-1.5 py-0.5 text-xs w-36 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                />
+                              ) : (
+                                <button
+                                  onClick={() => { setCommEditingCell({ id: c.id, field: 'closer' }); setCommEditValue(c.closer || '') }}
+                                  className="text-left hover:text-blue-600 dark:hover:text-blue-400 group/edit w-full"
+                                >
+                                  {c.closer || <span className="text-zinc-300 dark:text-zinc-600">—</span>}
+                                  <span className="opacity-0 group-hover/edit:opacity-100 ml-1 text-[10px] text-blue-400">&#9998;</span>
+                                </button>
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs text-right">{c.closer_commission != null ? fmtCurrency(Number(c.closer_commission)) : '—'}</TableCell>
                             <TableCell className="text-xs">
                               <StatusDropdown commissionId={c.id} field="closer_commission_status" currentStatus={c.closer_commission_status || 'N/A'} />
                             </TableCell>
-                            <TableCell className="text-xs">{c.setter || '—'}</TableCell>
+                            <TableCell className="text-xs">
+                              {commEditingCell?.id === c.id && commEditingCell?.field === 'setter' ? (
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={commEditValue}
+                                  onChange={(e) => setCommEditValue(e.target.value)}
+                                  onBlur={() => handleSaveCommEdit(c.id, 'setter', commEditValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveCommEdit(c.id, 'setter', commEditValue)
+                                    if (e.key === 'Escape') setCommEditingCell(null)
+                                  }}
+                                  className="border border-blue-400 rounded px-1.5 py-0.5 text-xs w-36 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                />
+                              ) : (
+                                <button
+                                  onClick={() => { setCommEditingCell({ id: c.id, field: 'setter' }); setCommEditValue(c.setter || '') }}
+                                  className="text-left hover:text-blue-600 dark:hover:text-blue-400 group/edit w-full"
+                                >
+                                  {c.setter || <span className="text-zinc-300 dark:text-zinc-600">—</span>}
+                                  <span className="opacity-0 group-hover/edit:opacity-100 ml-1 text-[10px] text-blue-400">&#9998;</span>
+                                </button>
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs text-right">{c.setter_commission != null ? fmtCurrency(Number(c.setter_commission)) : '—'}</TableCell>
                             <TableCell className="text-xs">
                               <StatusDropdown commissionId={c.id} field="setter_commission_status" currentStatus={c.setter_commission_status || 'N/A'} />
