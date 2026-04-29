@@ -46,7 +46,8 @@
       "Read(//Users/federicoalarconu/hic-dashboard/**)",
       "Bash(done)",
       "Bash(vercel --version)",
-      "Bash(npx vercel:*)"
+      "Bash(npx vercel:*)",
+      "Bash(grep -r \"finance_commissions\\\\|finance_monthly\" /Users/federicoalarconu/hic-dashboard --include=*.ts --include=*.tsx --include=*.sql --include=*.json)"
     ]
   }
 }

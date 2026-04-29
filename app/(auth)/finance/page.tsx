@@ -120,18 +120,50 @@ export default function FinancePage() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
-  // ── Fetch data ────────────────────────────────────────────────────────────
+  // ── Fetch data (paginated to handle >1000 rows) ────────────────────────────
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const [commRes, monthRes, txRes] = await Promise.all([
-      supabase.from('finance_commissions').select('*').order('date', { ascending: false }),
-      supabase.from('finance_monthly').select('*').order('month', { ascending: true }),
-      supabase.from('transactions').select('date, cost, status, offer_title').order('date', { ascending: false }),
+
+    async function fetchPaginated<T>(
+      table: string,
+      select: string,
+      orderCol: string,
+      ascending: boolean,
+    ): Promise<T[]> {
+      const pageSize = 1000
+      let all: T[] = []
+      let page = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from(table)
+          .select(select)
+          .order(orderCol, { ascending })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+        if (error) {
+          console.error(`[Finance] Error fetching ${table}:`, error.message, error)
+          break
+        }
+        if (!data || data.length === 0) break
+        all = [...all, ...(data as T[])]
+        if (data.length < pageSize) break
+        page++
+      }
+      return all
+    }
+
+    const [comm, mon, tx] = await Promise.all([
+      fetchPaginated<FinanceCommission>('finance_commissions', '*', 'date', false),
+      fetchPaginated<FinanceMonthly>('finance_monthly', '*', 'month', true),
+      fetchPaginated<{ date: string; cost: number; status: string; offer_title: string }>(
+        'transactions', 'date, cost, status, offer_title', 'date', false,
+      ),
     ])
-    setCommissions(commRes.data ?? [])
-    setMonthly(monthRes.data ?? [])
-    setTransactions(txRes.data ?? [])
+
+    console.log(`[Finance] Loaded: ${comm.length} commissions, ${mon.length} monthly, ${tx.length} transactions`)
+    setCommissions(comm)
+    setMonthly(mon)
+    setTransactions(tx)
     setLoading(false)
   }, [supabase])
 
