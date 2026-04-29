@@ -473,38 +473,60 @@ export default function FinancePage() {
     }
   }
 
-  // ── P&L logic ─────────────────────────────────────────────────────────────
+  // ── P&L logic (vertical layout) ────────────────────────────────────────────
 
-  // Expense field definitions for the P&L table
-  const EXPENSE_FIELDS: { key: string; label: string }[] = [
-    { key: 'advertising_marketing', label: 'Adv. & Marketing' },
+  const MONTH_KEYS = ['01','02','03','04','05','06','07','08','09','10','11','12']
+
+  const EXPENSE_ROWS: { key: string; label: string }[] = [
+    { key: 'advertising_marketing', label: 'Advertising & Marketing' },
     { key: 'bank_charges', label: 'Bank Charges' },
     { key: 'contractors', label: 'Contractors' },
-    { key: 'legal_professional', label: 'Legal & Prof.' },
+    { key: 'legal_professional', label: 'Legal & Professional' },
     { key: 'office_software', label: 'Office & Software' },
     { key: 'payroll_company', label: 'Payroll Company' },
     { key: 'payroll_fees', label: 'Payroll Fees' },
-    { key: 'professional_fees', label: 'Prof. Fees' },
+    { key: 'professional_fees', label: 'Professional Fees' },
     { key: 'taxes_licenses', label: 'Taxes & Licenses' },
     { key: 'telephone', label: 'Telephone' },
     { key: 'travel', label: 'Travel' },
     { key: 'utilities', label: 'Utilities' },
-    { key: 'other_expenses', label: 'Other' },
+    { key: 'other_expenses', label: 'Other Expenses' },
   ]
 
-  const plMonths = useMemo(() => {
-    const yearMonths = monthly.filter(m => m.year === plYear)
-    return yearMonths.map(m => {
-      const monthKey = (m.month || m.month_date || '').slice(0, 7)
-      // For 2026+, auto-calculate sales_actual from transactions
-      const autoSales = plYear >= 2026 ? (salesByMonth[monthKey] || 0) : (m.sales_actual || 0)
-      return { ...m, sales_actual: autoSales }
+  // Build keyed map: { '2025-01': { id, sales_forecast, ... }, ... }
+  const plData = useMemo(() => {
+    const map: Record<string, FinanceMonthly> = {}
+    monthly.filter(m => m.year === plYear).forEach(m => {
+      const md = (m.month || m.month_date || '').slice(0, 7)
+      if (md) {
+        // For 2026+, override sales_actual from transactions
+        const autoSales = plYear >= 2026 ? (salesByMonth[md] || 0) : (m.sales_actual || 0)
+        map[md] = { ...m, sales_actual: autoSales }
+      }
     })
+    return map
   }, [monthly, plYear, salesByMonth])
 
-  // Sum helper for any numeric field across plMonths
-  function plSum(field: string): number {
-    return plMonths.reduce((s, m) => s + (Number((m as Record<string, unknown>)[field]) || 0), 0)
+  // Helper to get a field value for a month
+  function plVal(mk: string, field: string): number {
+    const row = plData[`${plYear}-${mk}`]
+    return row ? (Number((row as unknown as Record<string, unknown>)[field]) || 0) : 0
+  }
+
+  // Helper to get row id for a month
+  function plId(mk: string): string | null {
+    return plData[`${plYear}-${mk}`]?.id ?? null
+  }
+
+  // Sum a field across all 12 months
+  function plTotal(field: string): number {
+    return MONTH_KEYS.reduce((s, mk) => s + plVal(mk, field), 0)
+  }
+
+  // Pct calc
+  function plPct(mk: string, actualField: string, forecastField: string): number {
+    const f = plVal(mk, forecastField)
+    return f > 0 ? (plVal(mk, actualField) / f * 100) : 0
   }
 
   async function ensureYearMonths(year: number) {
@@ -530,10 +552,8 @@ export default function FinancePage() {
   }
 
   async function handlePLSave(id: string, field: string, value: number) {
-    // Optimistic update
     setMonthly(prev => prev.map(m => m.id === id ? { ...m, [field]: value } as FinanceMonthly : m))
     setPlEditingCell(null)
-
     try {
       const res = await fetch('/api/finance/monthly', {
         method: 'PATCH',
@@ -552,33 +572,25 @@ export default function FinancePage() {
   }
 
   function exportCSV() {
-    const expHeaders = EXPENSE_FIELDS.map(f => f.label)
-    const headers = ['Month','Sales Forecast','Sales Actual','Sales %','Sales Gap','GP Forecast','Gross Profit','GP %','NI Forecast','Net Income','NI %','Total Expenses',...expHeaders,'NOI Actual','NOI Forecast','NOI %']
-    const rows = plMonths.map(m => {
-      const sa = m.sales_actual || 0
-      const sf = m.sales_forecast || 0
-      const salesPct = sf ? (sa / sf * 100).toFixed(1) : '0'
-      const gpPct = m.gross_profit_forecast ? ((m.gross_profit_actual || 0) / m.gross_profit_forecast * 100).toFixed(1) : '0'
-      const niPct = m.net_income_forecast ? ((m.net_income_actual || 0) / m.net_income_forecast * 100).toFixed(1) : '0'
-      const noiPct = m.net_operating_income_forecast ? ((m.net_operating_income_actual || 0) / m.net_operating_income_forecast * 100).toFixed(1) : '0'
-      const md = m.month || m.month_date || ''
-      const expVals = EXPENSE_FIELDS.map(f => (m as Record<string, unknown>)[f.key] || 0)
-      return [
-        MONTHS[parseInt(md.slice(5, 7) || '1') - 1] + ' ' + md.slice(0, 4),
-        sf, sa, salesPct, sa - sf,
-        m.gross_profit_forecast || 0, m.gross_profit_actual || 0, gpPct,
-        m.net_income_forecast || 0, m.net_income_actual || 0, niPct,
-        m.total_expenses_actual || 0, ...expVals,
-        m.net_operating_income_actual || 0, m.net_operating_income_forecast || 0, noiPct,
-      ].join(',')
+    const metricLabels = ['Sales Forecast','Sales Actual','Sales %', ...EXPENSE_ROWS.map(r => r.label), 'TOTAL EXPENSES', 'GP Forecast','Gross Profit','GP %','NI Forecast','Net Income','NI %']
+    const metricFields = ['sales_forecast','sales_actual','_sales_pct', ...EXPENSE_ROWS.map(r => r.key), '_total_exp', 'gross_profit_forecast','gross_profit_actual','_gp_pct','net_income_forecast','net_income_actual','_ni_pct']
+    const header = ['Metric', ...MONTHS, 'TOTAL']
+    const rows = metricLabels.map((label, idx) => {
+      const field = metricFields[idx]
+      const vals = MONTH_KEYS.map(mk => {
+        if (field === '_sales_pct') return plPct(mk, 'sales_actual', 'sales_forecast').toFixed(1) + '%'
+        if (field === '_gp_pct') return plPct(mk, 'gross_profit_actual', 'gross_profit_forecast').toFixed(1) + '%'
+        if (field === '_ni_pct') return plPct(mk, 'net_income_actual', 'net_income_forecast').toFixed(1) + '%'
+        if (field === '_total_exp') return EXPENSE_ROWS.reduce((s, r) => s + plVal(mk, r.key), 0)
+        return plVal(mk, field)
+      })
+      const total: string | number = field.startsWith('_') ? '' : vals.reduce<number>((s, v) => s + (typeof v === 'number' ? v : 0), 0)
+      return [label, ...vals, total].join(',')
     })
-    const csv = [headers.join(','), ...rows].join('\n')
+    const csv = [header.join(','), ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `PnL_${plYear}.csv`
-    a.click()
+    const a = document.createElement('a'); a.href = url; a.download = `PnL_${plYear}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -590,61 +602,80 @@ export default function FinancePage() {
     { key: 'pnl', label: 'P&L' },
   ]
 
-  // ── P&L editable cell ──────────────────────────────────────────────────────
+  // ── P&L vertical cell components ────────────────────────────────────────────
 
-  function PLEditCell({ id, field, value }: { id: string; field: string; value: number | null }) {
+  function PLCell({ mk, field }: { mk: string; field: string }) {
+    const id = plId(mk)
+    const value = plVal(mk, field)
+    const cellKey = `${id}-${field}`
     const isEditing = plEditingCell?.id === id && plEditingCell?.field === field
+
+    if (!id) return <td className="px-3 py-2 text-right text-sm text-zinc-300 dark:text-zinc-600">$0.00</td>
+
     if (isEditing) {
       return (
-        <input
-          autoFocus
-          className="w-full text-xs border border-blue-400 rounded px-1.5 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
-          defaultValue={plEditValue}
-          onBlur={(e) => handlePLSave(id, field, parseFloat(e.target.value) || 0)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handlePLSave(id, field, parseFloat((e.target as HTMLInputElement).value) || 0)
-            if (e.key === 'Escape') setPlEditingCell(null)
-          }}
-        />
+        <td className="px-2 py-1">
+          <input
+            autoFocus
+            type="number"
+            className="w-24 text-sm border border-blue-400 rounded px-2 py-1 text-right bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+            defaultValue={plEditValue}
+            onBlur={(e) => handlePLSave(id, field, parseFloat(e.target.value) || 0)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handlePLSave(id, field, parseFloat((e.target as HTMLInputElement).value) || 0)
+              if (e.key === 'Escape') setPlEditingCell(null)
+            }}
+          />
+        </td>
       )
     }
-    const v = Number(value) || 0
+
     return (
-      <button
-        className="w-full text-left text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded px-1.5 py-1 transition-colors cursor-pointer group/pl"
-        onClick={() => { setPlEditingCell({ id, field }); setPlEditValue(String(value ?? 0)) }}
+      <td
+        className="px-3 py-2 text-right text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group/plc"
+        onClick={() => { setPlEditingCell({ id, field }); setPlEditValue(String(value)) }}
       >
-        <span className={v < 0 ? 'text-red-600 dark:text-red-400' : ''}>{fmtCurrency(v)}</span>
-        <span className="opacity-0 group-hover/pl:opacity-100 ml-1 text-[10px] text-blue-400">&#9998;</span>
-      </button>
+        <span className={cn(value === 0 && 'text-zinc-300 dark:text-zinc-600', value < 0 && 'text-red-600 dark:text-red-400')}>
+          {fmtCurrency(value)}
+        </span>
+        <span className="opacity-0 group-hover/plc:opacity-100 ml-1 text-[10px] text-blue-400">&#9998;</span>
+      </td>
     )
   }
 
-  // ── Locked (auto-calculated) cell ─────────────────────────────────────────
-
-  function LockedCell({ value }: { value: number | null }) {
-    const v = Number(value) || 0
+  function AutoCell({ value }: { value: number }) {
     return (
-      <div className="flex items-center gap-1 px-1.5 py-1 text-xs font-medium">
-        <span className={v < 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-800 dark:text-zinc-200'}>{fmtCurrency(v)}</span>
-        <svg className="h-3 w-3 text-zinc-300 dark:text-zinc-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-      </div>
+      <td className="px-3 py-2 text-right text-sm bg-zinc-50/80 dark:bg-zinc-800/30">
+        <span className={cn('font-medium', value === 0 && 'text-zinc-400', value < 0 && 'text-red-600 dark:text-red-400')}>
+          {fmtCurrency(value)}
+        </span>
+      </td>
     )
   }
 
-  // ── Pct cell with progress bar ────────────────────────────────────────────
-
-  function PctCell({ actual, forecast }: { actual: number; forecast: number }) {
+  function PctTd({ actual, forecast }: { actual: number; forecast: number }) {
     const pct = forecast > 0 ? (actual / forecast * 100) : 0
     return (
-      <div className="flex items-center gap-1.5">
-        <div className="w-14 h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-          <div className={cn('h-full rounded-full transition-all', pctBarColor(pct))} style={{ width: `${Math.min(pct, 100)}%` }} />
+      <td className="px-3 py-2 text-right">
+        <div className="flex items-center justify-end gap-1.5">
+          <div className="w-12 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+            <div className={cn('h-full rounded-full', pctBarColor(pct))} style={{ width: `${Math.min(pct, 100)}%` }} />
+          </div>
+          <span className={cn('text-xs font-semibold', pctColor(pct).replace(/bg-\S+\s?/g, ''))}>
+            {fmtPct(pct)}
+          </span>
         </div>
-        <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', pctColor(pct))}>
-          {fmtPct(pct)}
+      </td>
+    )
+  }
+
+  function TotalTd({ value, bold }: { value: number; bold?: boolean }) {
+    return (
+      <td className={cn('px-3 py-2 text-right text-sm border-l border-zinc-200 dark:border-zinc-700', bold && 'font-bold')}>
+        <span className={cn(value === 0 && 'text-zinc-400', value < 0 && 'text-red-600 dark:text-red-400')}>
+          {fmtCurrency(value)}
         </span>
-      </div>
+      </td>
     )
   }
 
@@ -1039,122 +1070,131 @@ export default function FinancePage() {
               </button>
             </div>
 
-            {/* P&L Table */}
+            {/* P&L Vertical Table */}
             <Card>
               <CardContent className="p-0">
-                <div className="overflow-x-auto relative">
-                  <table className="w-full text-left border-collapse">
-                    {/* ── Grouped header row ──────────────────────────── */}
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    {/* Header: Metric | Jan | Feb | ... | Dec | TOTAL */}
                     <thead>
-                      <tr>
-                        <th rowSpan={2} className="sticky left-0 z-20 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-600 dark:text-zinc-400 px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 whitespace-nowrap min-w-[80px]">Month</th>
-                        {/* Income group */}
-                        <th colSpan={4} className="text-center text-[10px] font-bold uppercase tracking-wider px-1 py-1.5 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-b border-blue-200 dark:border-blue-800">Income</th>
-                        {/* Profitability group */}
-                        <th colSpan={6} className="text-center text-[10px] font-bold uppercase tracking-wider px-1 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-b border-emerald-200 dark:border-emerald-800">Profitability</th>
-                        {/* Expenses group */}
-                        <th colSpan={14} className="text-center text-[10px] font-bold uppercase tracking-wider px-1 py-1.5 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-b border-orange-200 dark:border-orange-800">Expenses</th>
-                        {/* Totals group */}
-                        <th colSpan={3} className="text-center text-[10px] font-bold uppercase tracking-wider px-1 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-b border-zinc-300 dark:border-zinc-600">Totals</th>
-                      </tr>
-                      <tr className="bg-zinc-50 dark:bg-zinc-900/50">
-                        {/* Income sub-headers */}
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-blue-50/50 dark:bg-blue-950/10">Forecast</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-blue-50/50 dark:bg-blue-950/10">Actual</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 whitespace-nowrap bg-blue-50/50 dark:bg-blue-950/10">%</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-blue-50/50 dark:bg-blue-950/10">Gap</th>
-                        {/* Profitability sub-headers */}
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-emerald-50/50 dark:bg-emerald-950/10">GP Fcst</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-emerald-50/50 dark:bg-emerald-950/10">GP</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 whitespace-nowrap bg-emerald-50/50 dark:bg-emerald-950/10">GP %</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-emerald-50/50 dark:bg-emerald-950/10">NI Fcst</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-emerald-50/50 dark:bg-emerald-950/10">NI</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 whitespace-nowrap bg-emerald-50/50 dark:bg-emerald-950/10">NI %</th>
-                        {/* Expenses sub-headers */}
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-orange-50/50 dark:bg-orange-950/10">Total</th>
-                        {EXPENSE_FIELDS.map(f => (
-                          <th key={f.key} className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-orange-50/50 dark:bg-orange-950/10">{f.label}</th>
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                        <th className="sticky left-0 z-20 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-600 dark:text-zinc-400 px-4 py-3 text-left min-w-[200px] border-r border-zinc-200 dark:border-zinc-700">
+                          Metric
+                        </th>
+                        {MONTHS.map((m, i) => (
+                          <th key={m} className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 px-3 py-3 text-right min-w-[100px] whitespace-nowrap">
+                            {m}
+                          </th>
                         ))}
-                        {/* Totals sub-headers */}
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-zinc-100/50 dark:bg-zinc-800/30">NOI</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 text-right whitespace-nowrap bg-zinc-100/50 dark:bg-zinc-800/30">NOI Fcst</th>
-                        <th className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-2 whitespace-nowrap bg-zinc-100/50 dark:bg-zinc-800/30">NOI %</th>
+                        <th className="text-xs font-bold text-zinc-800 dark:text-zinc-200 px-3 py-3 text-right min-w-[110px] border-l border-zinc-200 dark:border-zinc-700">
+                          TOTAL
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {plMonths.map((m, i) => {
-                        const md = m.month || m.month_date || ''
-                        const sa = m.sales_actual || 0
-                        const sf = m.sales_forecast || 0
-                        const gap = sa - sf
-                        const is2026 = plYear >= 2026
-                        return (
-                          <tr key={m.id} className={cn('border-b border-zinc-100 dark:border-zinc-800 transition-colors hover:bg-blue-50/30 dark:hover:bg-blue-900/10', i % 2 === 1 && 'bg-zinc-50/40 dark:bg-zinc-900/15')}>
-                            {/* Sticky month column */}
-                            <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 whitespace-nowrap border-r border-zinc-100 dark:border-zinc-800">
-                              {MONTHS[parseInt(md.slice(5, 7) || '1') - 1]} {md.slice(0, 4)}
-                            </td>
-                            {/* Income */}
-                            <td className="px-2 py-1.5 text-right"><PLEditCell id={m.id} field="sales_forecast" value={m.sales_forecast} /></td>
-                            <td className="px-2 py-1.5 text-right">{is2026 ? <LockedCell value={sa} /> : <PLEditCell id={m.id} field="sales_actual" value={sa} />}</td>
-                            <td className="px-2 py-1.5"><PctCell actual={sa} forecast={sf} /></td>
-                            <td className={cn('px-2 py-1.5 text-right text-xs font-medium', gap < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>{fmtCurrency(gap)}</td>
-                            {/* Profitability */}
-                            <td className="px-2 py-1.5 text-right"><PLEditCell id={m.id} field="gross_profit_forecast" value={m.gross_profit_forecast} /></td>
-                            <td className="px-2 py-1.5 text-right"><PLEditCell id={m.id} field="gross_profit_actual" value={m.gross_profit_actual} /></td>
-                            <td className="px-2 py-1.5"><PctCell actual={m.gross_profit_actual || 0} forecast={m.gross_profit_forecast || 0} /></td>
-                            <td className="px-2 py-1.5 text-right"><PLEditCell id={m.id} field="net_income_forecast" value={m.net_income_forecast} /></td>
-                            <td className="px-2 py-1.5 text-right"><PLEditCell id={m.id} field="net_income_actual" value={m.net_income_actual} /></td>
-                            <td className="px-2 py-1.5"><PctCell actual={m.net_income_actual || 0} forecast={m.net_income_forecast || 0} /></td>
-                            {/* Expenses */}
-                            <td className="px-2 py-1.5 text-right"><PLEditCell id={m.id} field="total_expenses_actual" value={m.total_expenses_actual} /></td>
-                            {EXPENSE_FIELDS.map(f => (
-                              <td key={f.key} className="px-2 py-1.5 text-right">
-                                <PLEditCell id={m.id} field={f.key} value={(m as Record<string, unknown>)[f.key] as number | null} />
-                              </td>
-                            ))}
-                            {/* Totals */}
-                            <td className="px-2 py-1.5 text-right"><PLEditCell id={m.id} field="net_operating_income_actual" value={m.net_operating_income_actual} /></td>
-                            <td className="px-2 py-1.5 text-right"><PLEditCell id={m.id} field="net_operating_income_forecast" value={m.net_operating_income_forecast} /></td>
-                            <td className="px-2 py-1.5"><PctCell actual={m.net_operating_income_actual || 0} forecast={m.net_operating_income_forecast || 0} /></td>
-                          </tr>
-                        )
-                      })}
+                      {/* ─── INCOME SECTION ─── */}
+                      <tr>
+                        <td colSpan={14} className="bg-blue-50 dark:bg-blue-950/30 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 border-b border-blue-200 dark:border-blue-800">
+                          Income
+                        </td>
+                      </tr>
+                      {/* Sales Forecast */}
+                      <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Sales Forecast</td>
+                        {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="sales_forecast" />)}
+                        <TotalTd value={plTotal('sales_forecast')} />
+                      </tr>
+                      {/* Sales Actual */}
+                      <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Sales Actual</td>
+                        {MONTH_KEYS.map(mk => (
+                          plYear >= 2026
+                            ? <AutoCell key={mk} value={plVal(mk, 'sales_actual')} />
+                            : <PLCell key={mk} mk={mk} field="sales_actual" />
+                        ))}
+                        <TotalTd value={plTotal('sales_actual')} bold />
+                      </tr>
+                      {/* Sales % */}
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-500 dark:text-zinc-400 pl-8 border-r border-zinc-100 dark:border-zinc-800">Sales %</td>
+                        {MONTH_KEYS.map(mk => <PctTd key={mk} actual={plVal(mk, 'sales_actual')} forecast={plVal(mk, 'sales_forecast')} />)}
+                        <td className="px-3 py-2 text-right border-l border-zinc-200 dark:border-zinc-700">
+                          {(() => { const f = plTotal('sales_forecast'); return f > 0 ? <span className={cn('text-xs font-semibold', pctColor(plTotal('sales_actual')/f*100).replace(/bg-\S+\s?/g, ''))}>{fmtPct(plTotal('sales_actual')/f*100)}</span> : <span className="text-xs text-zinc-400">—</span> })()}
+                        </td>
+                      </tr>
 
-                      {/* Totals row */}
-                      {plMonths.length > 0 && (() => {
-                        const tSF = plSum('sales_forecast'), tSA = plSum('sales_actual')
-                        const tGPF = plSum('gross_profit_forecast'), tGPA = plSum('gross_profit_actual')
-                        const tNIF = plSum('net_income_forecast'), tNIA = plSum('net_income_actual')
-                        const tNOIF = plSum('net_operating_income_forecast'), tNOIA = plSum('net_operating_income_actual')
-                        const tGap = tSA - tSF
-                        const bold = 'px-2 py-3 text-right text-xs font-bold text-zinc-800 dark:text-zinc-200'
-                        return (
-                          <tr className="bg-zinc-100 dark:bg-zinc-800/60 border-t-2 border-zinc-300 dark:border-zinc-600 sticky bottom-0 z-10">
-                            <td className="sticky left-0 z-20 bg-zinc-100 dark:bg-zinc-800/60 px-3 py-3 text-xs font-bold text-zinc-800 dark:text-zinc-200 border-r border-zinc-200 dark:border-zinc-700">TOTAL</td>
-                            <td className={bold}>{fmtCurrency(tSF)}</td>
-                            <td className={bold}>{fmtCurrency(tSA)}</td>
-                            <td className="px-2 py-3"><PctCell actual={tSA} forecast={tSF} /></td>
-                            <td className={cn(bold, tGap < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>{fmtCurrency(tGap)}</td>
-                            <td className={bold}>{fmtCurrency(tGPF)}</td>
-                            <td className={bold}>{fmtCurrency(tGPA)}</td>
-                            <td className="px-2 py-3"><PctCell actual={tGPA} forecast={tGPF} /></td>
-                            <td className={bold}>{fmtCurrency(tNIF)}</td>
-                            <td className={bold}>{fmtCurrency(tNIA)}</td>
-                            <td className="px-2 py-3"><PctCell actual={tNIA} forecast={tNIF} /></td>
-                            <td className={bold}>{fmtCurrency(plSum('total_expenses_actual'))}</td>
-                            {EXPENSE_FIELDS.map(f => (
-                              <td key={f.key} className={bold}>{fmtCurrency(plSum(f.key))}</td>
-                            ))}
-                            <td className={bold}>{fmtCurrency(tNOIA)}</td>
-                            <td className={bold}>{fmtCurrency(tNOIF)}</td>
-                            <td className="px-2 py-3"><PctCell actual={tNOIA} forecast={tNOIF} /></td>
-                          </tr>
-                        )
-                      })()}
+                      {/* ─── EXPENSES SECTION ─── */}
+                      <tr>
+                        <td colSpan={14} className="bg-orange-50 dark:bg-orange-950/30 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400 border-b border-orange-200 dark:border-orange-800">
+                          Expenses
+                        </td>
+                      </tr>
+                      {EXPENSE_ROWS.map((row, ri) => (
+                        <tr key={row.key} className={cn('border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20', ri % 2 === 1 && 'bg-zinc-50/30 dark:bg-zinc-900/10')}>
+                          <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">{row.label}</td>
+                          {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field={row.key} />)}
+                          <TotalTd value={plTotal(row.key)} />
+                        </tr>
+                      ))}
+                      {/* TOTAL EXPENSES (calculated) */}
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700 bg-orange-50/30 dark:bg-orange-950/10 font-semibold">
+                        <td className="sticky left-0 z-10 bg-orange-50/50 dark:bg-orange-950/20 px-4 py-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200 pl-8 border-r border-zinc-100 dark:border-zinc-800">TOTAL EXPENSES</td>
+                        {MONTH_KEYS.map(mk => {
+                          const total = EXPENSE_ROWS.reduce((s, r) => s + plVal(mk, r.key), 0)
+                          return <AutoCell key={mk} value={total} />
+                        })}
+                        <TotalTd value={EXPENSE_ROWS.reduce((s, r) => s + plTotal(r.key), 0)} bold />
+                      </tr>
 
-                      {plMonths.length === 0 && (
-                        <tr><td colSpan={28} className="text-center py-12 text-sm text-zinc-400">No data for {plYear}. Select a year to auto-create months.</td></tr>
+                      {/* ─── PROFITABILITY SECTION ─── */}
+                      <tr>
+                        <td colSpan={14} className="bg-emerald-50 dark:bg-emerald-950/30 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 border-b border-emerald-200 dark:border-emerald-800">
+                          Profitability
+                        </td>
+                      </tr>
+                      {/* GP Forecast */}
+                      <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Gross Profit Forecast</td>
+                        {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="gross_profit_forecast" />)}
+                        <TotalTd value={plTotal('gross_profit_forecast')} />
+                      </tr>
+                      {/* GP Actual */}
+                      <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 bg-zinc-50/30 dark:bg-zinc-900/10">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Gross Profit</td>
+                        {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="gross_profit_actual" />)}
+                        <TotalTd value={plTotal('gross_profit_actual')} bold />
+                      </tr>
+                      {/* GP % */}
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-500 dark:text-zinc-400 pl-8 border-r border-zinc-100 dark:border-zinc-800">Gross Profit %</td>
+                        {MONTH_KEYS.map(mk => <PctTd key={mk} actual={plVal(mk, 'gross_profit_actual')} forecast={plVal(mk, 'gross_profit_forecast')} />)}
+                        <td className="px-3 py-2 text-right border-l border-zinc-200 dark:border-zinc-700">
+                          {(() => { const f = plTotal('gross_profit_forecast'); return f > 0 ? <span className={cn('text-xs font-semibold', pctColor(plTotal('gross_profit_actual')/f*100).replace(/bg-\S+\s?/g, ''))}>{fmtPct(plTotal('gross_profit_actual')/f*100)}</span> : <span className="text-xs text-zinc-400">—</span> })()}
+                        </td>
+                      </tr>
+                      {/* NI Forecast */}
+                      <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 bg-zinc-50/30 dark:bg-zinc-900/10">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Net Income Forecast</td>
+                        {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="net_income_forecast" />)}
+                        <TotalTd value={plTotal('net_income_forecast')} />
+                      </tr>
+                      {/* NI Actual */}
+                      <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Net Income</td>
+                        {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="net_income_actual" />)}
+                        <TotalTd value={plTotal('net_income_actual')} bold />
+                      </tr>
+                      {/* NI % */}
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 bg-zinc-50/30 dark:bg-zinc-900/10">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-500 dark:text-zinc-400 pl-8 border-r border-zinc-100 dark:border-zinc-800">Net Income %</td>
+                        {MONTH_KEYS.map(mk => <PctTd key={mk} actual={plVal(mk, 'net_income_actual')} forecast={plVal(mk, 'net_income_forecast')} />)}
+                        <td className="px-3 py-2 text-right border-l border-zinc-200 dark:border-zinc-700">
+                          {(() => { const f = plTotal('net_income_forecast'); return f > 0 ? <span className={cn('text-xs font-semibold', pctColor(plTotal('net_income_actual')/f*100).replace(/bg-\S+\s?/g, ''))}>{fmtPct(plTotal('net_income_actual')/f*100)}</span> : <span className="text-xs text-zinc-400">—</span> })()}
+                        </td>
+                      </tr>
+
+                      {Object.keys(plData).length === 0 && (
+                        <tr><td colSpan={14} className="text-center py-12 text-sm text-zinc-400">No data for {plYear}. Click a year button to create months.</td></tr>
                       )}
                     </tbody>
                   </table>
