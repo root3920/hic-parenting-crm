@@ -232,9 +232,10 @@ export default function FinancePage() {
   const startOfMonth = `${curMonth}-01`
   const endOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
 
-  // FIX 1: Total Revenue — directly from transactions (case-insensitive status check)
+  // Total Revenue — match Dashboard logic: only 'completed' and 'recovered' statuses
+  const validStatuses = ['completed', 'recovered']
   const currentMonthTx = useMemo(() =>
-    transactions.filter(t => t.date >= startOfMonth && t.date <= endOfMonth && t.status?.toLowerCase() !== 'refunded'),
+    transactions.filter(t => t.date >= startOfMonth && t.date <= endOfMonth && validStatuses.includes(t.status)),
     [transactions, startOfMonth, endOfMonth]
   )
 
@@ -298,7 +299,7 @@ export default function FinancePage() {
   const salesByMonth = useMemo(() => {
     const map: Record<string, number> = {}
     transactions.forEach(t => {
-      if (t.status?.toLowerCase() === 'refunded') return
+      if (!validStatuses.includes(t.status)) return
       const key = t.date?.substring(0, 7) // "YYYY-MM"
       if (key) map[key] = (map[key] || 0) + (t.cost || 0)
     })
