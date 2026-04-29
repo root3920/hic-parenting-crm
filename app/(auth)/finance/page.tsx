@@ -73,6 +73,41 @@ const selectCls = 'text-sm border border-zinc-200 dark:border-zinc-700 rounded-m
 
 type Tab = 'dashboard' | 'commissions' | 'pnl'
 
+const CLOSERS = [
+  'Marcela HIC Parenting',
+  'Ana Martin',
+  'Cali Luna',
+  'Ariana Peña',
+  'Jessica Fisk-Abraham',
+  'Maya Ahmed',
+  'Sona Patel',
+  'Steffanie Williams',
+  'Sylvia Smit',
+  'Tina Balmer',
+  'Veronica Herrera',
+  'Liliana Mendoza',
+  'Karina Lopez',
+  'Amanda Smith',
+]
+
+const SETTERS = [
+  'Valentina Llano',
+  'Marcela Collier',
+  'Ana Martin',
+  'Beatriz Navarro',
+  'Casper Holm',
+  'Hamza Sayyed',
+  'Katy Castellanos',
+  'Lamees Attia',
+  'Mariana Llano',
+  'Marrian Yousef',
+  'Patsy George',
+  'Rohit Rajendranath',
+  'Tina Balmer',
+  'Sylvia Smit',
+  'Venicia Lloyd',
+]
+
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
   visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
@@ -364,8 +399,6 @@ export default function FinancePage() {
     return data
   }, [commissions, dateRange, closerFilter, setterFilter, statusFilter, searchQuery, customFrom, customTo])
 
-  const uniqueClosers = useMemo(() => Array.from(new Set(commissions.map(c => c.closer).filter(Boolean))) as string[], [commissions])
-  const uniqueSetters = useMemo(() => Array.from(new Set(commissions.map(c => c.setter).filter(Boolean))) as string[], [commissions])
 
   const summaryTotal = useMemo(() => filteredCommissions.reduce((s, c) => s + (Number(c.amount) || 0), 0), [filteredCommissions])
   const summaryCommissions = useMemo(() => filteredCommissions.reduce((s, c) => s + (Number(c.total_commission) || 0), 0), [filteredCommissions])
@@ -426,9 +459,15 @@ export default function FinancePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, updates }),
       })
-      if (!res.ok) toast.error('Error saving')
-      else toast.success('Updated')
-    } catch {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[Finance] Save error:', err)
+        toast.error('Error: ' + (err.error || 'Failed to save'))
+      } else {
+        toast.success('Updated')
+      }
+    } catch (err) {
+      console.error('[Finance] Save failed:', err)
       toast.error('Error saving')
     }
   }
@@ -816,14 +855,14 @@ export default function FinancePage() {
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Closer</label>
                 <select className={selectCls} value={closerFilter} onChange={(e) => setCloserFilter(e.target.value)}>
                   <option value="All">All</option>
-                  {uniqueClosers.map(c => <option key={c} value={c}>{c}</option>)}
+                  {CLOSERS.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Setter</label>
                 <select className={selectCls} value={setterFilter} onChange={(e) => setSetterFilter(e.target.value)}>
                   <option value="All">All</option>
-                  {uniqueSetters.map(s => <option key={s} value={s}>{s}</option>)}
+                  {SETTERS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
@@ -894,18 +933,16 @@ export default function FinancePage() {
                             <TableCell className="text-xs text-right font-medium">{fmtCurrency(Number(c.amount))}</TableCell>
                             <TableCell className="text-xs">
                               {commEditingCell?.id === c.id && commEditingCell?.field === 'closer' ? (
-                                <input
+                                <select
                                   autoFocus
-                                  type="text"
                                   value={commEditValue}
-                                  onChange={(e) => setCommEditValue(e.target.value)}
-                                  onBlur={() => handleSaveCommEdit(c.id, 'closer', commEditValue)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSaveCommEdit(c.id, 'closer', commEditValue)
-                                    if (e.key === 'Escape') setCommEditingCell(null)
-                                  }}
-                                  className="border border-blue-400 rounded px-1.5 py-0.5 text-xs w-36 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                />
+                                  onChange={(e) => { setCommEditValue(e.target.value); handleSaveCommEdit(c.id, 'closer', e.target.value) }}
+                                  onBlur={() => setCommEditingCell(null)}
+                                  className="border border-blue-400 rounded px-1 py-0.5 text-xs w-44 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                >
+                                  <option value="">— None —</option>
+                                  {CLOSERS.map(name => <option key={name} value={name}>{name}</option>)}
+                                </select>
                               ) : (
                                 <button
                                   onClick={() => { setCommEditingCell({ id: c.id, field: 'closer' }); setCommEditValue(c.closer || '') }}
@@ -922,18 +959,16 @@ export default function FinancePage() {
                             </TableCell>
                             <TableCell className="text-xs">
                               {commEditingCell?.id === c.id && commEditingCell?.field === 'setter' ? (
-                                <input
+                                <select
                                   autoFocus
-                                  type="text"
                                   value={commEditValue}
-                                  onChange={(e) => setCommEditValue(e.target.value)}
-                                  onBlur={() => handleSaveCommEdit(c.id, 'setter', commEditValue)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSaveCommEdit(c.id, 'setter', commEditValue)
-                                    if (e.key === 'Escape') setCommEditingCell(null)
-                                  }}
-                                  className="border border-blue-400 rounded px-1.5 py-0.5 text-xs w-36 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                />
+                                  onChange={(e) => { setCommEditValue(e.target.value); handleSaveCommEdit(c.id, 'setter', e.target.value) }}
+                                  onBlur={() => setCommEditingCell(null)}
+                                  className="border border-blue-400 rounded px-1 py-0.5 text-xs w-44 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                >
+                                  <option value="">— None —</option>
+                                  {SETTERS.map(name => <option key={name} value={name}>{name}</option>)}
+                                </select>
                               ) : (
                                 <button
                                   onClick={() => { setCommEditingCell({ id: c.id, field: 'setter' }); setCommEditValue(c.setter || '') }}
