@@ -308,6 +308,7 @@ export interface FinanceCommission {
 export interface FinanceMonthly {
   id: string
   month: string // YYYY-MM-01
+  month_date: string // YYYY-MM-01 (alias used by some queries)
   year: number
   sales_forecast: number | null
   sales_actual: number | null
@@ -316,6 +317,38 @@ export interface FinanceMonthly {
   net_income_forecast: number | null
   net_income_actual: number | null
   net_operating_income_forecast: number | null
+  net_operating_income_actual: number | null
+  // Detailed expense columns (actual)
+  advertising_marketing: number | null
+  bank_charges: number | null
+  contractors: number | null
+  legal_professional: number | null
+  office_software: number | null
+  other_expenses: number | null
+  payroll_company: number | null
+  payroll_fees: number | null
+  professional_fees: number | null
+  taxes_licenses: number | null
+  telephone: number | null
+  travel: number | null
+  utilities: number | null
+  total_expenses_actual: number | null
+  // Projected expense columns
+  advertising_marketing_projected: number | null
+  bank_charges_projected: number | null
+  contractors_projected: number | null
+  legal_professional_projected: number | null
+  office_software_projected: number | null
+  other_expenses_projected: number | null
+  payroll_company_projected: number | null
+  payroll_fees_projected: number | null
+  professional_fees_projected: number | null
+  taxes_licenses_projected: number | null
+  telephone_projected: number | null
+  travel_projected: number | null
+  utilities_projected: number | null
+  total_expenses_projected: number | null
+  // Legacy columns (kept for backwards compat)
   expenses_total: number | null
   expenses_payroll: number | null
   expenses_marketing: number | null
