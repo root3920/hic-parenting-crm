@@ -16,9 +16,10 @@ interface MCOption {
 interface Question {
   id: string
   title: string
-  type: 'text' | 'email' | 'phone' | 'textarea' | 'mc'
+  type: 'text' | 'email' | 'phone' | 'textarea' | 'mc' | 'select'
   description?: string
   options?: MCOption[]
+  selectOptions?: string[]
   required?: boolean
   placeholder?: string
 }
@@ -59,9 +60,9 @@ const QUESTIONS: Question[] = [
   {
     id: 'q4_source',
     title: 'Where did you see the invitation to book a call?',
-    type: 'text',
+    type: 'select',
     required: true,
-    placeholder: 'Instagram, Facebook, a friend, etc.',
+    selectOptions: ['Facebook', 'Instagram', 'Webinar Class', 'YouTube', 'Email', 'Spotify', 'A Friend', 'Google Search', 'Linktree', 'Other'],
   },
   {
     id: 'q5_children_struggle',
@@ -397,6 +398,17 @@ function ApplyForm() {
               autoFocus
               className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y placeholder:text-zinc-400"
             />
+          )}
+
+          {q.type === 'select' && q.selectOptions && (
+            <select
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 cursor-pointer"
+            >
+              <option value="" disabled>Select an option...</option>
+              {q.selectOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
           )}
 
           {q.type === 'mc' && q.options && (
