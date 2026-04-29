@@ -286,6 +286,44 @@ export interface SpcReport {
   created_at: string
 }
 
+export interface FinanceCommission {
+  id: string
+  date: string
+  client_name: string
+  client_email: string
+  product: string
+  amount: number
+  closer_name: string | null
+  closer_commission: number | null
+  closer_status: 'Paid' | 'Pending' | 'N/A' | 'Refunded'
+  setter_name: string | null
+  setter_commission: number | null
+  setter_status: 'Paid' | 'Pending' | 'N/A' | 'Refunded'
+  transaction_id: string | null
+  created_at: string
+}
+
+export interface FinanceMonthly {
+  id: string
+  month: string // YYYY-MM-01
+  year: number
+  sales_forecast: number | null
+  sales_actual: number | null
+  gross_profit_forecast: number | null
+  gross_profit_actual: number | null
+  net_income_forecast: number | null
+  net_income_actual: number | null
+  net_operating_income_forecast: number | null
+  expenses_total: number | null
+  expenses_payroll: number | null
+  expenses_marketing: number | null
+  expenses_software: number | null
+  expenses_contractors: number | null
+  expenses_other: number | null
+  expenses_notes: string | null
+  created_at: string
+}
+
 export interface CsmReport {
   id: string
   date: string

@@ -383,21 +383,30 @@ function MemberProfileModal({
     if (selected.kind !== 'member') return
     setSaving(true)
     try {
-      const { data, error } = await supabase
-        .from('spc_members')
-        .update({
+      const updatePayload: Record<string, unknown> = {
           name: editForm.name,
           email: editForm.email,
           plan: editForm.plan,
           provider: editForm.provider,
           joined_at: editForm.joined_at || null,
           status: editForm.status,
-          next_payment_date: editForm.next_payment_date || null,
           trial_end_date: editForm.trial_end_date || null,
-        })
+      }
+      // next_payment_date is NOT NULL in DB — only include if non-empty
+      if (editForm.next_payment_date) {
+        updatePayload.next_payment_date = editForm.next_payment_date
+      }
+
+      console.log('Saving SPC member:', selected.data.id, updatePayload)
+
+      const { data, error } = await supabase
+        .from('spc_members')
+        .update(updatePayload)
         .eq('id', selected.data.id)
         .select()
         .single()
+
+      console.log('Save result:', { data, error })
       if (error) {
         toast.error(`Failed to save: ${error.message}`)
         return

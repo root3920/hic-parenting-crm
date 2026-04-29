@@ -254,6 +254,43 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Auto-create finance commission entry ────────────────────────────────
+    const costNum = parseFloat(cost) || 0
+    if (
+      costNum > 0 &&
+      buyer_email &&
+      (canonical.startsWith('Parenting With Understanding') || canonical === 'Secure Parent Collective' || canonical.includes('Program'))
+    ) {
+      // Look up calls table for a call with same buyer_email to find closer/setter
+      const { data: callMatch } = await supabase
+        .from('calls')
+        .select('closer_name, setter_name')
+        .ilike('email', buyer_email)
+        .order('start_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const closerName = callMatch?.closer_name || null
+      const setterName = callMatch?.setter_name || null
+      const closerComm = closerName ? costNum * 0.15 : null
+      const setterComm = setterName ? costNum * 0.05 : null
+
+      await supabase.from('finance_commissions').insert({
+        date,
+        client_name: buyer_fullname || 'Unknown',
+        client_email: buyer_email,
+        product: canonical,
+        amount: costNum,
+        closer_name: closerName,
+        closer_commission: closerComm,
+        closer_status: closerName ? 'Pending' : 'N/A',
+        setter_name: setterName,
+        setter_commission: setterComm,
+        setter_status: setterName ? 'Pending' : 'N/A',
+        transaction_id,
+      })
+    }
+
     return NextResponse.json({ success: true }, { status: 200 })
 
   } catch (err: any) {
