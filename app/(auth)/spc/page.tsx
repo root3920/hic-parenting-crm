@@ -2351,7 +2351,7 @@ export default function SpcPage() {
                         {conversionsInPeriod}
                       </p>
                       <p className="text-xs text-zinc-500 mt-1">
-                        {growthRange.start ? 'in period' : 'all time'} · trial → paid
+                        trial → paid in period
                       </p>
                       {(conversionsInPeriod + growthTrialCancelsCount) > 0 && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
@@ -2557,13 +2557,20 @@ export default function SpcPage() {
 
             {/* Trial Conversion Scenarios */}
             {!loading && trialMembers.length > 0 && (() => {
-              const ct = trialMembers.length
+              const totalTrials = trialMembers.length
+              const currentRate = trialConvRate
+              const currentActiveMembers = activeMembers.length
+
+              const currentBarColor = currentRate >= 50 ? 'bg-blue-500' : currentRate >= 30 ? 'bg-amber-500' : 'bg-red-500'
+
               const scenarios = [
-                { rate: 0.3, label: '30%', cls: 'border-red-200 dark:border-red-800', badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
-                { rate: 0.5, label: '50%', cls: 'border-amber-200 dark:border-amber-800', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-                { rate: 0.7, label: '70%', cls: 'border-blue-200 dark:border-blue-800', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-                { rate: 1.0, label: '100%', cls: 'border-green-200 dark:border-green-800', badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
+                { label: 'Current', rate: currentRate, barColor: currentBarColor, isCurrent: true },
+                { label: '30%', rate: 30, barColor: 'bg-gray-500', isCurrent: false },
+                { label: '50%', rate: 50, barColor: 'bg-yellow-500', isCurrent: false },
+                { label: '70%', rate: 70, barColor: 'bg-green-500', isCurrent: false },
+                { label: '100%', rate: 100, barColor: 'bg-emerald-500', isCurrent: false },
               ]
+
               return (
                 <Card className="mb-6">
                   <CardHeader className="pb-2">
@@ -2571,42 +2578,34 @@ export default function SpcPage() {
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Projected impact if we improve trial to active conversion rate</p>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex gap-3 overflow-x-auto pb-2">
-                      {/* Current state */}
-                      <div className="min-w-[180px] flex-1 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-4">
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 mb-2">
-                          Current · {allTimeConversionRate}% rate
-                        </span>
-                        <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-1">{formatCurrency(mrr)}</p>
-                        <p className="text-[10px] text-zinc-400 uppercase font-medium">MRR</p>
-                        <p className="text-xs text-zinc-500 mt-2">{formatCurrency(arr)} ARR</p>
-                        <p className="text-xs text-zinc-500">{activeMembers.length} active · {conversions.length} converted</p>
-                        <p className="text-xs text-zinc-500">{ct} trials pending</p>
-                      </div>
-                      {/* Scenario cards */}
-                      {scenarios.map(({ rate, label, cls, badge }) => {
-                        const converted = Math.floor(ct * rate)
-                        const newMrr = converted * 0.8 * 47 + converted * 0.2 * (470 / 12)
-                        const projMrr = mrr + newMrr
-                        const projArr = projMrr * 12
-                        const projMembers = activeMembers.length + converted
+                    <div className="space-y-1">
+                      {scenarios.map((scenario) => {
+                        const projectedNewMembers = Math.round(totalTrials * (scenario.rate / 100))
+                        const projectedMembers = currentActiveMembers + projectedNewMembers
+                        const projectedMRR = projectedMembers * 47
                         return (
-                          <div key={label} className={cn('min-w-[180px] flex-1 rounded-xl border-2 p-4', cls)}>
-                            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold mb-2', badge)}>
-                              {label} conversion
-                            </span>
-                            <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-1">{formatCurrency(projMrr)}</p>
-                            <p className="text-[10px] text-zinc-400 uppercase font-medium">Projected MRR</p>
-                            <p className="text-xs text-zinc-500 mt-2">{formatCurrency(projArr)} ARR</p>
-                            <p className="text-xs text-zinc-500">{projMembers} total members</p>
-                            <p className="text-xs text-zinc-500">{converted} of {ct} converted</p>
-                            <p className="text-xs font-medium text-green-600 dark:text-green-400 mt-1">+{formatCurrency(newMrr)}/mo vs current</p>
+                          <div key={scenario.label} className={cn('mb-4 rounded-lg p-3', scenario.isCurrent && 'bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700')}>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium">
+                                {scenario.label}
+                                {scenario.isCurrent && <span className="text-xs text-zinc-400 ml-1.5">← actual</span>}
+                              </span>
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                                {scenario.rate.toFixed(1)}% → {projectedMembers} members → {formatCurrency(projectedMRR)}/mo
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-100 dark:bg-zinc-700 rounded-full h-3">
+                              <div
+                                className={cn('h-3 rounded-full transition-all', scenario.barColor)}
+                                style={{ width: `${Math.min(scenario.rate, 100)}%` }}
+                              />
+                            </div>
                           </div>
                         )
                       })}
                     </div>
                     <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-3 italic">
-                      * Projections assume 80% monthly ($47) and 20% annual ($470/12 per month) plans
+                      * Projected MRR = (current active + projected new) × $47/mo
                     </p>
                   </CardContent>
                 </Card>

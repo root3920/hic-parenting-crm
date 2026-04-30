@@ -253,6 +253,7 @@ export interface SpcPerfReport {
   checkin_after_cancellation: number
   successfully_retained: number
   failed_purchase_contact: number
+  trials_expiring_soon_contacted: number
   created_at: string
 }
 

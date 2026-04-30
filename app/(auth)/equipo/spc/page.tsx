@@ -330,6 +330,7 @@ export default function SpcPerfDashboard() {
       checkin_after_cancellation: report.checkin_after_cancellation ?? 0,
       successfully_retained: report.successfully_retained ?? 0,
       failed_purchase_contact: report.failed_purchase_contact ?? 0,
+      trials_expiring_soon_contacted: (report as any).trials_expiring_soon_contacted ?? 0,
       questions_total: report.questions_total,
       questions_answered_24h: report.questions_answered_24h,
       referrals_generated: report.referrals_generated,
@@ -370,6 +371,7 @@ export default function SpcPerfDashboard() {
       checkin_after_cancellation: Number(editForm.checkin_after_cancellation ?? 0),
       successfully_retained:   Number(editForm.successfully_retained ?? 0),
       failed_purchase_contact: Number(editForm.failed_purchase_contact ?? 0),
+      trials_expiring_soon_contacted: Number(editForm.trials_expiring_soon_contacted ?? 0),
       questions_total:         Number(editForm.questions_total),
       questions_answered_24h:  Number(editForm.questions_answered_24h),
       referrals_generated:     Number(editForm.referrals_generated),
@@ -434,6 +436,7 @@ export default function SpcPerfDashboard() {
       totalFailedPurchaseContact: reports.reduce((s, r) => s + (r.failed_purchase_contact ?? 0), 0),
       totalCheckinActiveInactive: reports.reduce((s, r) => s + (r.checkin_active_inactive ?? 0), 0),
       totalCheckinAfterCancel:  reports.reduce((s, r) => s + (r.checkin_after_cancellation ?? 0), 0),
+      totalTrialsExpiringSoonContacted: reports.reduce((s, r) => s + ((r as any).trials_expiring_soon_contacted ?? 0), 0),
     }
   }, [allMetrics])
 
@@ -592,12 +595,6 @@ export default function SpcPerfDashboard() {
                 color={kpis ? scoreColor(kpis.avgScore) : undefined}
               />
               <KpiCard
-                label="% Response <24h"
-                value={kpis ? `${kpis.avgResp}%` : '—'}
-                sub="questions answered"
-                color="text-purple-600 dark:text-purple-400"
-              />
-              <KpiCard
                 label="Total Referrals"
                 value={kpis ? String(kpis.totalRefs) : '—'}
                 sub="in the period"
@@ -615,7 +612,7 @@ export default function SpcPerfDashboard() {
             <div className="mb-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Retention & Support Activity</p>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
               <KpiCard
                 label="Support Messages"
                 value={kpis ? String(kpis.totalSupportMessages) : '—'}
@@ -651,6 +648,12 @@ export default function SpcPerfDashboard() {
                 value={kpis ? String(kpis.totalCheckinAfterCancel) : '—'}
                 sub="follow-ups after cancellation"
                 color="text-purple-600 dark:text-purple-400"
+              />
+              <KpiCard
+                label="Trials < 7d Contacted"
+                value={kpis ? String(kpis.totalTrialsExpiringSoonContacted) : '—'}
+                sub="trials expiring soon messaged"
+                color="text-orange-600 dark:text-orange-400"
               />
             </div>
 

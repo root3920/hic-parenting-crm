@@ -46,6 +46,7 @@ interface FormState {
   successfully_retained: string
   checkin_after_cancellation: string
   failed_purchase_contact: string
+  trials_expiring_soon_contacted: string
   // operación
   questions_total: string
   questions_answered_24h: string
@@ -80,6 +81,7 @@ const initial: FormState = {
   successfully_retained: '',
   checkin_after_cancellation: '',
   failed_purchase_contact: '',
+  trials_expiring_soon_contacted: '',
   questions_total: '',
   questions_answered_24h: '',
   referrals_generated: '',
@@ -253,6 +255,7 @@ export default function NuevoSpcPerfPage() {
       checkin_after_cancellation: n(form.checkin_after_cancellation),
       successfully_retained:   n(form.successfully_retained),
       failed_purchase_contact: n(form.failed_purchase_contact),
+      trials_expiring_soon_contacted: n(form.trials_expiring_soon_contacted),
       questions_total:         n(form.questions_total),
       questions_answered_24h:  n(form.questions_answered_24h),
       referrals_generated:     n(form.referrals_generated),
@@ -443,6 +446,11 @@ export default function NuevoSpcPerfPage() {
                 <NumberInput value={form.failed_purchase_contact} onChange={(v) => set('failed_purchase_contact', v)} />
                 <p className="text-[10px] text-zinc-400 mt-1">Members contacted after a failed payment</p>
               </div>
+            </div>
+            <div className="mt-3">
+              <FieldLabel>Trials expiring in {'<'}7 days — messaged today</FieldLabel>
+              <NumberInput value={form.trials_expiring_soon_contacted} onChange={(v) => set('trials_expiring_soon_contacted', v)} />
+              <p className="text-[10px] text-zinc-400 mt-1">How many trials expiring within 7 days did you contact today?</p>
             </div>
           </SectionCard>
 
