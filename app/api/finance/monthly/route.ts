@@ -21,6 +21,83 @@ async function verifyAdmin() {
   return profile?.role === 'admin' ? user : null
 }
 
+// GET: fetch all months for a year
+export async function GET(req: NextRequest) {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const year = req.nextUrl.searchParams.get('year')
+  if (!year) {
+    return NextResponse.json({ error: 'Missing year param' }, { status: 400 })
+  }
+
+  const supabase = getServiceClient()
+  const { data, error } = await supabase
+    .from('finance_monthly')
+    .select('*')
+    .gte('month_date', `${year}-01-01`)
+    .lte('month_date', `${year}-12-31`)
+    .order('month_date')
+
+  if (error) {
+    console.error('[API finance/monthly] GET error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  return NextResponse.json(data || [])
+}
+
+// POST: ensure all 12 months exist for a year
+export async function POST(req: NextRequest) {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { year } = await req.json()
+  if (!year) {
+    return NextResponse.json({ error: 'Missing year' }, { status: 400 })
+  }
+
+  const supabase = getServiceClient()
+
+  // Check which months already exist
+  const { data: existing } = await supabase
+    .from('finance_monthly')
+    .select('month_date')
+    .gte('month_date', `${year}-01-01`)
+    .lte('month_date', `${year}-12-31`)
+
+  const existingSet = new Set((existing || []).map((r: { month_date: string }) => r.month_date))
+  const toCreate: { month_date: string; year: number }[] = []
+
+  for (let i = 1; i <= 12; i++) {
+    const md = `${year}-${String(i).padStart(2, '0')}-01`
+    if (!existingSet.has(md)) {
+      toCreate.push({ month_date: md, year })
+    }
+  }
+
+  if (toCreate.length > 0) {
+    const { error } = await supabase.from('finance_monthly').insert(toCreate)
+    if (error) {
+      console.error('[API finance/monthly] Insert error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+  }
+
+  // Return all 12 months
+  const { data: all } = await supabase
+    .from('finance_monthly')
+    .select('*')
+    .gte('month_date', `${year}-01-01`)
+    .lte('month_date', `${year}-12-31`)
+    .order('month_date')
+
+  return NextResponse.json(all || [])
+}
+
 export async function PATCH(req: NextRequest) {
   const user = await verifyAdmin()
   if (!user) {
@@ -43,6 +120,36 @@ export async function PATCH(req: NextRequest) {
 
   if (error) {
     console.error('[API finance/monthly] Update error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  return NextResponse.json(data)
+}
+
+// PUT: upsert by month_date (create if not exists, update field)
+export async function PUT(req: NextRequest) {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { month_date, field, value } = await req.json()
+  if (!month_date || !field) {
+    return NextResponse.json({ error: 'Missing month_date or field' }, { status: 400 })
+  }
+
+  const year = parseInt(month_date.slice(0, 4))
+  const supabase = getServiceClient()
+  const { data, error } = await supabase
+    .from('finance_monthly')
+    .upsert(
+      { month_date, year, [field]: value },
+      { onConflict: 'month_date' }
+    )
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[API finance/monthly] Upsert error:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   return NextResponse.json(data)

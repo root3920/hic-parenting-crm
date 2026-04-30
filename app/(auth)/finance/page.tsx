@@ -493,11 +493,55 @@ export default function FinancePage() {
     { key: 'other_expenses', label: 'Other Expenses' },
   ]
 
+  // P&L monthly data fetched directly via API (bypasses RLS)
+  const [plMonthly, setPlMonthly] = useState<FinanceMonthly[]>([])
+  const [plLoading, setPlLoading] = useState(false)
+
+  const fetchPlData = useCallback(async (year: number) => {
+    setPlLoading(true)
+    try {
+      const res = await fetch(`/api/finance/monthly?year=${year}`)
+      if (!res.ok) {
+        console.error('[P&L] Fetch error:', res.status)
+        setPlMonthly([])
+        return
+      }
+      const data = await res.json()
+      console.log('[P&L] Fetched months:', data.length, 'for year', year)
+      if (data.length < 12) {
+        // Auto-create missing months
+        const postRes = await fetch('/api/finance/monthly', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ year }),
+        })
+        if (postRes.ok) {
+          const allData = await postRes.json()
+          console.log('[P&L] After ensure:', allData.length, 'months')
+          setPlMonthly(allData)
+        } else {
+          setPlMonthly(data)
+        }
+      } else {
+        setPlMonthly(data)
+      }
+    } catch (err) {
+      console.error('[P&L] Fetch failed:', err)
+      setPlMonthly([])
+    } finally {
+      setPlLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'pnl') fetchPlData(plYear)
+  }, [activeTab, plYear, fetchPlData])
+
   // Build keyed map: { '2025-01': { id, sales_forecast, ... }, ... }
   const plData = useMemo(() => {
     const map: Record<string, FinanceMonthly> = {}
-    monthly.filter(m => m.year === plYear).forEach(m => {
-      const md = (m.month || m.month_date || '').slice(0, 7)
+    plMonthly.forEach(m => {
+      const md = (m.month_date || m.month || '').slice(0, 7)
       if (md) {
         // For 2026+, override sales_actual from transactions
         const autoSales = plYear >= 2026 ? (salesByMonth[md] || 0) : (m.sales_actual || 0)
@@ -505,17 +549,12 @@ export default function FinancePage() {
       }
     })
     return map
-  }, [monthly, plYear, salesByMonth])
+  }, [plMonthly, plYear, salesByMonth])
 
   // Helper to get a field value for a month
   function plVal(mk: string, field: string): number {
     const row = plData[`${plYear}-${mk}`]
     return row ? (Number((row as unknown as Record<string, unknown>)[field]) || 0) : 0
-  }
-
-  // Helper to get row id for a month
-  function plId(mk: string): string | null {
-    return plData[`${plYear}-${mk}`]?.id ?? null
   }
 
   // Sum a field across all 12 months
@@ -529,36 +568,27 @@ export default function FinancePage() {
     return f > 0 ? (plVal(mk, actualField) / f * 100) : 0
   }
 
-  async function ensureYearMonths(year: number) {
-    const existing = monthly.filter(m => m.year === year)
-    if (existing.length >= 12) return
-    const existingMonths = new Set(existing.map(m => (m.month || m.month_date || '').slice(0, 7)))
-    const toCreate: { month_date: string; year: number }[] = []
-    for (let i = 1; i <= 12; i++) {
-      const key = `${year}-${String(i).padStart(2, '0')}`
-      if (!existingMonths.has(key)) {
-        toCreate.push({ month_date: `${key}-01`, year })
-      }
-    }
-    if (toCreate.length > 0) {
-      const { data } = await supabase.from('finance_monthly').insert(toCreate).select('*')
-      if (data) setMonthly(prev => [...prev, ...data].sort((a, b) => (a.month || a.month_date || '').localeCompare(b.month || b.month_date || '')))
-    }
-  }
-
-  async function handlePlYearChange(year: number) {
+  function handlePlYearChange(year: number) {
     setPlYear(year)
-    await ensureYearMonths(year)
+    // fetchPlData triggers via useEffect on plYear change
   }
 
-  async function handlePLSave(id: string, field: string, value: number) {
-    setMonthly(prev => prev.map(m => m.id === id ? { ...m, [field]: value } as FinanceMonthly : m))
+  async function handlePLSave(monthKey: string, field: string, value: number) {
+    const monthDate = `${plYear}-${monthKey}-01`
+    const mapKey = `${plYear}-${monthKey}`
+
+    // Optimistic update
+    setPlMonthly(prev => prev.map(m => {
+      const md = (m.month_date || m.month || '').slice(0, 7)
+      return md === mapKey ? { ...m, [field]: value } as FinanceMonthly : m
+    }))
     setPlEditingCell(null)
+
     try {
       const res = await fetch('/api/finance/monthly', {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, updates: { [field]: value } }),
+        body: JSON.stringify({ month_date: monthDate, field, value }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Unknown' }))
@@ -605,12 +635,9 @@ export default function FinancePage() {
   // ── P&L vertical cell components ────────────────────────────────────────────
 
   function PLCell({ mk, field }: { mk: string; field: string }) {
-    const id = plId(mk)
     const value = plVal(mk, field)
-    const cellKey = `${id}-${field}`
-    const isEditing = plEditingCell?.id === id && plEditingCell?.field === field
-
-    if (!id) return <td className="px-3 py-2 text-right text-sm text-zinc-300 dark:text-zinc-600">$0.00</td>
+    const cellId = `${mk}-${field}`
+    const isEditing = plEditingCell?.id === mk && plEditingCell?.field === field
 
     if (isEditing) {
       return (
@@ -620,9 +647,9 @@ export default function FinancePage() {
             type="number"
             className="w-24 text-sm border border-blue-400 rounded px-2 py-1 text-right bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
             defaultValue={plEditValue}
-            onBlur={(e) => handlePLSave(id, field, parseFloat(e.target.value) || 0)}
+            onBlur={(e) => handlePLSave(mk, field, parseFloat(e.target.value) || 0)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handlePLSave(id, field, parseFloat((e.target as HTMLInputElement).value) || 0)
+              if (e.key === 'Enter') handlePLSave(mk, field, parseFloat((e.target as HTMLInputElement).value) || 0)
               if (e.key === 'Escape') setPlEditingCell(null)
             }}
           />
@@ -633,7 +660,7 @@ export default function FinancePage() {
     return (
       <td
         className="px-3 py-2 text-right text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group/plc"
-        onClick={() => { setPlEditingCell({ id, field }); setPlEditValue(String(value)) }}
+        onClick={() => { setPlEditingCell({ id: mk, field }); setPlEditValue(String(value)) }}
       >
         <span className={cn(value === 0 && 'text-zinc-300 dark:text-zinc-600', value < 0 && 'text-red-600 dark:text-red-400')}>
           {fmtCurrency(value)}
@@ -1193,8 +1220,11 @@ export default function FinancePage() {
                         </td>
                       </tr>
 
-                      {Object.keys(plData).length === 0 && (
-                        <tr><td colSpan={14} className="text-center py-12 text-sm text-zinc-400">No data for {plYear}. Click a year button to create months.</td></tr>
+                      {plLoading && (
+                        <tr><td colSpan={14} className="text-center py-12 text-sm text-zinc-400">Loading...</td></tr>
+                      )}
+                      {!plLoading && Object.keys(plData).length === 0 && (
+                        <tr><td colSpan={14} className="text-center py-12 text-sm text-zinc-400">No data for {plYear}. Creating months...</td></tr>
                       )}
                     </tbody>
                   </table>
