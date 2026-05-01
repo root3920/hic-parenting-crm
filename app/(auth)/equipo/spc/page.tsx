@@ -266,6 +266,8 @@ export default function SpcPerfDashboard() {
   const [saving, setSaving] = useState(false)
   const [realTrialConvRate, setRealTrialConvRate] = useState(0)
   const [realTrialConverted, setRealTrialConverted] = useState(0)
+  const [trialPoolActive, setTrialPoolActive] = useState(0)
+  const [trialPoolCancels, setTrialPoolCancels] = useState(0)
 
   const weekRange = useMemo(() => getCurrentWeekRange(), [])
 
@@ -329,6 +331,8 @@ export default function SpcPerfDashboard() {
         : 0
       setRealTrialConvRate(rate)
       setRealTrialConverted(converted)
+      setTrialPoolActive(activeTrials)
+      setTrialPoolCancels(trialCancels)
     }
     fetchTrialConversion()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -609,14 +613,19 @@ export default function SpcPerfDashboard() {
                 meta={20}
                 alert={10}
               />
-              <MainKpiCard
-                label="% Trial Conversion"
-                value={realTrialConvRate}
-                unit="%"
-                sub={`${realTrialConverted} trials converted`}
-                meta={60}
-                alert={40}
-              />
+              <div>
+                <MainKpiCard
+                  label="% Trial Conversion"
+                  value={realTrialConvRate}
+                  unit="%"
+                  sub={`${realTrialConverted} of ${realTrialConverted + trialPoolCancels} converted`}
+                  meta={60}
+                  alert={40}
+                />
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 px-1">
+                  {realTrialConverted + trialPoolCancels} trial pool ({trialPoolActive} active + {trialPoolCancels} cancelled in period)
+                </p>
+              </div>
               <MainKpiCard
                 label="% Cancellation Retention"
                 value={kpis?.avgRet ?? 0}
