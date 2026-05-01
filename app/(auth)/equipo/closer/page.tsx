@@ -515,7 +515,8 @@ export default function CloserDashboardPage() {
             <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on actual calls</p>
 
             {/* ── Section 1b: KPI Goal Cards — from closer reports ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-1">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-1">
+              <VolumeCard label="Offers Made" value={reportKPIs.offersProposed} sub="from closer reports" />
               <KpiGoalCard
                 label={GOALS.closing.offerRate.label}
                 description={GOALS.closing.offerRate.description}
