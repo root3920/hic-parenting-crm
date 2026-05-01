@@ -233,54 +233,6 @@ export default function CloserDashboardPage() {
     [reports, selectedCloser]
   )
 
-  // ── KPIs ──
-  const kpis = useMemo(() => {
-    const totalMeetings = s(filtered, 'total_meetings')
-    const totalShowed = s(filtered, 'showed_meetings')
-    const totalOffers = s(filtered, 'offers_proposed')
-    const totalWon = s(filtered, 'won_deals')
-    const weeks = rangeDays / 7
-    return {
-      showRate: Math.min(safeDiv(totalShowed, totalMeetings) * 100, 100),
-      offerRate: Math.min(safeDiv(totalOffers, totalShowed) * 100, 100),
-      closeRate: Math.min(safeDiv(totalWon, totalOffers) * 100, 100),
-      callsPerWeek: safeDiv(totalMeetings, weeks),
-    }
-  }, [filtered, rangeDays])
-
-  // ── KPIs from calls table ──
-  const callsFiltered = useMemo(
-    () => selectedCloser === 'All' ? callsData : callsData.filter(c => c.closer_name === selectedCloser),
-    [callsData, selectedCloser]
-  )
-
-  const callKPIs = useMemo(() => {
-    const totalMeetings = callsFiltered.length
-
-    // Use call_status (manually marked by team) when available, fall back to status.
-    // Both fields may use different casing ('No show' vs 'No Show'), so compare lowercase.
-    const effectiveStatus = (c: CallSummary) => (c.call_status ?? c.status ?? '').toLowerCase()
-
-    const showedUp = callsFiltered.filter(c => effectiveStatus(c) === 'showed up').length
-    const noShows  = callsFiltered.filter(c => effectiveStatus(c) === 'no show').length
-    const cancelled = callsFiltered.filter(c => effectiveStatus(c) === 'cancelled').length
-
-    // Show Rate    = showed / totalMeetings  (did they show up to scheduled calls?)
-    // Cancel Rate  = cancelled / totalMeetings
-    // No-show Rate = noShow / totalMeetings
-    const showRate = safeDiv(showedUp, totalMeetings) * 100
-    const cancelRate = safeDiv(cancelled, totalMeetings) * 100
-    const noShowRate = safeDiv(noShows, totalMeetings) * 100
-    const callsPerWeek = safeDiv(totalMeetings, rangeDays / 7)
-
-    const disqualified = callsFiltered.filter(c => (c.call_type ?? '').toLowerCase() === 'disqualified').length
-    const disqualifiedRate = safeDiv(disqualified, showedUp) * 100
-
-    console.log('Closing metrics:', { totalMeetings, showed: showedUp, noShow: noShows, cancelled, disqualified, showRate: showRate.toFixed(1), cancelRate: cancelRate.toFixed(1) })
-
-    return { totalMeetings, showedUp, noShows, cancelled, disqualified, disqualifiedRate, showRate, cancelRate, noShowRate, callsPerWeek }
-  }, [callsFiltered, rangeDays])
-
   // ── Dynamic goal for showed calls ──
   const showedCallsGoal = useMemo((): GoalConfig => {
     const weeks = Math.max(1, rangeDays / 7)
@@ -294,36 +246,38 @@ export default function CloserDashboardPage() {
     }
   }, [rangeDays])
 
-  // ── KPIs from closer_daily_reports ──
+  // ── KPIs from closer_daily_reports (ALL metrics) ──
   const reportKPIs = useMemo(() => {
+    const totalMeetings = s(filtered, 'total_meetings')
     const showedMeetings = s(filtered, 'showed_meetings')
+    const cancelledMeetings = s(filtered, 'cancelled_meetings')
+    const noShowMeetings = s(filtered, 'no_show_meetings')
+    const rescheduledMeetings = s(filtered, 'rescheduled_meetings')
     const offersProposed = s(filtered, 'offers_proposed')
     const wonDeals = s(filtered, 'won_deals')
     const cashCollected = s(filtered, 'cash_collected')
     const recurrentCash = s(filtered, 'recurrent_cash')
-    // Both numerator and denominator from the same source (closer_daily_reports)
-    // Offer Rate   = offers / showed  (of calls that happened, did closer make an offer?)
-    // Close Rate   = won / offers     (of offers made, how many closed?)
+
+    const showRate = Math.min(safeDiv(showedMeetings, totalMeetings) * 100, 100)
+    const cancelRate = safeDiv(cancelledMeetings, totalMeetings) * 100
+    const noShowRate = safeDiv(noShowMeetings, totalMeetings) * 100
     const offerRate = Math.min(safeDiv(offersProposed, showedMeetings) * 100, 100)
     const closeRate = offersProposed > 0
       ? Math.min((wonDeals / offersProposed) * 100, 100)
       : 0
-    const valuePerMeeting = safeDiv(cashCollected, callKPIs.totalMeetings)
+    const valuePerMeeting = safeDiv(cashCollected, totalMeetings)
 
-    console.log('Offer rate calc:', { totalOffers: offersProposed, totalShowed: showedMeetings, offerRate })
-    console.log('Close rate calc:', { totalWon: wonDeals, totalOffers: offersProposed, closeRate })
-
-    return { showedMeetings, offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, valuePerMeeting }
-  }, [filtered, callKPIs.totalMeetings])
+    return { totalMeetings, showedMeetings, cancelledMeetings, noShowMeetings, rescheduledMeetings, offersProposed, wonDeals, cashCollected, recurrentCash, showRate, cancelRate, noShowRate, offerRate, closeRate, valuePerMeeting }
+  }, [filtered])
 
   // ── Revenue ──
   const revenue = useMemo(() => {
     const cash = s(filtered, 'cash_collected')
     const recurrent = s(filtered, 'recurrent_cash')
     const won = s(filtered, 'won_deals')
-    // Value per meeting = cash / totalMeetings (all scheduled)
-    return { cash, recurrent, perMeeting: safeDiv(cash, callKPIs.totalMeetings), won }
-  }, [filtered, callKPIs.totalMeetings])
+    const totalMeetings = s(filtered, 'total_meetings')
+    return { cash, recurrent, perMeeting: safeDiv(cash, totalMeetings), won }
+  }, [filtered])
 
   // ── Volume ──
   const volume = useMemo(() => ({
@@ -366,28 +320,19 @@ export default function CloserDashboardPage() {
   // ── Closer comparison (only when "Todos") ──
   const closerComparison = useMemo(() => {
     if (selectedCloser !== 'All') return []
-    const callsByCloser: Record<string, { total: number; showed: number; noShows: number }> = {}
-    for (const c of callsData) {
-      if (!c.closer_name) continue
-      if (!callsByCloser[c.closer_name]) callsByCloser[c.closer_name] = { total: 0, showed: 0, noShows: 0 }
-      callsByCloser[c.closer_name].total++
-      if (c.status === 'Showed Up') callsByCloser[c.closer_name].showed++
-      if (c.status === 'No show')   callsByCloser[c.closer_name].noShows++
-    }
-    const reportsByCloser: Record<string, { offers: number; won: number; cash: number }> = {}
+    const byCloser: Record<string, { meetings: number; showed: number; offers: number; won: number; cash: number }> = {}
     for (const r of reports) {
-      if (!reportsByCloser[r.closer_name]) reportsByCloser[r.closer_name] = { offers: 0, won: 0, cash: 0 }
-      reportsByCloser[r.closer_name].offers += r.offers_proposed
-      reportsByCloser[r.closer_name].won    += r.won_deals
-      reportsByCloser[r.closer_name].cash   += r.cash_collected
+      if (!byCloser[r.closer_name]) byCloser[r.closer_name] = { meetings: 0, showed: 0, offers: 0, won: 0, cash: 0 }
+      byCloser[r.closer_name].meetings += r.total_meetings
+      byCloser[r.closer_name].showed   += r.showed_meetings
+      byCloser[r.closer_name].offers   += r.offers_proposed
+      byCloser[r.closer_name].won      += r.won_deals
+      byCloser[r.closer_name].cash     += r.cash_collected
     }
-    const names = new Set([...Object.keys(callsByCloser), ...Object.keys(reportsByCloser)])
-    return Array.from(names).map(name => {
-      const c = callsByCloser[name]   ?? { total: 0, showed: 0, noShows: 0 }
-      const r = reportsByCloser[name] ?? { offers: 0, won: 0, cash: 0 }
-      return { closer_name: name, meetings: c.total, showed: c.showed, offers: r.offers, won: r.won, cash: r.cash }
-    }).sort((a, b) => b.cash - a.cash)
-  }, [callsData, reports, selectedCloser])
+    return Object.entries(byCloser).map(([name, d]) => ({
+      closer_name: name, ...d,
+    })).sort((a, b) => b.cash - a.cash)
+  }, [reports, selectedCloser])
 
   // ── Pagination ──
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
@@ -485,22 +430,22 @@ export default function CloserDashboardPage() {
           />
         ) : (
           <>
-            {/* ── Section 1a: KPI Goal Cards — from calls table ── */}
+            {/* ── Section 1a: KPI Goal Cards ── */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-1">
               <KpiGoalCard
                 label={GOALS.closing.showRate.label}
                 description={GOALS.closing.showRate.description}
-                value={callKPIs.showRate}
+                value={reportKPIs.showRate}
                 unit="%"
                 goal={GOALS.closing.showRate}
               />
-              <VolumeCard label="No Shows" value={callKPIs.noShows} sub={`${fmtPct(callKPIs.noShowRate)} of ${callKPIs.totalMeetings} scheduled`} />
+              <VolumeCard label="No Shows" value={reportKPIs.noShowMeetings} sub={`${fmtPct(reportKPIs.noShowRate)} of ${reportKPIs.totalMeetings} scheduled`} />
               <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Cancelled</p>
-                <p className={cn('text-2xl font-bold', callKPIs.cancelRate < 20 ? 'text-green-600 dark:text-green-400' : callKPIs.cancelRate <= 35 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>
-                  {fmtPct(callKPIs.cancelRate)}
+                <p className={cn('text-2xl font-bold', reportKPIs.cancelRate < 20 ? 'text-green-600 dark:text-green-400' : reportKPIs.cancelRate <= 35 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>
+                  {fmtPct(reportKPIs.cancelRate)}
                 </p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{callKPIs.cancelled} of {callKPIs.totalMeetings} scheduled</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{reportKPIs.cancelledMeetings} of {reportKPIs.totalMeetings} scheduled</p>
               </div>
               <KpiGoalCard
                 label="Showed Calls"
@@ -510,7 +455,7 @@ export default function CloserDashboardPage() {
                 goal={showedCallsGoal}
                 decimals={0}
               />
-              <VolumeCard label="Disqualified" value={callKPIs.disqualified} sub={`${fmtPct(callKPIs.disqualifiedRate)} of showed calls`} />
+              <VolumeCard label="Rescheduled" value={reportKPIs.rescheduledMeetings} sub={`of ${reportKPIs.totalMeetings} scheduled`} />
             </div>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on closer reports</p>
 
@@ -562,8 +507,8 @@ export default function CloserDashboardPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <VolumeCard
                 label="Total Meetings"
-                value={callKPIs.totalMeetings}
-                sub={`${fmtPct(safeDiv(reportKPIs.showedMeetings, callKPIs.totalMeetings) * 100)} show rate`}
+                value={reportKPIs.totalMeetings}
+                sub={`${fmtPct(reportKPIs.showRate)} show rate`}
               />
               <VolumeCard
                 label="Showed"
@@ -577,8 +522,8 @@ export default function CloserDashboardPage() {
               />
               <VolumeCard
                 label="No-Shows"
-                value={callKPIs.noShows}
-                sub={`${fmtPct(callKPIs.noShowRate)} of total`}
+                value={reportKPIs.noShowMeetings}
+                sub={`${fmtPct(reportKPIs.noShowRate)} of total`}
               />
             </div>
 
