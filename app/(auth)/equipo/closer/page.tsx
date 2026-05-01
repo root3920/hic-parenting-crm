@@ -241,9 +241,9 @@ export default function CloserDashboardPage() {
     const totalWon = s(filtered, 'won_deals')
     const weeks = rangeDays / 7
     return {
-      showRate: safeDiv(totalShowed, totalMeetings) * 100,
-      offerRate: safeDiv(totalOffers, totalShowed) * 100,
-      closeRate: safeDiv(totalWon, totalOffers) * 100,
+      showRate: Math.min(safeDiv(totalShowed, totalMeetings) * 100, 100),
+      offerRate: Math.min(safeDiv(totalOffers, totalShowed) * 100, 100),
+      closeRate: Math.min(safeDiv(totalWon, totalOffers) * 100, 100),
       callsPerWeek: safeDiv(totalMeetings, weeks),
     }
   }, [filtered, rangeDays])
@@ -305,10 +305,12 @@ export default function CloserDashboardPage() {
     // Offer Rate   = offers / showed  (of calls that happened, did closer make an offer?)
     // Close Rate   = won / showed     (of calls that happened, did closer close?)
     // Close/Offer  = won / offers     (of offers made, how many closed?)
-    const offerRate = safeDiv(offersProposed, showedMeetings) * 100
-    const closeRate = safeDiv(wonDeals, showedMeetings) * 100
-    const closeOfferRate = safeDiv(wonDeals, offersProposed) * 100
+    const offerRate = Math.min(safeDiv(offersProposed, showedMeetings) * 100, 100)
+    const closeRate = Math.min(safeDiv(wonDeals, showedMeetings) * 100, 100)
+    const closeOfferRate = Math.min(safeDiv(wonDeals, offersProposed) * 100, 100)
     const valuePerMeeting = safeDiv(cashCollected, callKPIs.totalMeetings)
+
+    console.log('Offer rate calc:', { totalOffers: offersProposed, totalShowed: showedMeetings, offerRate })
 
     return { showedMeetings, offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, closeOfferRate, valuePerMeeting }
   }, [filtered, callKPIs.totalMeetings])
