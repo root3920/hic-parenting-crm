@@ -672,10 +672,11 @@ export default function FinancePage() {
 
   function AutoCell({ value }: { value: number }) {
     return (
-      <td className="px-3 py-2 text-right text-sm bg-zinc-50/80 dark:bg-zinc-800/30">
+      <td className="px-3 py-2 text-right text-sm bg-zinc-50/80 dark:bg-zinc-800/30 group/auto relative cursor-default" title="Auto-calculated from sales data">
         <span className={cn('font-medium', value === 0 && 'text-zinc-400', value < 0 && 'text-red-600 dark:text-red-400')}>
           {fmtCurrency(value)}
         </span>
+        <span className="absolute top-1 right-1 text-[10px] opacity-0 group-hover/auto:opacity-60 transition-opacity">🔒</span>
       </td>
     )
   }
