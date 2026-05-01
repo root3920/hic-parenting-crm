@@ -505,14 +505,14 @@ export default function CloserDashboardPage() {
               <KpiGoalCard
                 label="Showed Calls"
                 description='Total "Showed Up" calls in selected period'
-                value={callKPIs.showedUp}
+                value={reportKPIs.showedMeetings}
                 unit=""
                 goal={showedCallsGoal}
                 decimals={0}
               />
               <VolumeCard label="Disqualified" value={callKPIs.disqualified} sub={`${fmtPct(callKPIs.disqualifiedRate)} of showed calls`} />
             </div>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on actual calls</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on closer reports</p>
 
             {/* ── Section 1b: KPI Goal Cards — from closer reports ── */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-1">
@@ -563,11 +563,11 @@ export default function CloserDashboardPage() {
               <VolumeCard
                 label="Total Meetings"
                 value={callKPIs.totalMeetings}
-                sub={`${fmtPct(callKPIs.showRate)} show rate`}
+                sub={`${fmtPct(safeDiv(reportKPIs.showedMeetings, callKPIs.totalMeetings) * 100)} show rate`}
               />
               <VolumeCard
                 label="Showed"
-                value={callKPIs.showedUp}
+                value={reportKPIs.showedMeetings}
                 sub={`${fmtPct(reportKPIs.offerRate)} offer rate`}
               />
               <VolumeCard
