@@ -70,12 +70,12 @@ export async function POST(req: NextRequest) {
     .lte('month_date', `${year}-12-31`)
 
   const existingSet = new Set((existing || []).map((r: { month_date: string }) => r.month_date))
-  const toCreate: { month_date: string; year: number }[] = []
+  const toCreate: { month_date: string }[] = []
 
   for (let i = 1; i <= 12; i++) {
     const md = `${year}-${String(i).padStart(2, '0')}-01`
     if (!existingSet.has(md)) {
-      toCreate.push({ month_date: md, year })
+      toCreate.push({ month_date: md })
     }
   }
 
@@ -137,12 +137,11 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Missing month_date or field' }, { status: 400 })
   }
 
-  const year = parseInt(month_date.slice(0, 4))
   const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('finance_monthly')
     .upsert(
-      { month_date, year, [field]: value },
+      { month_date, [field]: value },
       { onConflict: 'month_date' }
     )
     .select()
