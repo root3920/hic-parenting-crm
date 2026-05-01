@@ -263,6 +263,8 @@ export default function SpcPerfDashboard() {
   const [editTarget, setEditTarget] = useState<SpcPerfReport | null>(null)
   const [editForm, setEditForm] = useState<Record<string, string | number>>({})
   const [saving, setSaving] = useState(false)
+  const [realTrialConvRate, setRealTrialConvRate] = useState(0)
+  const [realTrialConverted, setRealTrialConverted] = useState(0)
 
   function getRange(p: Preset): { from: string; to: string } {
     const now = new Date()
@@ -291,6 +293,42 @@ export default function SpcPerfDashboard() {
 
   useEffect(() => { fetchReports() }, [fetchReports])
   useEffect(() => { setPage(0) }, [preset, selectedRep])
+
+  // Fetch real trial conversion rate from spc_members + spc_cancellations (same as SPC Overview)
+  useEffect(() => {
+    async function fetchTrialConversion() {
+      const { from, to } = getRange(preset)
+      const [trialCancelsRes, activeTrialsRes, convertedRes] = await Promise.all([
+        supabase
+          .from('spc_cancellations')
+          .select('*', { count: 'exact', head: true })
+          .eq('trial_cancel', true)
+          .gte('cancelled_at', from)
+          .lte('cancelled_at', to),
+        supabase
+          .from('spc_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'trial'),
+        supabase
+          .from('spc_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('converted_from_trial', true)
+          .gte('converted_at', from)
+          .lte('converted_at', to),
+      ])
+      const trialCancels = trialCancelsRes.count ?? 0
+      const activeTrials = activeTrialsRes.count ?? 0
+      const converted = convertedRes.count ?? 0
+      const totalTrialPool = converted + trialCancels
+      const rate = totalTrialPool > 0
+        ? parseFloat(((converted / totalTrialPool) * 100).toFixed(1))
+        : 0
+      setRealTrialConvRate(rate)
+      setRealTrialConverted(converted)
+    }
+    fetchTrialConversion()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, preset, customFrom, customTo])
 
   async function handleDelete(report: SpcPerfReport) {
     setReports((prev) => prev.filter((r) => r.id !== report.id))
@@ -567,9 +605,9 @@ export default function SpcPerfDashboard() {
               />
               <MainKpiCard
                 label="% Trial Conversion"
-                value={kpis?.avgConv ?? 0}
+                value={realTrialConvRate}
                 unit="%"
-                sub="trials converted"
+                sub={`${realTrialConverted} trials converted`}
                 meta={60}
                 alert={40}
               />
