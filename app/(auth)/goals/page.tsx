@@ -37,7 +37,7 @@ export default function GoalsPage() {
       setLoading(true)
       const [{ data: sr }, { data: cr }] = await Promise.all([
         supabase.from('setter_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: true }),
-        supabase.from('closer_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: true }),
+        supabase.from('closer_daily_reports').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: true }),
       ])
       setSetterReports(sr ?? [])
       setCloserReports(cr ?? [])

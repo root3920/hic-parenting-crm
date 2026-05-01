@@ -73,7 +73,7 @@ export default function DashboardPage() {
             .order('date', { ascending: false }),
           supabase.from('spc_members').select('*'),
           supabase.from('setter_reports').select('qualified_calls').gte('date', from).lte('date', to),
-          supabase.from('closer_reports').select('won_deals, cash_collected').gte('date', from).lte('date', to),
+          supabase.from('closer_daily_reports').select('won_deals, cash_collected').gte('date', from).lte('date', to),
           supabase
             .from('spc_cancellations')
             .select('id, trial_cancel, cancelled_at')
