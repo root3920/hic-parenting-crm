@@ -289,7 +289,11 @@ export default function NuevoReporteSetterPage() {
             />
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div><FieldLabel>Total convos</FieldLabel><NumberInput value={form.total_convos} onChange={(v) => set('total_convos', v)} /></div>
-              <div><FieldLabel>Followups</FieldLabel><NumberInput value={form.followups} onChange={(v) => set('followups', v)} /></div>
+              <div>
+                <FieldLabel>Follow-ups done today</FieldLabel>
+                <NumberInput value={form.followups} onChange={(v) => set('followups', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">Conversations with leads you&apos;ve contacted before</p>
+              </div>
               <div><FieldLabel>Inbound</FieldLabel><NumberInput value={form.inbound} onChange={(v) => set('inbound', v)} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">

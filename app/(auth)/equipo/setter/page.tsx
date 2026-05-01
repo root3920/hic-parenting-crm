@@ -14,6 +14,7 @@ import { Plus, ChevronLeft, ChevronRight, Download, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { GOALS } from '@/lib/goals'
+import { getCurrentWeekRange } from '@/lib/dateUtils'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
@@ -26,7 +27,7 @@ const PAGE_SIZE = 10
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Preset = '7d' | '30d' | '90d' | 'todo' | 'custom'
+type Preset = 'week' | '7d' | '30d' | '90d' | 'todo' | 'custom'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any
@@ -47,6 +48,10 @@ function getDateRange(preset: Preset) {
     const d = new Date()
     d.setDate(d.getDate() - n)
     return localDateStr(d)
+  }
+  if (preset === 'week') {
+    const w = getCurrentWeekRange()
+    return { from: w.start, to: w.end }
   }
   if (preset === '7d')  return { from: daysAgo(6),  to }
   if (preset === '30d') return { from: daysAgo(29), to }
@@ -153,7 +158,7 @@ export default function SetterDashboardPage() {
   const isSetter = profile?.role === 'setter'
   const [allRows, setAllRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
-  const [preset, setPreset] = useState<Preset>('30d')
+  const [preset, setPreset] = useState<Preset>('week')
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return localDateStr(d) })
   const [customTo, setCustomTo] = useState(() => localDateStr(new Date()))
   const [selectedSetter, setSelectedSetter] = useState('All')
@@ -195,6 +200,7 @@ export default function SetterDashboardPage() {
           date:              r.date?.slice(0, 10) ?? '',
           setter_name:       (r.setter_name ?? '').replace('@', '').trim(),
           total_convos:      r.total_convos ?? 0,
+          followups:         r.followups ?? 0,
           call_proposed:     r.call_proposed ?? 0,
           qualified_calls:   r.qualified_calls ?? 0,
           performance_score: r.performance_score ?? 0,
@@ -208,6 +214,7 @@ export default function SetterDashboardPage() {
           date:              r.date?.slice(0, 10) ?? '',
           setter_name:       (r.setter_name ?? '').replace('@', '').trim(),
           total_convos:      r.total_convos ?? 0,
+          followups:         r.followups ?? 0,
           call_proposed:     r.calls_proposed ?? 0,
           qualified_calls:   r.calls_booked ?? 0,
           performance_score: r.performance_score ?? 0,
@@ -263,6 +270,7 @@ export default function SetterDashboardPage() {
   // ── Volume stats ──
   const volume = useMemo(() => {
     const totalConvos   = sumField(filtered, 'total_convos')
+    const totalFollowups = sumField(filtered, 'followups')
     const totalProposed = sumField(filtered, 'call_proposed')
     const totalBooked   = sumField(filtered, 'qualified_calls')
     const avgPerf = filtered.length > 0
@@ -270,12 +278,15 @@ export default function SetterDashboardPage() {
       : NaN
     return {
       totalConvos,
+      totalFollowups,
       totalProposed,
       totalBooked,
       avgPerf,
       bookingPct: fmtPct(safeDiv(totalBooked, totalProposed) * 100),
     }
   }, [filtered])
+
+  const weekRange = useMemo(() => getCurrentWeekRange(), [])
 
   // ── Chart data ──
   const chartData = useMemo(() => {
@@ -327,22 +338,22 @@ export default function SetterDashboardPage() {
             </Link>
           </div>
         )}
-        <PageHeader title="Setting Team" description="Daily setter team performance">
+        <PageHeader title="Setting Team" description={preset === 'week' ? `Current week: ${weekRange.label} (Fri → Thu)` : 'Daily setter team performance'}>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset buttons */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', '90d', 'todo', 'custom'] as Preset[]).map((p) => (
+              {(['week', '7d', '30d', '90d', 'todo', 'custom'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => { setPreset(p); setPage(0) }}
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors',
                     preset === p
-                      ? 'bg-[#185FA5] text-white'
+                      ? p === 'week' ? 'bg-indigo-600 text-white' : 'bg-[#185FA5] text-white'
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'todo' ? 'All' : p === 'custom' ? 'Custom' : p}
+                  {p === 'week' ? 'Week' : p === 'todo' ? 'All' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>
@@ -443,9 +454,14 @@ export default function SetterDashboardPage() {
             </div>
 
             {/* ── Section 2: Volume Stats ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <VolumeCard label="Total Convos"      value={volume.totalConvos} />
-              <VolumeCard label="Proposed Calls"  value={volume.totalProposed} />
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+              <VolumeCard label="Total Convos" value={volume.totalConvos} sub="Meta: 80–90/week" />
+              <VolumeCard
+                label="Follow-ups"
+                value={volume.totalFollowups}
+                sub={volume.totalFollowups >= 30 ? 'On Target' : volume.totalFollowups >= 20 ? 'Needs Improvement' : 'Alert'}
+              />
+              <VolumeCard label="Proposed Calls" value={volume.totalProposed} />
               <VolumeCard
                 label="Scheduled Calls"
                 value={volume.totalBooked}

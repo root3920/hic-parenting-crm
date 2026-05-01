@@ -16,12 +16,13 @@ import {
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getCurrentWeekRange } from '@/lib/dateUtils'
 
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 10
 
-type Preset = '7d' | '30d' | '90d' | 'all' | 'custom'
+type Preset = 'week' | '7d' | '30d' | '90d' | 'all' | 'custom'
 
 interface HtReport {
   id: string
@@ -66,6 +67,10 @@ function avg(arr: number[]): number {
 
 function getDateRange(preset: Preset, customFrom?: string, customTo?: string): { from: string; to: string } | null {
   if (preset === 'all') return null
+  if (preset === 'week') {
+    const w = getCurrentWeekRange()
+    return { from: w.start, to: w.end }
+  }
   if (preset === 'custom' && customFrom && customTo) return { from: customFrom, to: customTo }
   const today = new Date()
   const fmt = (d: Date) => d.toISOString().split('T')[0]
@@ -552,11 +557,12 @@ export default function HtCsmDashboardPage() {
   const supabase = useMemo(() => createClient(), [])
   const [reports, setReports] = useState<HtReport[]>([])
   const [loading, setLoading] = useState(true)
-  const [preset, setPreset] = useState<Preset>('30d')
+  const [preset, setPreset] = useState<Preset>('week')
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
   const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingReport, setEditingReport] = useState<HtReport | null>(null)
+  const weekRange = useMemo(() => getCurrentWeekRange(), [])
   const [page, setPage] = useState(0)
   const [totalGraduates, setTotalGraduates] = useState(0)
 
@@ -677,22 +683,22 @@ export default function HtCsmDashboardPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Client Success — High Ticket" description="Daily HT CSM performance">
+        <PageHeader title="Client Success — High Ticket" description={preset === 'week' ? `Current week: ${weekRange.label} (Fri → Thu)` : 'Daily HT CSM performance'}>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Date preset */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', '90d', 'all', 'custom'] as Preset[]).map((p) => (
+              {(['week', '7d', '30d', '90d', 'all', 'custom'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPreset(p)}
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors',
                     preset === p
-                      ? 'bg-[#185FA5] text-white'
+                      ? p === 'week' ? 'bg-indigo-600 text-white' : 'bg-[#185FA5] text-white'
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'all' ? 'All' : p === 'custom' ? 'Custom' : p}
+                  {p === 'week' ? 'Week' : p === 'all' ? 'All' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>

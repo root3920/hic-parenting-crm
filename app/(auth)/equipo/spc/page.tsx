@@ -17,12 +17,13 @@ import {
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { motion } from 'framer-motion'
+import { getCurrentWeekRange } from '@/lib/dateUtils'
 
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 15
 
-type Preset = '7d' | '30d' | 'all' | 'custom'
+type Preset = 'week' | '7d' | '30d' | 'all' | 'custom'
 
 // ── Score & metrics engine ────────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ export default function SpcPerfDashboard() {
   const supabase = useMemo(() => createClient(), [])
   const [reports, setReports] = useState<SpcPerfReport[]>([])
   const [loading, setLoading] = useState(true)
-  const [preset, setPreset] = useState<Preset>('30d')
+  const [preset, setPreset] = useState<Preset>('week')
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
   const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
   const [selectedRep, setSelectedRep] = useState('Todos')
@@ -266,9 +267,12 @@ export default function SpcPerfDashboard() {
   const [realTrialConvRate, setRealTrialConvRate] = useState(0)
   const [realTrialConverted, setRealTrialConverted] = useState(0)
 
+  const weekRange = useMemo(() => getCurrentWeekRange(), [])
+
   function getRange(p: Preset): { from: string; to: string } {
     const now = new Date()
     const fmt = (d: Date) => d.toISOString().split('T')[0]
+    if (p === 'week') { const w = getCurrentWeekRange(); return { from: w.start, to: w.end } }
     if (p === '7d')  { const f = new Date(now); f.setDate(now.getDate() - 6); return { from: fmt(f), to: fmt(now) } }
     if (p === '30d') { const f = new Date(now); f.setDate(now.getDate() - 29); return { from: fmt(f), to: fmt(now) } }
     if (p === 'custom') return { from: customFrom, to: customTo }
@@ -501,20 +505,22 @@ export default function SpcPerfDashboard() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Client Success — SPC" description="Daily community management performance">
+        <PageHeader title="Client Success — SPC" description={preset === 'week' ? `Current week: ${weekRange.label} (Fri → Thu)` : 'Daily community management performance'}>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Preset */}
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', 'all', 'custom'] as Preset[]).map((p) => (
+              {(['week', '7d', '30d', 'all', 'custom'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPreset(p)}
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors border-r border-zinc-200 dark:border-zinc-700 last:border-r-0',
-                    preset === p ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    preset === p
+                      ? p === 'week' ? 'bg-indigo-600 text-white' : 'bg-[#185FA5] text-white'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'all' ? 'All' : p === 'custom' ? 'Custom' : p}
+                  {p === 'week' ? 'Week' : p === 'all' ? 'All' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>

@@ -13,6 +13,7 @@ import { CloserDailyReport } from '@/types'
 import { Plus, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GOALS, GoalConfig } from '@/lib/goals'
+import { getCurrentWeekRange } from '@/lib/dateUtils'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, Cell,
@@ -23,7 +24,7 @@ export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 10
 
-type Preset = '7d' | '30d' | '90d' | 'todo' | 'custom'
+type Preset = 'week' | '7d' | '30d' | '90d' | 'todo' | 'custom'
 
 interface CallSummary {
   id: string
@@ -37,6 +38,10 @@ interface CallSummary {
 function getDateRange(preset: Exclude<Preset, 'custom'>) {
   const today = new Date()
   const fmt = (d: Date) => d.toISOString().split('T')[0]
+  if (preset === 'week') {
+    const w = getCurrentWeekRange()
+    return { from: w.start, to: w.end, days: 7 }
+  }
   if (preset === '7d') {
     const from = new Date(today); from.setDate(today.getDate() - 6)
     return { from: fmt(from), to: fmt(today), days: 7 }
@@ -177,13 +182,15 @@ export default function CloserDashboardPage() {
   const supabase = useMemo(() => createClient(), [])
   const [reports, setReports] = useState<CloserDailyReport[]>([])
   const [loading, setLoading] = useState(true)
-  const [preset, setPreset] = useState<Preset>('30d')
+  const [preset, setPreset] = useState<Preset>('week')
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
   const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
   const [selectedCloser, setSelectedCloser] = useState('All')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<CloserDailyReport | null>(null)
   const [callsData, setCallsData] = useState<CallSummary[]>([])
+
+  const weekRange = useMemo(() => getCurrentWeekRange(), [])
 
   const { from: fromDate, to: toDate, days: rangeDays } = useMemo(() => {
     if (preset === 'custom') {
@@ -386,19 +393,21 @@ export default function CloserDashboardPage() {
   return (
     <PageTransition>
       <div className="max-w-7xl mx-auto">
-        <PageHeader title="Closing Team" description="Daily closer team performance">
+        <PageHeader title="Closing Team" description={preset === 'week' ? `Current week: ${weekRange.label} (Fri → Thu)` : 'Daily closer team performance'}>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-              {(['7d', '30d', '90d', 'todo', 'custom'] as Preset[]).map((p) => (
+              {(['week', '7d', '30d', '90d', 'todo', 'custom'] as Preset[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => { setPreset(p); setPage(0) }}
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors',
-                    preset === p ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    preset === p
+                      ? p === 'week' ? 'bg-indigo-600 text-white' : 'bg-[#185FA5] text-white'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
-                  {p === 'todo' ? 'All' : p === 'custom' ? 'Custom' : p}
+                  {p === 'week' ? 'Week' : p === 'todo' ? 'All' : p === 'custom' ? 'Custom' : p}
                 </button>
               ))}
             </div>
