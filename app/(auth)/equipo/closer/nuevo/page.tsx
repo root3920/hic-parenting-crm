@@ -334,6 +334,23 @@ export default function NuevoReporteCloserPage() {
         setDayCalls(calls)
         const initialReports: Record<string, CallReport> = {}
         for (const call of calls) {
+          // Rescheduled calls must start with a blank form — previous report
+          // data belongs to the old occurrence, not this new one.
+          const wasRescheduled =
+            (call.call_status ?? '').toLowerCase() === 'rescheduled' ||
+            (call.status ?? '').toLowerCase() === 'rescheduled'
+
+          if (wasRescheduled) {
+            initialReports[call.id] = {
+              call_id: call.id,
+              call_status: '',
+              call_type: '',
+              next_step: '',
+              call_summary: '',
+            }
+            continue
+          }
+
           const validNextSteps: Array<CallReport['next_step']> = ['Follow Up', 'Cancelled', 'Rescheduled', '']
           const rawNext = call.next_step ?? ''
           const validCallTypes: Array<CallReport['call_type']> = ['Qualified', 'Disqualified', 'Onboarding', 'Interview', '']
