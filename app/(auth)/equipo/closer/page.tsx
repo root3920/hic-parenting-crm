@@ -303,16 +303,17 @@ export default function CloserDashboardPage() {
     const recurrentCash = s(filtered, 'recurrent_cash')
     // Both numerator and denominator from the same source (closer_daily_reports)
     // Offer Rate   = offers / showed  (of calls that happened, did closer make an offer?)
-    // Close Rate   = won / showed     (of calls that happened, did closer close?)
-    // Close/Offer  = won / offers     (of offers made, how many closed?)
+    // Close Rate   = won / offers     (of offers made, how many closed?)
     const offerRate = Math.min(safeDiv(offersProposed, showedMeetings) * 100, 100)
-    const closeRate = Math.min(safeDiv(wonDeals, showedMeetings) * 100, 100)
-    const closeOfferRate = Math.min(safeDiv(wonDeals, offersProposed) * 100, 100)
+    const closeRate = offersProposed > 0
+      ? Math.min((wonDeals / offersProposed) * 100, 100)
+      : 0
     const valuePerMeeting = safeDiv(cashCollected, callKPIs.totalMeetings)
 
     console.log('Offer rate calc:', { totalOffers: offersProposed, totalShowed: showedMeetings, offerRate })
+    console.log('Close rate calc:', { totalWon: wonDeals, totalOffers: offersProposed, closeRate })
 
-    return { showedMeetings, offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, closeOfferRate, valuePerMeeting }
+    return { showedMeetings, offersProposed, wonDeals, cashCollected, recurrentCash, offerRate, closeRate, valuePerMeeting }
   }, [filtered, callKPIs.totalMeetings])
 
   // ── Revenue ──
@@ -529,7 +530,7 @@ export default function CloserDashboardPage() {
                 unit="%"
                 goal={GOALS.closing.closeRate}
               />
-              <VolumeCard label="Won Deals" value={reportKPIs.wonDeals} sub={`${fmtPct(reportKPIs.closeRate)} of showed · ${fmtPct(reportKPIs.closeOfferRate)} of offers`} />
+              <VolumeCard label="Won Deals" value={reportKPIs.wonDeals} sub={`${reportKPIs.wonDeals} of ${reportKPIs.offersProposed} offers closed`} />
               <VolumeCard label="Cash Collected" value={fmtCash(reportKPIs.cashCollected)} sub="revenue this period" />
             </div>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-6">Based on closer reports</p>
@@ -571,7 +572,7 @@ export default function CloserDashboardPage() {
               <VolumeCard
                 label="Won Deals"
                 value={reportKPIs.wonDeals}
-                sub={`${fmtPct(reportKPIs.closeRate)} close rate`}
+                sub={`${fmtPct(reportKPIs.closeRate)} of offers closed`}
               />
               <VolumeCard
                 label="No-Shows"
