@@ -2838,22 +2838,20 @@ export default function SpcPage() {
                     <option value="score_desc">Score (highest)</option>
                     <option value="last_note_desc">Last Note (recent)</option>
                   </select>
+                  <button
+                    onClick={() => { resetAddForm(); setAddMemberOpen(true) }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Member
+                  </button>
                   {isAdmin && (
-                    <>
-                      <button
-                        onClick={() => { resetAddForm(); setAddMemberOpen(true) }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                      >
-                        <Plus className="h-3.5 w-3.5" /> Add Member
-                      </button>
-                      <button
-                        onClick={exportActiveMembers}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-                        title="Export CSV"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                    </>
+                    <button
+                      onClick={exportActiveMembers}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      title="Export CSV"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
                   )}
                 </div>
               </div>
