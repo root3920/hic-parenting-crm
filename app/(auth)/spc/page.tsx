@@ -19,7 +19,7 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, Calendar, Clock, Download, ExternalLink, Mail, MessageSquare, Pencil, Phone, Search, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, Calendar, Clock, Download, ExternalLink, Mail, MessageSquare, Pencil, Phone, Plus, Search, Trash2, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -1255,6 +1255,72 @@ export default function SpcPage() {
   const [addingNote, setAddingNote] = useState(false)
   const [lastNoteByEmail, setLastNoteByEmail] = useState<Record<string, string>>({})
   const [highlightNotes, setHighlightNotes] = useState(false)
+
+  // ── Add Member modal state ─────────────────────────────────────────────────
+  const [addMemberOpen, setAddMemberOpen] = useState(false)
+  const [addMemberSaving, setAddMemberSaving] = useState(false)
+  const addFormToday = new Date().toISOString().split('T')[0]
+  const [addForm, setAddForm] = useState({
+    name: '', email: '', phone: '', plan: 'monthly' as 'monthly' | 'annual',
+    amount: 47, provider: 'Stripe', joined_at: addFormToday,
+    next_payment_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    whatsapp_active: false, converted_from_trial: false,
+  })
+
+  function resetAddForm() {
+    const today = new Date().toISOString().split('T')[0]
+    setAddForm({
+      name: '', email: '', phone: '', plan: 'monthly', amount: 47, provider: 'Stripe',
+      joined_at: today,
+      next_payment_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      whatsapp_active: false, converted_from_trial: false,
+    })
+  }
+
+  function handleAddFormPlanChange(plan: 'monthly' | 'annual') {
+    const amount = plan === 'annual' ? 470 : 47
+    const days = plan === 'annual' ? 365 : 30
+    const npd = new Date(new Date(addForm.joined_at || Date.now()).getTime() + days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    setAddForm(prev => ({ ...prev, plan, amount, next_payment_date: npd }))
+  }
+
+  async function handleAddMember() {
+    if (!addForm.name.trim() || !addForm.email.trim()) {
+      toast.error('Name and email are required')
+      return
+    }
+    setAddMemberSaving(true)
+    try {
+      const { data, error } = await supabase.from('spc_members').insert({
+        name: addForm.name.trim(),
+        email: addForm.email.trim().toLowerCase(),
+        phone: addForm.phone.trim() || null,
+        plan: addForm.plan,
+        amount: addForm.amount,
+        provider: addForm.provider,
+        status: 'active',
+        joined_at: addForm.joined_at,
+        next_payment_date: addForm.next_payment_date,
+        whatsapp_active: addForm.whatsapp_active,
+        converted_from_trial: addForm.converted_from_trial,
+        converted_at: addForm.converted_from_trial ? new Date().toISOString() : null,
+        lead_score: 0,
+      }).select().single()
+
+      if (error) {
+        toast.error('Error: ' + error.message)
+        return
+      }
+      if (data) setMembers(prev => [data as SpcMember, ...prev])
+      toast.success('Member added')
+      setAddMemberOpen(false)
+      resetAddForm()
+    } catch {
+      toast.error('Failed to add member')
+    } finally {
+      setAddMemberSaving(false)
+    }
+  }
 
   // ── Zoom CSV upload state ─────────────────────────────────────────────────
   const [zoomModalOpen, setZoomModalOpen] = useState(false)
@@ -2773,13 +2839,21 @@ export default function SpcPage() {
                     <option value="last_note_desc">Last Note (recent)</option>
                   </select>
                   {isAdmin && (
-                    <button
-                      onClick={exportActiveMembers}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-                      title="Export CSV"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => { resetAddForm(); setAddMemberOpen(true) }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Member
+                      </button>
+                      <button
+                        onClick={exportActiveMembers}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        title="Export CSV"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -3809,6 +3883,113 @@ export default function SpcPage() {
             setSelectedMember(null)
           }}
         />
+      )}
+
+      {/* ── Add Member Modal ─────────────────────────────────────────────── */}
+      {addMemberOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setAddMemberOpen(false)} />
+          <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-700 w-full max-w-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Add Active Member</h3>
+              <button onClick={() => setAddMemberOpen(false)} className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Name & Email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Full Name *</label>
+                  <input type="text" value={addForm.name} onChange={(e) => setAddForm(p => ({ ...p, name: e.target.value }))}
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Email *</label>
+                  <input type="email" value={addForm.email} onChange={(e) => setAddForm(p => ({ ...p, email: e.target.value }))}
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                </div>
+              </div>
+              {/* Phone & Plan */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Phone</label>
+                  <input type="text" value={addForm.phone} onChange={(e) => setAddForm(p => ({ ...p, phone: e.target.value }))}
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Plan *</label>
+                  <select value={addForm.plan} onChange={(e) => handleAddFormPlanChange(e.target.value as 'monthly' | 'annual')}
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    <option value="monthly">Monthly — $47</option>
+                    <option value="annual">Annual — $470</option>
+                  </select>
+                </div>
+              </div>
+              {/* Amount & Provider */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Amount</label>
+                  <input type="number" value={addForm.amount} onChange={(e) => setAddForm(p => ({ ...p, amount: parseFloat(e.target.value) || 0 }))}
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Provider</label>
+                  <select value={addForm.provider} onChange={(e) => setAddForm(p => ({ ...p, provider: e.target.value }))}
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    <option value="Stripe">Stripe</option>
+                    <option value="PayPal">PayPal</option>
+                    <option value="Kajabi">Kajabi Payments</option>
+                    <option value="GoHighLevel">GoHighLevel</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Joined Date *</label>
+                  <input type="date" value={addForm.joined_at} onChange={(e) => {
+                    const jd = e.target.value
+                    const days = addForm.plan === 'annual' ? 365 : 30
+                    const npd = new Date(new Date(jd).getTime() + days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                    setAddForm(p => ({ ...p, joined_at: jd, next_payment_date: npd }))
+                  }}
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Next Payment Date</label>
+                  <input type="date" value={addForm.next_payment_date} onChange={(e) => setAddForm(p => ({ ...p, next_payment_date: e.target.value }))}
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                </div>
+              </div>
+              {/* Toggles */}
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={addForm.whatsapp_active} onChange={(e) => setAddForm(p => ({ ...p, whatsapp_active: e.target.checked }))}
+                    className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-xs text-zinc-700 dark:text-zinc-300">WhatsApp Active</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={addForm.converted_from_trial} onChange={(e) => setAddForm(p => ({ ...p, converted_from_trial: e.target.checked }))}
+                    className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-xs text-zinc-700 dark:text-zinc-300">Converted from Trial</span>
+                </label>
+              </div>
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={() => setAddMemberOpen(false)}
+                  className="px-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                  Cancel
+                </button>
+                <button onClick={handleAddMember} disabled={addMemberSaving}
+                  className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium">
+                  {addMemberSaving ? 'Saving...' : 'Add Member'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </PageTransition>
   )

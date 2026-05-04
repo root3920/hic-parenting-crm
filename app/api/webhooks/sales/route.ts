@@ -254,6 +254,51 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Auto-add "Raising Secure Children" buyer as annual SPC member ──────
+    const isRSC =
+      offer_tittle?.toLowerCase().includes('raising secure children') ||
+      (parseFloat(cost) === 470 && offer_tittle?.toLowerCase().includes('secure'))
+
+    if (isRSC && body.status !== 'Refunded' && buyer_email) {
+      const { data: existingRsc } = await supabase
+        .from('spc_members')
+        .select('id, status')
+        .eq('email', buyer_email)
+        .maybeSingle()
+
+      if (!existingRsc) {
+        const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        await supabase.from('spc_members').insert({
+          name: buyer_fullname || 'Unknown',
+          email: buyer_email,
+          phone: buyer_phone ?? null,
+          plan: 'annual',
+          amount: 470,
+          status: 'active',
+          provider: source === 'Kajabi' ? 'Kajabi' : 'Stripe',
+          joined_at: date,
+          next_payment_date: nextYear,
+          whatsapp_active: false,
+          lead_score: 0,
+          converted_from_trial: false,
+        })
+        console.log('[SPC Webhook] Added RSC buyer as annual SPC member:', buyer_email)
+      } else if (existingRsc.status !== 'active') {
+        const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        await supabase
+          .from('spc_members')
+          .update({
+            status: 'active',
+            plan: 'annual',
+            amount: 470,
+            joined_at: date,
+            next_payment_date: nextYear,
+          })
+          .eq('id', existingRsc.id)
+        console.log('[SPC Webhook] Reactivated RSC buyer as annual SPC member:', buyer_email)
+      }
+    }
+
     // ── Auto-create finance commission entry ────────────────────────────────
     const costNum = parseFloat(cost) || 0
     if (
