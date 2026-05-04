@@ -15,7 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader,
 } from '@/components/ui/table'
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, ComposedChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { DollarSign, Download, Search } from 'lucide-react'
@@ -310,6 +310,19 @@ export default function FinancePage() {
   const currentYear = new Date().getFullYear()
   const currentMonthIdx = new Date().getMonth() // 0-indexed
 
+  // Calculate total expenses from individual columns (fallback when total_expenses_actual is 0)
+  const EXPENSE_FIELDS = [
+    'advertising_marketing', 'bank_charges', 'contractors', 'legal_professional',
+    'office_software', 'payroll_company', 'payroll_fees', 'professional_fees',
+    'taxes_licenses', 'telephone', 'travel', 'utilities', 'other_expenses',
+  ] as const
+
+  const calcExpenses = useCallback((row: FinanceMonthly) => {
+    const stored = Number(row.total_expenses_actual) || 0
+    if (stored > 0) return stored
+    return EXPENSE_FIELDS.reduce((s, f) => s + (Number((row as unknown as Record<string, unknown>)[f]) || 0), 0)
+  }, [])
+
   const revenueVsNetData = useMemo(() => {
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     const monthKeys = ['01','02','03','04','05','06','07','08','09','10','11','12']
@@ -326,7 +339,7 @@ export default function FinancePage() {
       const key = `${currentYear}-${mk}`
       const pl = plByMonth[key]
       const sales = salesByMonth[key] || 0
-      const expenses = Number(pl?.total_expenses_actual) || 0
+      const expenses = pl ? calcExpenses(pl) : 0
       const netIncome = sales - expenses
       return {
         month: monthNames[i],
@@ -335,7 +348,7 @@ export default function FinancePage() {
         expenses,
       }
     })
-  }, [monthly, salesByMonth, currentYear, currentMonthIdx])
+  }, [monthly, salesByMonth, currentYear, currentMonthIdx, calcExpenses])
 
   const commissionsByCloser = useMemo(() => {
     const map: Record<string, { paid: number; pending: number }> = {}
@@ -876,16 +889,16 @@ export default function FinancePage() {
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Monthly Revenue vs Net Income</CardTitle></CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={280}>
-                      <LineChart data={revenueVsNetData} margin={{ top: 4, right: 12, left: 0, bottom: 40 }}>
+                      <ComposedChart data={revenueVsNetData} margin={{ top: 4, right: 12, left: 0, bottom: 40 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
                         <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#71717a' }} angle={-40} textAnchor="end" />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                         <Tooltip content={<ChartTooltip />} />
                         <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-xs text-zinc-600 dark:text-zinc-400">{v}</span>} />
-                        <Line type="monotone" dataKey="salesActual" name="Sales" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                        <Area type="monotone" dataKey="salesActual" name="Sales" stroke="#3b82f6" fill="#dbeafe" fillOpacity={0.3} strokeWidth={2} />
+                        <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" fill="#fee2e2" fillOpacity={0.3} strokeWidth={2} />
                         <Line type="monotone" dataKey="netIncome" name="Net Income" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-                      </LineChart>
+                      </ComposedChart>
                     </ResponsiveContainer>
                     {revenueVsNetData.every(d => d.expenses === 0) && revenueVsNetData.some(d => d.salesActual > 0) && (
                       <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center mt-1">
