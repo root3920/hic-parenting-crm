@@ -295,7 +295,7 @@ export default function FinancePage() {
 
   // ── Chart data ────────────────────────────────────────────────────────────
 
-  // FIX 4: Build monthly sales from transactions, not finance_monthly.sales_actual
+  // Build monthly sales from transactions (all years, for P&L reuse)
   const salesByMonth = useMemo(() => {
     const map: Record<string, number> = {}
     transactions.forEach(t => {
@@ -306,44 +306,36 @@ export default function FinancePage() {
     return map
   }, [transactions])
 
-  const revenueVsNetData = useMemo(() => {
-    const monthLabels: Record<string, string> = {
-      '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
-      '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
-      '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec',
-    }
-    const fmtKey = (k: string) => {
-      const [y, mn] = k.split('-')
-      return `${monthLabels[mn] || mn} ${y?.substring(2)}`
-    }
-    const seenKeys = new Set<string>()
-    const data: { month: string; salesActual: number; netIncome: number; expenses: number; _key: string }[] = []
+  // Dashboard chart: current year only, one point per month
+  const currentYear = new Date().getFullYear()
+  const currentMonthIdx = new Date().getMonth() // 0-indexed
 
-    // From finance_monthly rows
+  const revenueVsNetData = useMemo(() => {
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const monthKeys = ['01','02','03','04','05','06','07','08','09','10','11','12']
+
+    // Build finance_monthly lookup for current year
+    const plByMonth: Record<string, FinanceMonthly> = {}
     monthly.forEach(m => {
       const key = (m.month_date || m.month || '').slice(0, 7)
-      if (!key) return
-      seenKeys.add(key)
-      data.push({
-        _key: key,
-        month: fmtKey(key),
-        salesActual: salesByMonth[key] || 0,
-        netIncome: Number(m.net_income_actual) || 0,
-        expenses: Number(m.total_expenses_actual) || 0,
-      })
+      if (key.startsWith(String(currentYear))) plByMonth[key] = m
     })
 
-    // Add months that only have transactions
-    Object.entries(salesByMonth).forEach(([key, sales]) => {
-      if (!seenKeys.has(key)) {
-        data.push({ _key: key, month: fmtKey(key), salesActual: sales, netIncome: 0, expenses: 0 })
+    // One data point per month, up to current month
+    return monthKeys.slice(0, currentMonthIdx + 1).map((mk, i) => {
+      const key = `${currentYear}-${mk}`
+      const pl = plByMonth[key]
+      const sales = salesByMonth[key] || 0
+      const expenses = Number(pl?.total_expenses_actual) || 0
+      const netIncome = sales - expenses
+      return {
+        month: monthNames[i],
+        salesActual: sales,
+        netIncome,
+        expenses,
       }
     })
-
-    // Sort chronologically
-    data.sort((a, b) => a._key.localeCompare(b._key))
-    return data
-  }, [monthly, salesByMonth])
+  }, [monthly, salesByMonth, currentYear, currentMonthIdx])
 
   const commissionsByCloser = useMemo(() => {
     const map: Record<string, { paid: number; pending: number }> = {}
@@ -368,21 +360,26 @@ export default function FinancePage() {
   }, [commissions])
 
   const revenueByMonth = useMemo(() => {
-    const monthLabels: Record<string, string> = {
-      '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
-      '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
-      '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec',
-    }
-    return monthly.map(m => {
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const monthKeys = ['01','02','03','04','05','06','07','08','09','10','11','12']
+
+    // Build finance_monthly lookup for current year
+    const plByMonth: Record<string, FinanceMonthly> = {}
+    monthly.forEach(m => {
       const key = (m.month_date || m.month || '').slice(0, 7)
-      const [y, mn] = key.split('-')
+      if (key.startsWith(String(currentYear))) plByMonth[key] = m
+    })
+
+    return monthKeys.slice(0, currentMonthIdx + 1).map((mk, i) => {
+      const key = `${currentYear}-${mk}`
+      const pl = plByMonth[key]
       return {
-        month: `${monthLabels[mn] || mn} ${y?.substring(2)}`,
-        Forecast: m.sales_forecast || 0,
+        month: monthNames[i],
+        Forecast: Number(pl?.sales_forecast) || 0,
         Actual: salesByMonth[key] || 0,
       }
     })
-  }, [monthly, salesByMonth])
+  }, [monthly, salesByMonth, currentYear, currentMonthIdx])
 
   const commissionStatusData = useMemo(() => {
     const counts: Record<string, number> = { Paid: 0, Pending: 0, 'N/A': 0, Refunded: 0 }
