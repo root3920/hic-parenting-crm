@@ -882,11 +882,16 @@ export default function FinancePage() {
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                         <Tooltip content={<ChartTooltip />} />
                         <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-xs text-zinc-600 dark:text-zinc-400">{v}</span>} />
-                        <Line type="monotone" dataKey="salesActual" name="Sales Actual" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="salesActual" name="Sales" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                         <Line type="monotone" dataKey="netIncome" name="Net Income" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
                         <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
                       </LineChart>
                     </ResponsiveContainer>
+                    {revenueVsNetData.every(d => d.expenses === 0) && revenueVsNetData.some(d => d.salesActual > 0) && (
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center mt-1">
+                        * Expenses not yet entered for {currentYear}. Fill in the P&L tab to see net income.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
