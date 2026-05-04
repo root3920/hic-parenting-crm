@@ -306,18 +306,44 @@ export default function FinancePage() {
     return map
   }, [transactions])
 
-  const revenueVsNetData = useMemo(() =>
-    monthly.map(m => {
-      const monthKey = m.month?.slice(0, 7) || ''
-      return {
-        month: MONTHS[parseInt(m.month?.slice(5, 7) || '1') - 1] + ' ' + m.month?.slice(2, 4),
-        'Sales Actual': salesByMonth[monthKey] || 0,
-        'Net Income': m.net_income_actual || 0,
-        'Expenses': m.total_expenses_actual || 0,
+  const revenueVsNetData = useMemo(() => {
+    const monthLabels: Record<string, string> = {
+      '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+      '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
+      '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec',
+    }
+    const fmtKey = (k: string) => {
+      const [y, mn] = k.split('-')
+      return `${monthLabels[mn] || mn} ${y?.substring(2)}`
+    }
+    const seenKeys = new Set<string>()
+    const data: { month: string; salesActual: number; netIncome: number; expenses: number; _key: string }[] = []
+
+    // From finance_monthly rows
+    monthly.forEach(m => {
+      const key = (m.month_date || m.month || '').slice(0, 7)
+      if (!key) return
+      seenKeys.add(key)
+      data.push({
+        _key: key,
+        month: fmtKey(key),
+        salesActual: salesByMonth[key] || 0,
+        netIncome: Number(m.net_income_actual) || 0,
+        expenses: Number(m.total_expenses_actual) || 0,
+      })
+    })
+
+    // Add months that only have transactions
+    Object.entries(salesByMonth).forEach(([key, sales]) => {
+      if (!seenKeys.has(key)) {
+        data.push({ _key: key, month: fmtKey(key), salesActual: sales, netIncome: 0, expenses: 0 })
       }
-    }),
-    [monthly, salesByMonth]
-  )
+    })
+
+    // Sort chronologically
+    data.sort((a, b) => a._key.localeCompare(b._key))
+    return data
+  }, [monthly, salesByMonth])
 
   const commissionsByCloser = useMemo(() => {
     const map: Record<string, { paid: number; pending: number }> = {}
@@ -341,17 +367,22 @@ export default function FinancePage() {
     return Object.entries(map).map(([name, v]) => ({ name, ...v }))
   }, [commissions])
 
-  const revenueByMonth = useMemo(() =>
-    monthly.map(m => {
-      const monthKey = m.month?.slice(0, 7) || ''
+  const revenueByMonth = useMemo(() => {
+    const monthLabels: Record<string, string> = {
+      '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+      '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
+      '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec',
+    }
+    return monthly.map(m => {
+      const key = (m.month_date || m.month || '').slice(0, 7)
+      const [y, mn] = key.split('-')
       return {
-        month: MONTHS[parseInt(m.month?.slice(5, 7) || '1') - 1] + ' ' + m.month?.slice(2, 4),
+        month: `${monthLabels[mn] || mn} ${y?.substring(2)}`,
         Forecast: m.sales_forecast || 0,
-        Actual: salesByMonth[monthKey] || 0,
+        Actual: salesByMonth[key] || 0,
       }
-    }),
-    [monthly, salesByMonth]
-  )
+    })
+  }, [monthly, salesByMonth])
 
   const commissionStatusData = useMemo(() => {
     const counts: Record<string, number> = { Paid: 0, Pending: 0, 'N/A': 0, Refunded: 0 }
@@ -854,9 +885,9 @@ export default function FinancePage() {
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                         <Tooltip content={<ChartTooltip />} />
                         <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-xs text-zinc-600 dark:text-zinc-400">{v}</span>} />
-                        <Line type="monotone" dataKey="Sales Actual" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="Net Income" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="Expenses" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="salesActual" name="Sales Actual" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="netIncome" name="Net Income" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   </CardContent>
