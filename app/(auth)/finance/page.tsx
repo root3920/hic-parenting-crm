@@ -210,7 +210,7 @@ export default function FinancePage() {
 
     const [comm, mon, tx] = await Promise.all([
       fetchCommissions(),
-      fetchPaginated<FinanceMonthly>('finance_monthly', '*', 'month', true),
+      fetchPaginated<FinanceMonthly>('finance_monthly', '*', 'month_date', true),
       fetchPaginated<{ date: string; cost: number; status: string; offer_title: string }>(
         'transactions', 'date, cost, status, offer_title', 'date', false,
       ),
@@ -283,9 +283,9 @@ export default function FinancePage() {
     [monthly, curMonth]
   )
 
-  const netIncome = currentMonthPL?.net_income_actual ?? 0
-  const grossProfit = currentMonthPL?.gross_profit_actual ?? 0
-  const expensesTotal = currentMonthPL?.expenses_total ?? 0
+  const expensesTotal = currentMonthPL?.total_expenses_actual ?? 0
+  const grossProfit = totalRevenue // service business: GP = Sales
+  const netIncome = currentMonthPL?.net_income_actual ?? (totalRevenue - expensesTotal)
 
   const commissionRate = useMemo(() => {
     const totalAmt = commissions.reduce((s, c) => s + (Number(c.amount) || 0), 0)
@@ -313,7 +313,7 @@ export default function FinancePage() {
         month: MONTHS[parseInt(m.month?.slice(5, 7) || '1') - 1] + ' ' + m.month?.slice(2, 4),
         'Sales Actual': salesByMonth[monthKey] || 0,
         'Net Income': m.net_income_actual || 0,
-        'Expenses': m.expenses_total || 0,
+        'Expenses': m.total_expenses_actual || 0,
       }
     }),
     [monthly, salesByMonth]
@@ -562,6 +562,15 @@ export default function FinancePage() {
     return MONTH_KEYS.reduce((s, mk) => s + plVal(mk, field), 0)
   }
 
+  // Auto-derive profitability for a month
+  function plDerived(mk: string) {
+    const salesActual = plVal(mk, 'sales_actual')
+    const totalExpenses = EXPENSE_ROWS.reduce((s, r) => s + plVal(mk, r.key), 0)
+    const grossProfit = salesActual // service business: GP = Sales
+    const netIncome = salesActual - totalExpenses
+    return { totalExpenses, grossProfit, netIncome }
+  }
+
   // Pct calc
   function plPct(mk: string, actualField: string, forecastField: string): number {
     const f = plVal(mk, forecastField)
@@ -576,15 +585,27 @@ export default function FinancePage() {
   async function handlePLSave(monthKey: string, field: string, value: number) {
     const monthDate = `${plYear}-${monthKey}-01`
     const mapKey = `${plYear}-${monthKey}`
+    const isExpense = EXPENSE_ROWS.some(r => r.key === field)
 
     // Optimistic update
     setPlMonthly(prev => prev.map(m => {
       const md = (m.month_date || m.month || '').slice(0, 7)
-      return md === mapKey ? { ...m, [field]: value } as FinanceMonthly : m
+      if (md !== mapKey) return m
+      const updated = { ...m, [field]: value } as FinanceMonthly
+      if (isExpense) {
+        // Recalculate derived values with the new expense value
+        const salesActual = Number(updated.sales_actual) || 0
+        const totalExp = EXPENSE_ROWS.reduce((s, r) => s + (Number((updated as unknown as Record<string, unknown>)[r.key]) || 0), 0)
+        updated.total_expenses_actual = totalExp
+        updated.gross_profit_actual = salesActual
+        updated.net_income_actual = salesActual - totalExp
+      }
+      return updated
     }))
     setPlEditingCell(null)
 
     try {
+      // Save the edited field
       const res = await fetch('/api/finance/monthly', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -593,9 +614,32 @@ export default function FinancePage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Unknown' }))
         toast.error('Error: ' + (err.error || 'Failed to save'))
-      } else {
-        toast.success('Saved')
+        return
       }
+      // If expense field changed, also persist derived values
+      if (isExpense) {
+        const d = plDerived(monthKey)
+        // Account for the just-saved value (plDerived reads from plData which may not have updated yet)
+        const row = plData[mapKey]
+        const salesActual = row ? (Number(row.sales_actual) || 0) : 0
+        const totalExp = EXPENSE_ROWS.reduce((s, r) => {
+          if (r.key === field) return s + value
+          return s + (row ? (Number((row as unknown as Record<string, unknown>)[r.key]) || 0) : 0)
+        }, 0)
+        await fetch('/api/finance/monthly', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: row?.id,
+            updates: {
+              total_expenses_actual: totalExp,
+              gross_profit_actual: salesActual,
+              net_income_actual: salesActual - totalExp,
+            },
+          }),
+        })
+      }
+      toast.success('Saved')
     } catch {
       toast.error('Error saving')
     }
@@ -1186,18 +1230,18 @@ export default function FinancePage() {
                         {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="gross_profit_forecast" />)}
                         <TotalTd value={plTotal('gross_profit_forecast')} />
                       </tr>
-                      {/* GP Actual */}
+                      {/* GP Actual (auto-calculated: GP = Sales for service business) */}
                       <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 bg-zinc-50/30 dark:bg-zinc-900/10">
-                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Gross Profit</td>
-                        {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="gross_profit_actual" />)}
-                        <TotalTd value={plTotal('gross_profit_actual')} bold />
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm font-semibold text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Gross Profit</td>
+                        {MONTH_KEYS.map(mk => <AutoCell key={mk} value={plDerived(mk).grossProfit} />)}
+                        <TotalTd value={MONTH_KEYS.reduce((s, mk) => s + plDerived(mk).grossProfit, 0)} bold />
                       </tr>
                       {/* GP % */}
                       <tr className="border-b border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
                         <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-500 dark:text-zinc-400 pl-8 border-r border-zinc-100 dark:border-zinc-800">Gross Profit %</td>
-                        {MONTH_KEYS.map(mk => <PctTd key={mk} actual={plVal(mk, 'gross_profit_actual')} forecast={plVal(mk, 'gross_profit_forecast')} />)}
+                        {MONTH_KEYS.map(mk => <PctTd key={mk} actual={plDerived(mk).grossProfit} forecast={plVal(mk, 'gross_profit_forecast')} />)}
                         <td className="px-3 py-2 text-right border-l border-zinc-200 dark:border-zinc-700">
-                          {(() => { const f = plTotal('gross_profit_forecast'); return f > 0 ? <span className={cn('text-xs font-semibold', pctColor(plTotal('gross_profit_actual')/f*100).replace(/bg-\S+\s?/g, ''))}>{fmtPct(plTotal('gross_profit_actual')/f*100)}</span> : <span className="text-xs text-zinc-400">—</span> })()}
+                          {(() => { const f = plTotal('gross_profit_forecast'); const a = MONTH_KEYS.reduce((s, mk) => s + plDerived(mk).grossProfit, 0); return f > 0 ? <span className={cn('text-xs font-semibold', pctColor(a/f*100).replace(/bg-\S+\s?/g, ''))}>{fmtPct(a/f*100)}</span> : <span className="text-xs text-zinc-400">—</span> })()}
                         </td>
                       </tr>
                       {/* NI Forecast */}
@@ -1206,18 +1250,27 @@ export default function FinancePage() {
                         {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="net_income_forecast" />)}
                         <TotalTd value={plTotal('net_income_forecast')} />
                       </tr>
-                      {/* NI Actual */}
+                      {/* NI Actual (auto-calculated: Sales - Total Expenses) */}
                       <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
-                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Net Income</td>
-                        {MONTH_KEYS.map(mk => <PLCell key={mk} mk={mk} field="net_income_actual" />)}
-                        <TotalTd value={plTotal('net_income_actual')} bold />
+                        <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm font-semibold text-zinc-700 dark:text-zinc-300 pl-8 border-r border-zinc-100 dark:border-zinc-800">Net Income</td>
+                        {MONTH_KEYS.map(mk => {
+                          const ni = plDerived(mk).netIncome
+                          return (
+                            <td key={mk} className="px-3 py-2 text-right text-sm bg-zinc-50/80 dark:bg-zinc-800/30 cursor-default">
+                              <span className={cn('font-semibold', ni > 0 && 'text-emerald-600 dark:text-emerald-400', ni < 0 && 'text-red-600 dark:text-red-400', ni === 0 && 'text-zinc-400')}>
+                                {fmtCurrency(ni)}
+                              </span>
+                            </td>
+                          )
+                        })}
+                        <TotalTd value={MONTH_KEYS.reduce((s, mk) => s + plDerived(mk).netIncome, 0)} bold />
                       </tr>
                       {/* NI % */}
                       <tr className="border-b border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 bg-zinc-50/30 dark:bg-zinc-900/10">
                         <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 px-4 py-0 text-sm text-zinc-500 dark:text-zinc-400 pl-8 border-r border-zinc-100 dark:border-zinc-800">Net Income %</td>
-                        {MONTH_KEYS.map(mk => <PctTd key={mk} actual={plVal(mk, 'net_income_actual')} forecast={plVal(mk, 'net_income_forecast')} />)}
+                        {MONTH_KEYS.map(mk => <PctTd key={mk} actual={plDerived(mk).netIncome} forecast={plVal(mk, 'net_income_forecast')} />)}
                         <td className="px-3 py-2 text-right border-l border-zinc-200 dark:border-zinc-700">
-                          {(() => { const f = plTotal('net_income_forecast'); return f > 0 ? <span className={cn('text-xs font-semibold', pctColor(plTotal('net_income_actual')/f*100).replace(/bg-\S+\s?/g, ''))}>{fmtPct(plTotal('net_income_actual')/f*100)}</span> : <span className="text-xs text-zinc-400">—</span> })()}
+                          {(() => { const f = plTotal('net_income_forecast'); const a = MONTH_KEYS.reduce((s, mk) => s + plDerived(mk).netIncome, 0); return f > 0 ? <span className={cn('text-xs font-semibold', pctColor(a/f*100).replace(/bg-\S+\s?/g, ''))}>{fmtPct(a/f*100)}</span> : <span className="text-xs text-zinc-400">—</span> })()}
                         </td>
                       </tr>
 
