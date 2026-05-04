@@ -313,7 +313,7 @@ export default function FinancePage() {
   // Calculate total expenses from individual columns (fallback when total_expenses_actual is 0)
   const EXPENSE_FIELDS = [
     'advertising_marketing', 'bank_charges', 'contractors', 'legal_professional',
-    'office_software', 'payroll_company', 'payroll_fees', 'professional_fees',
+    'office_software', 'payroll_company', 'payroll_fees',
     'taxes_licenses', 'telephone', 'travel', 'utilities', 'other_expenses',
   ] as const
 
@@ -526,7 +526,6 @@ export default function FinancePage() {
     { key: 'office_software', label: 'Office & Software' },
     { key: 'payroll_company', label: 'Payroll Company' },
     { key: 'payroll_fees', label: 'Payroll Fees' },
-    { key: 'professional_fees', label: 'Professional Fees' },
     { key: 'taxes_licenses', label: 'Taxes & Licenses' },
     { key: 'telephone', label: 'Telephone' },
     { key: 'travel', label: 'Travel' },
@@ -628,21 +627,26 @@ export default function FinancePage() {
     const mapKey = `${plYear}-${monthKey}`
     const isExpense = EXPENSE_ROWS.some(r => r.key === field)
 
-    // Optimistic update
-    setPlMonthly(prev => prev.map(m => {
-      const md = (m.month_date || m.month || '').slice(0, 7)
-      if (md !== mapKey) return m
-      const updated = { ...m, [field]: value } as FinanceMonthly
-      if (isExpense) {
-        // Recalculate derived values with the new expense value
-        const salesActual = Number(updated.sales_actual) || 0
-        const totalExp = EXPENSE_ROWS.reduce((s, r) => s + (Number((updated as unknown as Record<string, unknown>)[r.key]) || 0), 0)
-        updated.total_expenses_actual = totalExp
-        updated.gross_profit_actual = salesActual
-        updated.net_income_actual = salesActual - totalExp
+    // Optimistic update — update existing row or add a stub if missing
+    setPlMonthly(prev => {
+      const exists = prev.some(m => (m.month_date || m.month || '').slice(0, 7) === mapKey)
+      if (!exists) {
+        return [...prev, { month_date: monthDate, [field]: value } as unknown as FinanceMonthly]
       }
-      return updated
-    }))
+      return prev.map(m => {
+        const md = (m.month_date || m.month || '').slice(0, 7)
+        if (md !== mapKey) return m
+        const updated = { ...m, [field]: value } as FinanceMonthly
+        if (isExpense) {
+          const salesActual = Number(updated.sales_actual) || 0
+          const totalExp = EXPENSE_ROWS.reduce((s, r) => s + (Number((updated as unknown as Record<string, unknown>)[r.key]) || 0), 0)
+          updated.total_expenses_actual = totalExp
+          updated.gross_profit_actual = salesActual
+          updated.net_income_actual = salesActual - totalExp
+        }
+        return updated
+      })
+    })
     setPlEditingCell(null)
 
     try {
