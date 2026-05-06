@@ -132,7 +132,7 @@ const CALENDAR_MAP: Record<string, string> = {
   'Stop Reaction':         'https://api.hicparenting.com/widget/bookings/calendar-qajacy3n',
   'Marcela':               'https://api.hicparenting.com/widget/bookings/calendar-gn238uf8kt2j',
   'Jessica':               'https://api.hicparenting.com/widget/bookings/calendar-gn238u',
-  'Valentina':             'https://api.hicparenting.com/widget/bookings/calendar-gn238u18k0ib',
+  'Valentina':             'https://api.hicparenting.com/widget/bookings/calendar-vs23fnijik',
 }
 
 const DEFAULT_CALENDAR = 'https://api.hicparenting.com/widget/bookings/calendar-qa'
