@@ -421,6 +421,22 @@ export interface Contact {
   phone: string | null
   owner: string | null
   status: string
+  tags: string[]
+  is_spc_member: boolean
+  is_spc_trial: boolean
+  is_pwu_student: boolean
+  is_pwu_graduate: boolean
+  spc_status: string | null
+  pwu_cohort: string | null
+  source: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ContactNote {
+  id: string
+  contact_id: string
+  author_name: string
+  note: string
+  created_at: string
 }

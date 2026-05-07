@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { syncContact } from '@/lib/contacts-sync'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -219,6 +220,22 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`INSERTED: ${appointmentId} | ${status} | ${fullName}`)
+
+    // Sync contact record
+    if (email) {
+      try {
+        await syncContact(supabase, {
+          email,
+          full_name: fullName,
+          phone,
+          ghl_id: body?.contact_id || body?.id || null,
+          status: 'Call Booked',
+          tags: ['Call Scheduled'],
+        })
+      } catch (syncErr) {
+        console.error('Contact sync error (non-fatal):', syncErr)
+      }
+    }
 
     return NextResponse.json({
       success:        true,

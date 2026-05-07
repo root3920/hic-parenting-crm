@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { getCanonicalProduct } from '@/lib/products'
+import { syncContact } from '@/lib/contacts-sync'
 
 export async function POST(req: NextRequest) {
   try {
@@ -337,6 +338,57 @@ export async function POST(req: NextRequest) {
         commission_pending: totalComm,
         net_total: costNum - totalComm,
       })
+    }
+
+    // ── Sync contact record ──────────────────────────────────────────────
+    if (buyer_email) {
+      try {
+        if (canonical === 'Secure Parent Collective') {
+          const costNum2 = parseFloat(cost) || 0
+          if (costNum2 === 0) {
+            await syncContact(supabase, {
+              email: buyer_email,
+              full_name: buyer_fullname,
+              phone: buyer_phone,
+              status: 'Engaged',
+              tags: ['SPC Trial'],
+              is_spc_trial: true,
+              spc_status: 'trial',
+            })
+          } else {
+            await syncContact(supabase, {
+              email: buyer_email,
+              full_name: buyer_fullname,
+              phone: buyer_phone,
+              status: 'Enrolled',
+              tags: ['SPC Member'],
+              is_spc_member: true,
+              spc_status: 'active',
+            })
+          }
+        } else if (canonical.startsWith('Parenting With Understanding')) {
+          await syncContact(supabase, {
+            email: buyer_email,
+            full_name: buyer_fullname,
+            phone: buyer_phone,
+            status: 'Enrolled',
+            tags: ['PWU Student'],
+            is_pwu_student: true,
+          })
+        } else if (isRSC) {
+          await syncContact(supabase, {
+            email: buyer_email,
+            full_name: buyer_fullname,
+            phone: buyer_phone,
+            status: 'Enrolled',
+            tags: ['SPC Member'],
+            is_spc_member: true,
+            spc_status: 'active',
+          })
+        }
+      } catch (syncErr) {
+        console.error('Contact sync error (non-fatal):', syncErr)
+      }
     }
 
     return NextResponse.json({ success: true }, { status: 200 })
