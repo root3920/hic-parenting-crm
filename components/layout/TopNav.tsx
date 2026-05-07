@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Eye,
   ClipboardList,
+  Contact,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -48,6 +49,7 @@ const ALL_NAV_ITEMS = [
   { href: '/equipo/spc',   label: 'Team',         icon: UsersRound,      roles: ['csm_spc'] as UserRole[] },
   { href: '/finance',      label: 'Finance',      icon: DollarSign,      roles: ['admin'] as UserRole[] },
   { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },
+  { href: '/contacts',     label: 'Contacts',     icon: Contact,         roles: ['admin'] as UserRole[] },
   { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
 ]
 

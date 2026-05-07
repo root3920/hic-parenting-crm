@@ -410,3 +410,14 @@ export interface CsmReport {
   c_accion3: string | null
   created_at: string
 }
+
+export interface Contact {
+  id: string
+  ghl_id: string | null
+  full_name: string
+  email: string | null
+  phone: string | null
+  status: string
+  created_at: string
+  updated_at: string
+}
