@@ -415,8 +415,11 @@ export interface Contact {
   id: string
   ghl_id: string | null
   full_name: string
+  first_name: string | null
+  last_name: string | null
   email: string | null
   phone: string | null
+  owner: string | null
   status: string
   created_at: string
   updated_at: string
