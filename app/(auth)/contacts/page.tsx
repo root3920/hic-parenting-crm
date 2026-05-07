@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, ExternalLink, Users, UserPlus, PhoneCall, GraduationCap } from 'lucide-react'
+import { Search, ExternalLink, Users, UserPlus, PhoneCall, GraduationCap, Plus, Pencil, Trash2, X } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
 import { AnimatedTableRow } from '@/components/motion/AnimatedTableRow'
@@ -39,9 +39,150 @@ const STATUS_COLORS: Record<ContactStatus, string> = {
 
 type DateFilter = 'today' | '7d' | '30d' | 'all'
 
+interface ContactForm {
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  owner: string
+  status: ContactStatus
+  ghl_id: string
+}
+
+const emptyForm: ContactForm = {
+  first_name: '', last_name: '', email: '', phone: '',
+  owner: '', status: 'New', ghl_id: '',
+}
+
 function isNew24h(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
 }
+
+// ── Contact Form Modal ──────────────────────────────────────────────────
+
+function ContactFormModal({
+  title,
+  form,
+  saving,
+  onChange,
+  onSave,
+  onClose,
+}: {
+  title: string
+  form: ContactForm
+  saving: boolean
+  onChange: <K extends keyof ContactForm>(key: K, value: ContactForm[K]) => void
+  onSave: () => void
+  onClose: () => void
+}) {
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
+            <X className="h-4 w-4 text-zinc-500" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+              First Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              className={inputCls}
+              value={form.first_name}
+              onChange={(e) => onChange('first_name', e.target.value)}
+              placeholder="John"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Last Name</label>
+            <input
+              className={inputCls}
+              value={form.last_name}
+              onChange={(e) => onChange('last_name', e.target.value)}
+              placeholder="Doe"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Email</label>
+          <input
+            type="email"
+            className={inputCls}
+            value={form.email}
+            onChange={(e) => onChange('email', e.target.value)}
+            placeholder="john@example.com"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Phone</label>
+          <input
+            className={inputCls}
+            value={form.phone}
+            onChange={(e) => onChange('phone', e.target.value)}
+            placeholder="+1 555 123 4567"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Owner</label>
+          <input
+            className={inputCls}
+            value={form.owner}
+            onChange={(e) => onChange('owner', e.target.value)}
+            placeholder="Optional"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Status</label>
+            <select
+              className={inputCls}
+              value={form.status}
+              onChange={(e) => onChange('status', e.target.value as ContactStatus)}
+            >
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">GHL ID</label>
+            <input
+              className={inputCls}
+              value={form.ghl_id}
+              onChange={(e) => onChange('ghl_id', e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button
+            size="sm"
+            onClick={onSave}
+            disabled={saving || !form.first_name.trim()}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Page ───────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
   const supabase = useMemo(() => createClient(), [])
@@ -50,7 +191,17 @@ export default function ContactsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ContactStatus | 'All'>('All')
   const [dateFilter, setDateFilter] = useState<DateFilter>('all')
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [statusEditId, setStatusEditId] = useState<string | null>(null)
+
+  // Modal state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [editContact, setEditContact] = useState<Contact | null>(null)
+  const [form, setForm] = useState<ContactForm>(emptyForm)
+  const [saving, setSaving] = useState(false)
+
+  function setField<K extends keyof ContactForm>(key: K, value: ContactForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
 
   // Fetch contacts
   useEffect(() => {
@@ -90,28 +241,120 @@ export default function ContactsPage() {
     return () => { supabase.removeChannel(channel) }
   }, [supabase])
 
-  // Update status
+  // Inline status update
   async function updateStatus(id: string, newStatus: ContactStatus) {
-    const { error } = await supabase
-      .from('contacts')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', id)
-
-    if (error) {
-      toast.error('Failed to update status: ' + error.message)
+    const res = await fetch(`/api/contacts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+    if (!res.ok) {
+      toast.error('Failed to update status')
       return
     }
-    setContacts((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: newStatus, updated_at: new Date().toISOString() } : c))
-    )
-    setEditingId(null)
+    const updated = await res.json()
+    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)))
+    setStatusEditId(null)
+  }
+
+  // Add contact
+  function openAddModal() {
+    setForm(emptyForm)
+    setEditContact(null)
+    setShowAddModal(true)
+  }
+
+  async function handleAdd() {
+    if (!form.first_name.trim()) return
+    setSaving(true)
+    const full_name = `${form.first_name} ${form.last_name}`.trim()
+    const { data, error } = await supabase
+      .from('contacts')
+      .insert({
+        first_name: form.first_name || null,
+        last_name: form.last_name || null,
+        full_name,
+        email: form.email || null,
+        phone: form.phone || null,
+        owner: form.owner || null,
+        status: form.status,
+        ghl_id: form.ghl_id || null,
+      })
+      .select()
+      .single()
+    setSaving(false)
+
+    if (error) {
+      toast.error('Failed to add contact: ' + error.message)
+      return
+    }
+    setContacts((prev) => [data as Contact, ...prev])
+    setShowAddModal(false)
+    toast.success('Contact added')
+  }
+
+  // Edit contact
+  function openEditModal(contact: Contact) {
+    setForm({
+      first_name: contact.first_name || '',
+      last_name: contact.last_name || '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      owner: contact.owner || '',
+      status: (contact.status as ContactStatus) || 'New',
+      ghl_id: contact.ghl_id || '',
+    })
+    setEditContact(contact)
+    setShowAddModal(false)
+  }
+
+  async function handleEdit() {
+    if (!editContact || !form.first_name.trim()) return
+    setSaving(true)
+    const full_name = `${form.first_name} ${form.last_name}`.trim()
+    const res = await fetch(`/api/contacts/${editContact.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        first_name: form.first_name || null,
+        last_name: form.last_name || null,
+        full_name,
+        email: form.email || null,
+        phone: form.phone || null,
+        owner: form.owner || null,
+        status: form.status,
+        ghl_id: form.ghl_id || null,
+      }),
+    })
+    setSaving(false)
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      toast.error('Failed to update: ' + (body.error || 'Unknown error'))
+      return
+    }
+    const updated = await res.json()
+    setContacts((prev) => prev.map((c) => (c.id === editContact.id ? { ...c, ...updated } : c)))
+    setEditContact(null)
+    toast.success('Contact updated')
+  }
+
+  // Delete contact
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this contact? This cannot be undone.')) return
+    const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error('Error deleting contact')
+      return
+    }
+    setContacts((prev) => prev.filter((c) => c.id !== id))
+    toast.success('Contact deleted')
   }
 
   // Filtered contacts
   const filtered = useMemo(() => {
     let list = contacts
 
-    // Date filter
     if (dateFilter !== 'all') {
       const now = Date.now()
       const ms =
@@ -121,12 +364,10 @@ export default function ContactsPage() {
       list = list.filter((c) => now - new Date(c.created_at).getTime() < ms)
     }
 
-    // Status filter
     if (statusFilter !== 'All') {
       list = list.filter((c) => c.status === statusFilter)
     }
 
-    // Search
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -147,7 +388,16 @@ export default function ContactsPage() {
 
   return (
     <PageTransition>
-      <PageHeader title="Contacts" description="Lead pipeline from Go High Level" />
+      <PageHeader title="Contacts" description="Lead pipeline from Go High Level">
+        <Button
+          onClick={openAddModal}
+          className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+          size="sm"
+        >
+          <Plus className="h-4 w-4" />
+          Add Contact
+        </Button>
+      </PageHeader>
 
       {/* KPI Cards */}
       <KPICardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -268,13 +518,13 @@ export default function ContactsPage() {
                     {contact.phone || '—'}
                   </TableCell>
                   <TableCell>
-                    {editingId === contact.id ? (
+                    {statusEditId === contact.id ? (
                       <select
                         autoFocus
                         className="text-xs rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                         value={contact.status}
                         onChange={(e) => updateStatus(contact.id, e.target.value as ContactStatus)}
-                        onBlur={() => setEditingId(null)}
+                        onBlur={() => setStatusEditId(null)}
                       >
                         {STATUSES.map((s) => (
                           <option key={s} value={s}>{s}</option>
@@ -282,7 +532,7 @@ export default function ContactsPage() {
                       </select>
                     ) : (
                       <button
-                        onClick={() => setEditingId(contact.id)}
+                        onClick={() => setStatusEditId(contact.id)}
                         className={cn(
                           'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity',
                           STATUS_COLORS[contact.status as ContactStatus] ?? STATUS_COLORS['New']
@@ -296,27 +546,65 @@ export default function ContactsPage() {
                   <TableCell className="text-sm text-zinc-500 dark:text-zinc-400">
                     {formatDate(contact.created_at)}
                   </TableCell>
-                  <TableCell className="text-right">
-                    {contact.ghl_id ? (
-                      <a
-                        href={`https://app.hicparenting.com/v2/location/E9DtRyrhRO9Ce7h1D0u7/contacts/detail/${contact.ghl_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      {contact.ghl_id && (
+                        <a
+                          href={`https://app.hicparenting.com/v2/location/E9DtRyrhRO9Ce7h1D0u7/contacts/detail/${contact.ghl_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="outline" size="sm" className="gap-1 text-xs h-7 px-2">
+                            Contact
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        </a>
+                      )}
+                      <button
+                        onClick={() => openEditModal(contact)}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        title="Edit"
                       >
-                        <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                          Contact
-                          <ExternalLink className="h-3 w-3" />
-                        </Button>
-                      </a>
-                    ) : (
-                      <span className="text-xs text-zinc-400">No GHL ID</span>
-                    )}
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(contact.id)}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </TableCell>
                 </AnimatedTableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {/* Add Contact Modal */}
+      {showAddModal && (
+        <ContactFormModal
+          title="Add Contact"
+          form={form}
+          saving={saving}
+          onChange={setField}
+          onSave={handleAdd}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {/* Edit Contact Modal */}
+      {editContact && (
+        <ContactFormModal
+          title="Edit Contact"
+          form={form}
+          saving={saving}
+          onChange={setField}
+          onSave={handleEdit}
+          onClose={() => setEditContact(null)}
+        />
       )}
     </PageTransition>
   )
