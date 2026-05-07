@@ -1,105 +1,117 @@
 import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-interface ContactPayload {
-  ghl_id: string | null
-  full_name: string
-  first_name: string
-  last_name: string
-  email: string | null
-  phone: string | null
-  owner: string | null
-}
-
-function buildUpsertData(p: ContactPayload) {
-  return {
-    ghl_id: p.ghl_id,
-    full_name: p.full_name,
-    first_name: p.first_name || null,
-    last_name: p.last_name || null,
-    email: p.email,
-    phone: p.phone,
-    owner: p.owner,
-    status: 'New',
-    updated_at: new Date().toISOString(),
-  }
-}
-
-async function upsertContact(payload: ContactPayload) {
-  const { data, error } = await supabase
-    .from('contacts')
-    .upsert(buildUpsertData(payload), {
-      onConflict: 'ghl_id',
-      ignoreDuplicates: false,
-    })
-    .select()
-    .single()
-
-  return { data, error }
-}
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
+  try {
+    const { searchParams } = new URL(request.url)
 
-  const first_name = searchParams.get('first_name') || ''
-  const last_name = searchParams.get('last_name') || ''
-  const email = searchParams.get('email') || null
-  const phone = searchParams.get('phone') || null
-  const ghl_id = searchParams.get('ID') || searchParams.get('id') || null
-  const owner = searchParams.get('owner') || null
+    // Log ALL params received from GHL
+    const allParams: Record<string, string> = {}
+    searchParams.forEach((value, key) => {
+      allParams[key] = value
+    })
+    console.log('=== CONTACTS WEBHOOK GET ===')
+    console.log('All params:', JSON.stringify(allParams))
+    console.log('Full URL:', request.url)
 
-  const full_name = `${first_name} ${last_name}`.trim() || 'Unknown'
+    const first_name = searchParams.get('first_name') || ''
+    const last_name = searchParams.get('last_name') || ''
+    const email = searchParams.get('email') || null
+    const phone = searchParams.get('phone') || null
+    const ghl_id = searchParams.get('ID') || searchParams.get('id') || null
+    const owner = searchParams.get('owner') || null
 
-  console.log('Contact webhook GET:', { ghl_id, full_name, email, phone, owner })
+    const full_name = `${first_name} ${last_name}`.trim() || 'Unknown'
 
-  if (!ghl_id && !email) {
-    return NextResponse.json({ error: 'Missing id or email' }, { status: 400 })
+    console.log('Parsed:', { ghl_id, full_name, email, phone, owner })
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.error('Missing NEXT_PUBLIC_SUPABASE_URL')
+      return Response.json({ error: 'Missing Supabase URL' }, { status: 500 })
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing SUPABASE_SERVICE_ROLE_KEY')
+      return Response.json({ error: 'Missing service role key' }, { status: 500 })
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data, error } = await supabase
+      .from('contacts')
+      .upsert({
+        ghl_id: ghl_id,
+        full_name: full_name,
+        first_name: first_name,
+        last_name: last_name,
+        email: email,
+        phone: phone,
+        owner: owner,
+        status: 'New',
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'ghl_id',
+        ignoreDuplicates: false,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Supabase error:', JSON.stringify(error))
+      return Response.json({ error: error.message, details: error }, { status: 500 })
+    }
+
+    console.log('Contact saved successfully:', data?.id)
+    return Response.json({ success: true, id: data?.id })
+
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    const stack = err instanceof Error ? err.stack : undefined
+    console.error('Webhook crash:', message, stack)
+    return Response.json({ error: message }, { status: 500 })
   }
-
-  const { data, error } = await upsertContact({ ghl_id, full_name, first_name, last_name, email, phone, owner })
-
-  if (error) {
-    console.error('Contact upsert error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  console.log('Contact saved:', data)
-  return NextResponse.json({ success: true, contact: data })
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    console.log('Contact webhook POST:', body)
+    console.log('=== CONTACTS WEBHOOK POST ===')
+    console.log('Body:', JSON.stringify(body))
 
-    const first_name = body.first_name || body.firstName || ''
-    const last_name = body.last_name || body.lastName || ''
+    const first_name = body.first_name || ''
+    const last_name = body.last_name || ''
     const email = body.email || null
     const phone = body.phone || null
-    const ghl_id = body.ID || body.id || null
+    const ghl_id = body.ID || body.id || body.ghl_id || null
     const owner = body.owner || null
+    const full_name = `${first_name} ${last_name}`.trim() || body.full_name || 'Unknown'
 
-    const full_name = body.full_name || `${first_name} ${last_name}`.trim() || 'Unknown'
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
-    if (!ghl_id && !email) {
-      return NextResponse.json({ error: 'Missing id or email' }, { status: 400 })
-    }
-
-    const { data, error } = await upsertContact({ ghl_id, full_name, first_name, last_name, email, phone, owner })
+    const { data, error } = await supabase
+      .from('contacts')
+      .upsert({
+        ghl_id, full_name, first_name, last_name,
+        email, phone, owner,
+        status: 'New',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'ghl_id' })
+      .select()
+      .single()
 
     if (error) {
-      console.error('Contact upsert error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Supabase error:', error)
+      return Response.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, contact: data })
-  } catch (err) {
-    console.error('Contact webhook error:', err)
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    return Response.json({ success: true, id: data?.id })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('POST crash:', message)
+    return Response.json({ error: message }, { status: 500 })
   }
 }
