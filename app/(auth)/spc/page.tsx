@@ -281,6 +281,7 @@ function MemberProfileModal({
   onClose,
   onSave,
   onSaveCancellation,
+  onDeleteCancellation,
   onReactivate,
   memberTransactions,
   memberAttendance,
@@ -296,6 +297,7 @@ function MemberProfileModal({
   onClose: () => void
   onSave: (updated: SpcMember) => void
   onSaveCancellation: (updated: SpcCancellation) => void
+  onDeleteCancellation: (id: string) => void
   onReactivate: (cancellationId: string, member: SpcMember) => void
   memberTransactions: Transaction[]
   memberAttendance: SpcClassAttendance[]
@@ -671,6 +673,19 @@ function MemberProfileModal({
             </button>
           )}
           <button
+            onClick={async () => {
+              if (selected.kind === 'cancellation') {
+                if (!confirm('Delete this cancellation record? This cannot be undone.')) return
+                const res = await fetch(`/api/spc/cancellations/${selected.data.id}`, { method: 'DELETE' })
+                if (!res.ok) {
+                  const body = await res.json().catch(() => ({}))
+                  toast.error('Error deleting: ' + (body.error || 'Unknown error'))
+                  return
+                }
+                onDeleteCancellation(selected.data.id)
+                toast.success('Record deleted')
+              }
+            }}
             className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
             title="Delete"
           >
@@ -3871,6 +3886,10 @@ export default function SpcPage() {
             if (!updated) return
             setCancellations((prev) => prev.map((c) => c.id === updated.id ? updated : c))
             setSelectedMember({ kind: 'cancellation', data: updated })
+          }}
+          onDeleteCancellation={(id) => {
+            setCancellations((prev) => prev.filter((c) => c.id !== id))
+            setSelectedMember(null)
           }}
           onReactivate={(cancellationId, member) => {
             setCancellations((prev) => prev.filter((c) => c.id !== cancellationId))
