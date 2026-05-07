@@ -63,6 +63,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/surveys') ||
     pathname === '/api/sales/backfill' ||
     pathname === '/api/spc/backfill-csv' ||
+    pathname.startsWith('/api/contacts/backfill') ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
   ) {
     return NextResponse.next()
