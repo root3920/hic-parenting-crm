@@ -49,6 +49,11 @@ const TAG_COLORS: Record<string, string> = {
   'Call Scheduled': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
 }
 
+const ALL_TAGS = [
+  'SPC Member', 'SPC Trial', 'SPC Cancelled', 'PWU Student', 'PWU Graduate',
+  'Call Scheduled', 'Hot Lead', 'Cold Lead', 'Do Not Contact', 'VIP', 'Referral',
+] as const
+
 const TAG_FILTER_OPTIONS = ['All', 'SPC Member', 'SPC Trial', 'PWU Student', 'PWU Graduate', 'No tags'] as const
 type TagFilter = (typeof TAG_FILTER_OPTIONS)[number]
 
@@ -191,6 +196,8 @@ function ContactDetailModal({
   onEdit,
   onDelete,
   onStatusChange,
+  onAddTag,
+  onRemoveTag,
   authorName,
 }: {
   contact: Contact
@@ -198,6 +205,8 @@ function ContactDetailModal({
   onEdit: () => void
   onDelete: () => void
   onStatusChange: (id: string, status: ContactStatus) => void
+  onAddTag: (id: string, tag: string) => void
+  onRemoveTag: (id: string, tag: string) => void
   authorName: string
 }) {
   const supabase = useMemo(() => createClient(), [])
@@ -351,22 +360,45 @@ function ContactDetailModal({
               )}
             </div>
 
-            {/* Tags section */}
-            {(contact.tags || []).length > 0 && (
-              <div className="mt-5">
-                <p className={sectionLabel}>
-                  <Tag className="h-3 w-3 inline mr-1" />
-                  Tags
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {contact.tags.map((tag) => (
-                    <span key={tag} className={cn('inline-flex px-2.5 py-1 rounded-full text-xs font-medium', TAG_COLORS[tag] || 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400')}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+            {/* Tags section (editable) */}
+            <div className="mt-5">
+              <p className={sectionLabel}>
+                <Tag className="h-3 w-3 inline mr-1" />
+                Tags
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {(contact.tags || []).length === 0 && (
+                  <span className="text-xs text-zinc-400 italic">No tags</span>
+                )}
+                {(contact.tags || []).map((tag) => (
+                  <span key={tag} className={cn('inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium', TAG_COLORS[tag] || 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400')}>
+                    {tag}
+                    <button
+                      onClick={() => onRemoveTag(contact.id, tag)}
+                      className="hover:text-red-500 transition-colors text-current opacity-60 hover:opacity-100"
+                      title="Remove tag"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ))}
               </div>
-            )}
+              <select
+                className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onAddTag(contact.id, e.target.value)
+                    e.target.value = ''
+                  }
+                }}
+              >
+                <option value="" disabled>+ Add tag...</option>
+                {ALL_TAGS.filter((t) => !(contact.tags || []).includes(t)).map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* RIGHT: Notes */}
@@ -607,6 +639,37 @@ export default function ContactsPage() {
     setContacts((prev) => prev.filter((c) => c.id !== id))
     setDetailContact(null)
     toast.success('Contact deleted')
+  }
+
+  // Tag management
+  async function handleAddTag(id: string, tag: string) {
+    const contact = contacts.find((c) => c.id === id)
+    if (!contact || (contact.tags || []).includes(tag)) return
+    const newTags = [...(contact.tags || []), tag]
+    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, tags: newTags } : c)))
+    setDetailContact((prev) => prev && prev.id === id ? { ...prev, tags: newTags } : prev)
+    const res = await fetch(`/api/contacts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags: newTags }),
+    })
+    if (!res.ok) toast.error('Failed to add tag')
+    else toast.success(`Tag added: ${tag}`)
+  }
+
+  async function handleRemoveTag(id: string, tag: string) {
+    const contact = contacts.find((c) => c.id === id)
+    if (!contact) return
+    const newTags = (contact.tags || []).filter((t) => t !== tag)
+    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, tags: newTags } : c)))
+    setDetailContact((prev) => prev && prev.id === id ? { ...prev, tags: newTags } : prev)
+    const res = await fetch(`/api/contacts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags: newTags }),
+    })
+    if (!res.ok) toast.error('Failed to remove tag')
+    else toast.success('Tag removed')
   }
 
   // Filtered contacts
@@ -879,6 +942,8 @@ export default function ContactsPage() {
           onEdit={() => openEditModal(detailContact)}
           onDelete={() => handleDelete(detailContact.id)}
           onStatusChange={updateStatus}
+          onAddTag={handleAddTag}
+          onRemoveTag={handleRemoveTag}
           authorName={profile?.full_name || 'Unknown'}
         />
       )}

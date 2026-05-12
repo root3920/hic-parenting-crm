@@ -17,6 +17,7 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { US_TIMEZONES } from '@/lib/timezones'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { useProfile } from '@/hooks/useProfile'
+import { useTeamMembers, TeamMember } from '@/hooks/useTeamMembers'
 import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -70,9 +71,16 @@ const ROLE_COLORS: Record<Role, string> = {
   csm_spc: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
   csm_ht:  'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
 }
-const CLOSER_NAMES = ['Marcela HIC Parenting', 'Cali Luna']
-const SETTER_NAMES = ['Valentina Llano', 'Marcela Collier']
 const emptyInviteForm: InviteForm = { email: '', full_name: '', role: 'closer', closer_name: '', setter_name: '' }
+
+type TeamMemberRole = 'closer' | 'setter' | 'csm_spc' | 'csm_ht'
+type TeamTab = 'closer' | 'setter'
+
+interface TeamMemberForm {
+  name: string
+  email: string
+}
+const emptyTeamMemberForm: TeamMemberForm = { name: '', email: '' }
 
 // ─── Settings page ────────────────────────────────────────────────────────────
 
@@ -92,6 +100,79 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false)
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
   const { previewRole, setPreviewRole } = usePreviewRole()
+
+  // Team Members management
+  const { names: CLOSER_NAMES, refetch: refetchClosers } = useTeamMembers('closer')
+  const { names: SETTER_NAMES, refetch: refetchSetters } = useTeamMembers('setter')
+  const { members: allTeamMembers, loading: allTeamLoading, refetch: refetchAll } = useTeamMembers(undefined, false)
+  const [teamTab, setTeamTab] = useState<TeamTab>('closer')
+  const [tmModalOpen, setTmModalOpen] = useState(false)
+  const [tmModalRole, setTmModalRole] = useState<TeamMemberRole>('closer')
+  const [tmForm, setTmForm] = useState<TeamMemberForm>(emptyTeamMemberForm)
+  const [tmSaving, setTmSaving] = useState(false)
+  const [tmEditingId, setTmEditingId] = useState<string | null>(null)
+  const [tmEditName, setTmEditName] = useState('')
+
+  const displayedTeamMembers = allTeamMembers.filter(m => m.role === teamTab)
+
+  function refetchTeamMembers() {
+    refetchClosers()
+    refetchSetters()
+    refetchAll()
+  }
+
+  async function handleAddTeamMember(e: React.FormEvent) {
+    e.preventDefault()
+    if (!tmForm.name.trim()) { toast.error('Name is required'); return }
+    setTmSaving(true)
+    const res = await fetch('/api/team-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: tmForm.name.trim(), email: tmForm.email.trim() || null, role: tmModalRole }),
+    })
+    setTmSaving(false)
+    if (!res.ok) {
+      const d = await res.json()
+      toast.error(d.error ?? 'Error adding member')
+      return
+    }
+    toast.success(`${tmForm.name} added as ${tmModalRole}`)
+    setTmModalOpen(false)
+    setTmForm(emptyTeamMemberForm)
+    refetchTeamMembers()
+  }
+
+  async function handleToggleActive(member: TeamMember) {
+    const res = await fetch(`/api/team-members/${member.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: !member.active }),
+    })
+    if (!res.ok) { toast.error('Failed to update'); return }
+    toast.success(`${member.name} ${member.active ? 'deactivated' : 'activated'}`)
+    refetchTeamMembers()
+  }
+
+  async function handleSaveTeamMemberName(member: TeamMember) {
+    if (!tmEditName.trim()) { setTmEditingId(null); return }
+    const res = await fetch(`/api/team-members/${member.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: tmEditName.trim() }),
+    })
+    setTmEditingId(null)
+    if (!res.ok) { toast.error('Failed to update name'); return }
+    toast.success('Name updated')
+    refetchTeamMembers()
+  }
+
+  async function handleDeleteTeamMember(member: TeamMember) {
+    if (!confirm(`Delete ${member.name}? This cannot be undone.`)) return
+    const res = await fetch(`/api/team-members/${member.id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete'); return }
+    toast.success(`${member.name} deleted`)
+    refetchTeamMembers()
+  }
 
   useEffect(() => {
     void supabase.auth.getUser().then((r: { data: { user: { email?: string } | null } }) => {
@@ -381,6 +462,121 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
+            {/* Team Members (dynamic closers / setters) */}
+            <Card className="mb-6">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle className="text-sm font-semibold">Team Members</CardTitle>
+                  <CardDescription className="mt-1">Manage closers, setters, and their availability</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Tabs */}
+                <div className="flex items-center gap-0 mb-4 border-b border-zinc-200 dark:border-zinc-700">
+                  {(['closer', 'setter'] as TeamTab[]).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setTeamTab(tab)}
+                      className={cn(
+                        'px-4 py-2 text-xs font-semibold transition-colors border-b-2 -mb-px',
+                        teamTab === tab
+                          ? 'border-[#185FA5] text-[#185FA5]'
+                          : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                      )}
+                    >
+                      {tab === 'closer' ? 'Closers' : 'Setters'}
+                    </button>
+                  ))}
+                  <div className="flex-1" />
+                  <button
+                    onClick={() => { setTmModalRole(teamTab === 'closer' ? 'closer' : 'setter'); setTmForm(emptyTeamMemberForm); setTmModalOpen(true) }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 mb-1"
+                    style={{ backgroundColor: '#185FA5' }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add {teamTab === 'closer' ? 'Closer' : 'Setter'}
+                  </button>
+                </div>
+
+                {/* Table */}
+                {allTeamLoading ? (
+                  <div className="space-y-0">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded mb-1" />
+                    ))}
+                  </div>
+                ) : displayedTeamMembers.length === 0 ? (
+                  <p className="text-xs text-zinc-400 py-8 text-center">No {teamTab === 'closer' ? 'closers' : 'setters'} yet</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-zinc-200 dark:border-zinc-800">
+                          <th className="text-left py-2 px-3 font-semibold text-zinc-500 dark:text-zinc-400">Name</th>
+                          <th className="text-left py-2 px-3 font-semibold text-zinc-500 dark:text-zinc-400">Email</th>
+                          <th className="text-left py-2 px-3 font-semibold text-zinc-500 dark:text-zinc-400">Status</th>
+                          <th className="text-left py-2 px-3 font-semibold text-zinc-500 dark:text-zinc-400">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayedTeamMembers.map(m => (
+                          <tr key={m.id} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                            <td className="py-2.5 px-3">
+                              {tmEditingId === m.id ? (
+                                <input
+                                  autoFocus
+                                  value={tmEditName}
+                                  onChange={e => setTmEditName(e.target.value)}
+                                  onBlur={() => handleSaveTeamMemberName(m)}
+                                  onKeyDown={e => { if (e.key === 'Enter') handleSaveTeamMemberName(m); if (e.key === 'Escape') setTmEditingId(null) }}
+                                  className="text-xs border border-blue-400 rounded px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none w-48"
+                                />
+                              ) : (
+                                <span className="font-medium text-zinc-900 dark:text-zinc-100">{m.name}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">{m.email ?? '—'}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={cn(
+                                'inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold',
+                                m.active
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                                  : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                              )}>
+                                {m.active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => { setTmEditingId(m.id); setTmEditName(m.name) }}
+                                  className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                  title="Edit name"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleToggleActive(m)}
+                                  className={cn(
+                                    'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
+                                    m.active
+                                      ? 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                                      : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                  )}
+                                >
+                                  {m.active ? 'Deactivate' : 'Activate'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Preview as role */}
             <Card className="mb-6">
               <CardHeader>
@@ -578,6 +774,53 @@ export default function SettingsPage() {
                   style={{ backgroundColor: '#185FA5' }}
                 >
                   {inviting ? 'Sending...' : 'Send Invitation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Add Team Member modal */}
+      {tmModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setTmModalOpen(false)} />
+          <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-sm p-6 border border-zinc-200 dark:border-zinc-700">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                Add {tmModalRole === 'closer' ? 'Closer' : 'Setter'}
+              </h2>
+              <button onClick={() => setTmModalOpen(false)} className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={handleAddTeamMember} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={tmForm.name}
+                  onChange={e => setTmForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Full name"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Email <span className="text-zinc-400 font-normal">(optional)</span></label>
+                <input
+                  type="email"
+                  value={tmForm.email}
+                  onChange={e => setTmForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="email@example.com"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setTmModalOpen(false)} className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={tmSaving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+                  {tmSaving ? 'Saving...' : 'Add'}
                 </button>
               </div>
             </form>

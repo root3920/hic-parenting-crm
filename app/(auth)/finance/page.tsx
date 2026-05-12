@@ -20,6 +20,7 @@ import {
 } from 'recharts'
 import { DollarSign, Download, Search } from 'lucide-react'
 import { toast } from 'sonner'
+import { useTeamMembers } from '@/hooks/useTeamMembers'
 import type { FinanceCommission, FinanceMonthly } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -73,41 +74,6 @@ const selectCls = 'text-sm border border-zinc-200 dark:border-zinc-700 rounded-m
 
 type Tab = 'dashboard' | 'commissions' | 'pnl'
 
-const CLOSERS = [
-  'Marcela HIC Parenting',
-  'Ana Martin',
-  'Cali Luna',
-  'Ariana Peña',
-  'Jessica Fisk-Abraham',
-  'Maya Ahmed',
-  'Sona Patel',
-  'Steffanie Williams',
-  'Sylvia Smit',
-  'Tina Balmer',
-  'Veronica Herrera',
-  'Liliana Mendoza',
-  'Karina Lopez',
-  'Amanda Smith',
-]
-
-const SETTERS = [
-  'Valentina Llano',
-  'Marcela Collier',
-  'Ana Martin',
-  'Beatriz Navarro',
-  'Casper Holm',
-  'Hamza Sayyed',
-  'Katy Castellanos',
-  'Lamees Attia',
-  'Mariana Llano',
-  'Marrian Yousef',
-  'Patsy George',
-  'Rohit Rajendranath',
-  'Tina Balmer',
-  'Sylvia Smit',
-  'Venicia Lloyd',
-]
-
 const chartVariants = {
   hidden: { opacity: 0, scale: 0.97 },
   visible: { opacity: 1, scale: 1, transition: { duration: 0.5, delay: 0.2, ease: 'easeOut' as const } },
@@ -133,6 +99,8 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 
 export default function FinancePage() {
   const supabase = useMemo(() => createClient(), [])
+  const { names: CLOSERS } = useTeamMembers('closer')
+  const { names: SETTERS } = useTeamMembers('setter')
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [loading, setLoading] = useState(true)
 

@@ -18,6 +18,7 @@ import {
 import { CallsCalendar } from '@/components/calls/CallsCalendar'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useTeamMembers } from '@/hooks/useTeamMembers'
 import { US_TIMEZONES, formatDateTimeInTimezone } from '@/lib/timezones'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import {
@@ -64,16 +65,6 @@ const PIE_COLORS: Record<string, string> = {
 }
 
 const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show', 'Follow-up'] as const
-
-const CLOSERS = [
-  'Marcela HIC Parenting',
-  'Cali Luna',
-]
-
-const SETTERS = [
-  'Valentina Llano',
-  'Marcela Collier',
-]
 
 const STATUS_DOT: Record<string, string> = {
   'Scheduled':   'bg-blue-500',
@@ -190,6 +181,8 @@ export default function LlamadasPage() {
   const supabase = useMemo(() => createClient(), [])
   const { timezone } = useUserTimezone()
   const { profile } = useProfile()
+  const { names: CLOSERS } = useTeamMembers('closer')
+  const { names: SETTERS } = useTeamMembers('setter')
   const isCloser = profile?.role === 'closer'
   const tzAbbr = US_TIMEZONES.find(t => t.value === timezone)?.abbr ?? 'EST'
 

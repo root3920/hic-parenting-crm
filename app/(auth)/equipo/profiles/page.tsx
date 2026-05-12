@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { toast } from 'sonner'
 import { Plus, X, UserPlus } from 'lucide-react'
+import { useTeamMembers } from '@/hooks/useTeamMembers'
 import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -33,8 +34,6 @@ const ROLE_COLORS: Record<Role, string> = {
   setter: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
 }
 
-const CLOSER_NAMES = ['Marcela HIC Parenting', 'Cali Luna']
-const SETTER_NAMES = ['Valentina Llano', 'Marcela Collier']
 
 interface FormState {
   email: string
@@ -54,6 +53,8 @@ const emptyForm: FormState = {
 
 export default function ProfilesPage() {
   const supabase = useMemo(() => createClient(), [])
+  const { names: CLOSER_NAMES } = useTeamMembers('closer')
+  const { names: SETTER_NAMES } = useTeamMembers('setter')
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
