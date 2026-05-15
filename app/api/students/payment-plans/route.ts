@@ -97,10 +97,10 @@ export async function GET() {
       ? Math.round((paid / plan.total_installments) * 100)
       : 0
 
-    // Calculate months elapsed since start_date
+    // Calculate months elapsed since start_date (minimum 1)
     const start = new Date(plan.start_date + 'T12:00:00')
     const monthsElapsed = Math.max(
-      0,
+      1,
       (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()),
     )
     // Cap at total_installments — can't be overdue for more than the plan
