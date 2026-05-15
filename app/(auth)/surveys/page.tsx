@@ -87,15 +87,12 @@ function QualBadge({ qualified }: { qualified: boolean }) {
 }
 
 function SurveyDetail({ survey, onClose }: { survey: SurveyResponse; onClose: () => void }) {
-  function Row({ label, value, badge }: { label: string; value: string | null | undefined; badge?: React.ReactNode }) {
+  function ContactRow({ label, value }: { label: string; value: string | null | undefined }) {
     if (!value) return null
     return (
       <div className="flex items-start gap-2 py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-        <span className="text-xs text-zinc-400 w-44 shrink-0">{label}</span>
-        <div className="flex-1">
-          <span className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">{value}</span>
-          {badge && <span className="ml-2">{badge}</span>}
-        </div>
+        <span className="text-xs text-zinc-400 w-28 shrink-0">{label}</span>
+        <span className="text-xs text-zinc-700 dark:text-zinc-300">{value}</span>
       </div>
     )
   }
@@ -103,43 +100,65 @@ function SurveyDetail({ survey, onClose }: { survey: SurveyResponse; onClose: ()
   function QualTag({ qualified }: { qualified: boolean | null }) {
     if (qualified === null) return null
     return qualified
-      ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">Qualified</span>
-      : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">DQ</span>
+      ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">Qualified</span>
+      : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">DQ</span>
   }
 
+  const questions: { key: string; label: string; question: string; value: string | null | undefined; badge?: React.ReactNode }[] = [
+    { key: 'q4', label: 'Q4', question: 'Where did you hear about us?', value: survey.q4_source },
+    { key: 'q5', label: 'Q5', question: 'Tell us about your children and what you\'re struggling with', value: survey.q5_children_struggle },
+    { key: 'q6', label: 'Q6', question: 'Why is now the right time to make a change?', value: survey.q6_why_now },
+    { key: 'q7', label: 'Q7', question: 'Are you in a position to invest in yourself and your family if this is the right fit?', value: survey.q7_investment, badge: <QualTag qualified={survey.q7_qualified} /> },
+    { key: 'q8', label: 'Q8', question: 'Would your spouse/partner be able to join the Google Meet with you?', value: survey.q8_spouse, badge: <QualTag qualified={survey.q8_qualified} /> },
+    { key: 'q9', label: 'Q9', question: 'What is your current work/life situation?', value: survey.q9_situation, badge: <QualTag qualified={survey.q9_qualified} /> },
+  ]
+
   return (
-    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-6">
+    <DialogContent className="max-w-[900px] max-h-[85vh] overflow-y-auto p-6">
       <DialogHeader>
         <DialogTitle className="text-base flex items-center gap-2">
           {survey.name}
           <QualBadge qualified={survey.is_qualified} />
         </DialogTitle>
       </DialogHeader>
-      <div className="space-y-4 mt-2">
+      <div className="space-y-5 mt-2">
+        {/* Contact — full width */}
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Contact</p>
-          <Row label="Name" value={survey.name} />
-          <Row label="Email" value={survey.email} />
-          <Row label="Phone" value={survey.phone ? `${countryFlag(survey.country)} ${survey.phone}` : null} />
-          <Row label="Country" value={survey.country} />
+          <ContactRow label="Name" value={survey.name} />
+          <ContactRow label="Email" value={survey.email} />
+          <ContactRow label="Phone" value={survey.phone ? `${countryFlag(survey.country)} ${survey.phone}` : null} />
+          <ContactRow label="Country" value={survey.country} />
         </div>
+
+        {/* Responses — 2-column grid */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-green-600 mb-2">Responses</p>
-          <Row label="Q4: Source" value={survey.q4_source} />
-          <Row label="Q5: Children & Struggle" value={survey.q5_children_struggle} />
-          <Row label="Q6: Why now" value={survey.q6_why_now} />
-          <Row label="Q7: Investment" value={survey.q7_investment} badge={<QualTag qualified={survey.q7_qualified} />} />
-          <Row label="Q8: Spouse" value={survey.q8_spouse} badge={<QualTag qualified={survey.q8_qualified} />} />
-          <Row label="Q9: Situation" value={survey.q9_situation} badge={<QualTag qualified={survey.q9_qualified} />} />
+          <p className="text-xs font-bold uppercase tracking-wide text-green-600 mb-3">Responses</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {questions.map((q) => (
+              <div key={q.key} className="bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">{q.label}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 leading-relaxed">{q.question}</p>
+                <div className="flex items-start gap-2">
+                  <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap flex-1">
+                    {q.value || <span className="text-zinc-300 dark:text-zinc-600 italic">No answer</span>}
+                  </p>
+                  {q.badge}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* Meta — full width */}
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Meta</p>
-          <Row label="Setter" value={survey.setter} />
-          <Row label="UTM Source" value={survey.utm_source} />
-          <Row label="UTM Medium" value={survey.utm_medium} />
-          <Row label="UTM Campaign" value={survey.utm_campaign} />
-          <Row label="Submitted" value={new Date(survey.submitted_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} />
-          <Row label="DQ Count" value={String(survey.disqualifying_count)} />
+          <ContactRow label="Setter" value={survey.setter} />
+          <ContactRow label="UTM Source" value={survey.utm_source} />
+          <ContactRow label="UTM Medium" value={survey.utm_medium} />
+          <ContactRow label="UTM Campaign" value={survey.utm_campaign} />
+          <ContactRow label="Submitted" value={new Date(survey.submitted_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} />
+          <ContactRow label="DQ Count" value={String(survey.disqualifying_count)} />
         </div>
       </div>
     </DialogContent>
