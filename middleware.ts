@@ -18,6 +18,7 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/goals':              ['admin'],
   '/contacts':           ['admin', 'setter'],
   '/surveys':            ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'],
+  '/calendar':           ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'],
   '/settings':           ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'],
 }
 
