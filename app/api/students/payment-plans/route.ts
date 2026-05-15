@@ -53,24 +53,23 @@ export async function GET() {
     if (student?.email) emailSet.add(student.email.toLowerCase())
   }
 
-  // 3. Fetch completed payment-plan transactions for those emails
-  let txCountByEmail: Record<string, number> = {}
+  // 3. Fetch completed PWU transactions for those emails
+  //    We fetch all matching rows and filter per-student in code because
+  //    each student has a different amount_per_installment and start_date.
+  let txRows: { buyer_email: string; cost: number; date: string }[] = []
   if (emailSet.size > 0) {
-    const { data: txRows, error: txError } = await supabase
+    const { data, error: txError } = await supabase
       .from('transactions')
-      .select('buyer_email')
+      .select('buyer_email, cost, date')
       .in('buyer_email', Array.from(emailSet))
-      .ilike('offer_title', '%Payment Plan%')
+      .ilike('offer_title', '%Parenting With Understanding%')
       .eq('status', 'completed')
 
     if (txError) {
       return NextResponse.json({ error: txError.message }, { status: 500 })
     }
 
-    for (const tx of txRows ?? []) {
-      const key = (tx.buyer_email as string).toLowerCase()
-      txCountByEmail[key] = (txCountByEmail[key] ?? 0) + 1
-    }
+    txRows = (data ?? []) as typeof txRows
   }
 
   // 4. Build per-student data
@@ -86,8 +85,12 @@ export async function GET() {
     const name = [student?.first_name, student?.last_name].filter(Boolean).join(' ') || 'Unknown'
     const email = student?.email?.toLowerCase() ?? ''
 
-    // Actual completed transaction count for this student
-    const actualPaidCount = txCountByEmail[email] ?? 0
+    // Count transactions matching this student's installment amount and start date
+    const actualPaidCount = txRows.filter((tx) =>
+      (tx.buyer_email as string).toLowerCase() === email &&
+      tx.cost === plan.amount_per_installment &&
+      tx.date >= plan.start_date
+    ).length
 
     const paid = Math.min(actualPaidCount, plan.total_installments)
     const remaining = plan.total_installments - paid
