@@ -174,6 +174,10 @@ export interface SetterDailyReport {
   spc_invites: number
   spc_new: number
   spc_interested: number
+  // Downsell SPC
+  dq_detected: number
+  dq_spc_offered: number
+  spc_downsell_proposed: number
   // Autoevaluación
   performance_score: number
   highs: string[] | null

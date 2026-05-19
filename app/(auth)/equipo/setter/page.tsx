@@ -221,6 +221,9 @@ export default function SetterDashboardPage() {
           notes:             r.notas ?? '',
           highs:             Array.isArray(r.highs) ? r.highs.join(', ') : (r.highs ?? ''),
           lows:              Array.isArray(r.lows)  ? r.lows.join(', ')  : (r.lows  ?? ''),
+          dq_detected:       r.dq_detected ?? 0,
+          dq_spc_offered:    r.dq_spc_offered ?? 0,
+          spc_downsell_proposed: r.spc_downsell_proposed ?? 0,
           source:            'Formulario' as const,
         })),
       ].sort((a, b) => b.date.localeCompare(a.date))
@@ -473,6 +476,26 @@ export default function SetterDashboardPage() {
                 sub="/10 self-evaluation"
               />
             </div>
+
+            {/* ── Section 2b: Downsell SPC KPIs ── */}
+            {(() => {
+              const totalDqDetected = sumField(filtered, 'dq_detected')
+              const totalDqSpcOffered = sumField(filtered, 'dq_spc_offered')
+              const totalDownsellProposed = sumField(filtered, 'spc_downsell_proposed')
+              const dqConvRate = safeDiv(totalDqSpcOffered, totalDqDetected) * 100
+              if (totalDqDetected === 0 && totalDqSpcOffered === 0 && totalDownsellProposed === 0) return null
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+                  <VolumeCard label="DQ Detectados" value={totalDqDetected} />
+                  <VolumeCard
+                    label="DQ con oferta SPC"
+                    value={totalDqSpcOffered}
+                    sub={`${fmtPct(dqConvRate)} conversion rate`}
+                  />
+                  <VolumeCard label="Downsell SPC propuestos" value={totalDownsellProposed} />
+                </div>
+              )
+            })()}
 
             {/* ── Section 3: Charts ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

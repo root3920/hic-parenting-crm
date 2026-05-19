@@ -48,6 +48,10 @@ interface FormState {
   spc_invites: string
   spc_new: string
   spc_interested: string
+  // Downsell SPC
+  dq_detected: string
+  dq_spc_offered: string
+  spc_downsell_proposed: string
   // Autoevaluación
   performance_score: number
   highs: string[]
@@ -63,6 +67,7 @@ const initialState: FormState = {
   calls_proposed: '', calls_booked: '', calls_no_reply: '', calls_followup: '',
   qual_apps: '', disqual_apps: '', waiting: '', requalified: 'N/A', disqual_reasons: [],
   spc_invites: '', spc_new: '', spc_interested: '',
+  dq_detected: '', dq_spc_offered: '', spc_downsell_proposed: '',
   performance_score: 7, highs: [], lows: [], notas: '',
 }
 
@@ -201,6 +206,9 @@ export default function NuevoReporteSetterPage() {
       spc_invites: n(form.spc_invites),
       spc_new: n(form.spc_new),
       spc_interested: n(form.spc_interested),
+      dq_detected: n(form.dq_detected),
+      dq_spc_offered: n(form.dq_spc_offered),
+      spc_downsell_proposed: n(form.spc_downsell_proposed),
       performance_score: form.performance_score,
       highs: form.highs.length ? form.highs : null,
       lows: form.lows.length ? form.lows : null,
@@ -351,6 +359,24 @@ export default function NuevoReporteSetterPage() {
               <div><FieldLabel>Invitations</FieldLabel><NumberInput value={form.spc_invites} onChange={(v) => set('spc_invites', v)} /></div>
               <div><FieldLabel>New members</FieldLabel><NumberInput value={form.spc_new} onChange={(v) => set('spc_new', v)} /></div>
               <div><FieldLabel>Interested</FieldLabel><NumberInput value={form.spc_interested} onChange={(v) => set('spc_interested', v)} /></div>
+            </div>
+          </SectionCard>
+
+          {/* SECTION 4b — Downsell SPC */}
+          <SectionCard className="border-orange-300 dark:border-orange-700 border-l-4 border-l-orange-500">
+            <SectionHeader
+              color="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+              label="Downsell SPC"
+              sub="DQ → SPC tracking"
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <div><FieldLabel>Descualificados detectados</FieldLabel><NumberInput value={form.dq_detected} onChange={(v) => set('dq_detected', v)} /></div>
+              <div>
+                <FieldLabel>DQ a los que les ofreciste SPC</FieldLabel>
+                <NumberInput value={form.dq_spc_offered} onChange={(v) => set('dq_spc_offered', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">De los descualificados de hoy, ¿a cuántos les ofreciste el SPC?</p>
+              </div>
+              <div><FieldLabel>Propuestas de Downsell SPC (general)</FieldLabel><NumberInput value={form.spc_downsell_proposed} onChange={(v) => set('spc_downsell_proposed', v)} /></div>
             </div>
           </SectionCard>
 
