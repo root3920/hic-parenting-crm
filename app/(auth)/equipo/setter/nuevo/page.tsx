@@ -44,10 +44,6 @@ interface FormState {
   waiting: string
   requalified: string
   disqual_reasons: string[]
-  // SPC
-  spc_invites: string
-  spc_new: string
-  spc_interested: string
   // Downsell SPC
   dq_detected: string
   dq_spc_offered: string
@@ -66,7 +62,6 @@ const initialState: FormState = {
   total_convos: '', followups: '', inbound: '', outbound: '', no_reply: '', new_leads: '',
   calls_proposed: '', calls_booked: '', calls_no_reply: '', calls_followup: '',
   qual_apps: '', disqual_apps: '', waiting: '', requalified: 'N/A', disqual_reasons: [],
-  spc_invites: '', spc_new: '', spc_interested: '',
   dq_detected: '', dq_spc_offered: '', spc_downsell_proposed: '',
   performance_score: 7, highs: [], lows: [], notas: '',
 }
@@ -174,8 +169,7 @@ export default function NuevoReporteSetterPage() {
     bookingRate: pct(n(form.calls_booked), n(form.calls_proposed)),
     qualRate: pct(n(form.qual_apps), n(form.qual_apps) + n(form.disqual_apps)),
     convosPerHora: dec(n(form.total_convos), n(form.hours_worked)),
-    spcConvRate: pct(n(form.spc_new), n(form.spc_invites)),
-  }), [form.calls_booked, form.total_convos, form.calls_proposed, form.qual_apps, form.disqual_apps, form.hours_worked, form.spc_new, form.spc_invites])
+  }), [form.calls_booked, form.total_convos, form.calls_proposed, form.qual_apps, form.disqual_apps, form.hours_worked])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -203,9 +197,6 @@ export default function NuevoReporteSetterPage() {
       waiting: n(form.waiting),
       requalified: form.requalified,
       disqual_reasons: form.disqual_reasons.length ? form.disqual_reasons : null,
-      spc_invites: n(form.spc_invites),
-      spc_new: n(form.spc_new),
-      spc_interested: n(form.spc_interested),
       dq_detected: n(form.dq_detected),
       dq_spc_offered: n(form.dq_spc_offered),
       spc_downsell_proposed: n(form.spc_downsell_proposed),
@@ -242,13 +233,12 @@ export default function NuevoReporteSetterPage() {
         </div>
 
         {/* Live KPI bar */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
           {[
             { label: 'Conv Rate', value: liveKPIs.convRate },
             { label: 'Booking Rate', value: liveKPIs.bookingRate },
             { label: '% Qualified', value: liveKPIs.qualRate },
             { label: 'Convos/hour', value: liveKPIs.convosPerHora },
-            { label: 'SPC Conv', value: liveKPIs.spcConvRate },
           ].map(({ label, value }) => (
             <div key={label} className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 text-center">
               <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-0.5">{label}</p>
@@ -348,21 +338,7 @@ export default function NuevoReporteSetterPage() {
             </div>
           </SectionCard>
 
-          {/* SECTION 4 — SPC */}
-          <SectionCard className="border-purple-300 dark:border-purple-700 border-l-4 border-l-purple-500">
-            <SectionHeader
-              color="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
-              label="SPC"
-              sub="Secure Parent Collective"
-            />
-            <div className="grid grid-cols-3 gap-3">
-              <div><FieldLabel>Invitations</FieldLabel><NumberInput value={form.spc_invites} onChange={(v) => set('spc_invites', v)} /></div>
-              <div><FieldLabel>New members</FieldLabel><NumberInput value={form.spc_new} onChange={(v) => set('spc_new', v)} /></div>
-              <div><FieldLabel>Interested</FieldLabel><NumberInput value={form.spc_interested} onChange={(v) => set('spc_interested', v)} /></div>
-            </div>
-          </SectionCard>
-
-          {/* SECTION 4b — Downsell SPC */}
+          {/* SECTION 4 — Downsell SPC */}
           <SectionCard className="border-orange-300 dark:border-orange-700 border-l-4 border-l-orange-500">
             <SectionHeader
               color="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
