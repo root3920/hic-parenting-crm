@@ -279,6 +279,9 @@ export default function SetterDashboardPage() {
     const avgPerf = filtered.length > 0
       ? filtered.reduce((acc: number, r: Row) => acc + r.performance_score, 0) / filtered.length
       : NaN
+    const totalDqDetected = sumField(filtered, 'dq_detected')
+    const totalDqSpcOffered = sumField(filtered, 'dq_spc_offered')
+    const totalDownsellProposed = sumField(filtered, 'spc_downsell_proposed')
     return {
       totalConvos,
       totalFollowups,
@@ -286,6 +289,9 @@ export default function SetterDashboardPage() {
       totalBooked,
       avgPerf,
       bookingPct: fmtPct(safeDiv(totalBooked, totalProposed) * 100),
+      totalDqDetected,
+      totalDqSpcOffered,
+      totalDownsellProposed,
     }
   }, [filtered])
 
@@ -457,7 +463,7 @@ export default function SetterDashboardPage() {
             </div>
 
             {/* ── Section 2: Volume Stats ── */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <VolumeCard label="Total Convos" value={volume.totalConvos} sub="Meta: 80–90/week" />
               <VolumeCard
                 label="Follow-ups"
@@ -475,27 +481,14 @@ export default function SetterDashboardPage() {
                 value={isNaN(volume.avgPerf) ? '—' : `${volume.avgPerf.toFixed(1)}/10`}
                 sub="/10 self-evaluation"
               />
+              <VolumeCard label="DQ Detectados" value={volume.totalDqDetected} />
+              <VolumeCard
+                label="DQ con oferta SPC"
+                value={volume.totalDqSpcOffered}
+                sub={`${fmtPct(safeDiv(volume.totalDqSpcOffered, volume.totalDqDetected) * 100)} de DQ`}
+              />
+              <VolumeCard label="Downsell SPC propuestos" value={volume.totalDownsellProposed} />
             </div>
-
-            {/* ── Section 2b: Downsell SPC KPIs ── */}
-            {(() => {
-              const totalDqDetected = sumField(filtered, 'dq_detected')
-              const totalDqSpcOffered = sumField(filtered, 'dq_spc_offered')
-              const totalDownsellProposed = sumField(filtered, 'spc_downsell_proposed')
-              const dqConvRate = safeDiv(totalDqSpcOffered, totalDqDetected) * 100
-              if (totalDqDetected === 0 && totalDqSpcOffered === 0 && totalDownsellProposed === 0) return null
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-                  <VolumeCard label="DQ Detectados" value={totalDqDetected} />
-                  <VolumeCard
-                    label="DQ con oferta SPC"
-                    value={totalDqSpcOffered}
-                    sub={`${fmtPct(dqConvRate)} conversion rate`}
-                  />
-                  <VolumeCard label="Downsell SPC propuestos" value={totalDownsellProposed} />
-                </div>
-              )
-            })()}
 
             {/* ── Section 3: Charts ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
