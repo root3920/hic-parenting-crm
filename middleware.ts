@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes — no auth required
-  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback', '/apply']
+  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback', '/apply', '/checklist']
   if (
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/invite') ||
