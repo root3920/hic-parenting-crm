@@ -304,18 +304,50 @@ export default function ChecklistPage() {
     })
   }, [])
 
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
   const getGroupCount = useCallback(
     (group: string) => checked[group]?.filter(Boolean).length ?? 0,
     [checked]
   )
 
-  const fireCount = getGroupCount('firecracker')
-  const cookerCount = getGroupCount('cooker')
-  const stoneCount = getGroupCount('stonewall')
+  const buildCheckedItems = useCallback(() => {
+    const result: Record<string, string[]> = {}
+    SECTIONS.forEach((s) => {
+      result[s.group] = s.items.filter((_, i) => checked[s.group]?.[i])
+    })
+    return result
+  }, [checked])
 
-  const totalChecked = Object.values(checked)
-    .flat()
-    .filter(Boolean).length
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      if (submitting || submitted) return
+      setSubmitting(true)
+      try {
+        const res = await fetch('/api/checklist/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: fullName,
+            email,
+            checked_items: buildCheckedItems(),
+          }),
+        })
+        if (!res.ok) throw new Error('Submission failed')
+        setSubmitted(true)
+        window.print()
+      } catch {
+        alert('Something went wrong. Please try again.')
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [fullName, email, submitting, submitted, buildCheckedItems]
+  )
 
   // Scroll progress bar
   useEffect(() => {
@@ -483,67 +515,6 @@ export default function ChecklistPage() {
           </p>
         </div>
 
-        {/* PROGRESS SUMMARY */}
-        <div className="progress-summary no-print" id="progressSummary">
-          <h3>{'\uD83D\uDCCA'} Your Progress</h3>
-          <div className="type-progress">
-            <div className="type-row">
-              <span className="type-name">
-                {'\uD83D\uDD25'} Firecracker
-              </span>
-              <div className="type-bar-bg">
-                <div
-                  className="type-bar-fill"
-                  style={{
-                    background: '#E53E3E',
-                    width: `${(fireCount / 7) * 100}%`,
-                  }}
-                />
-              </div>
-              <span className="type-count">{fireCount} / 7</span>
-            </div>
-            <div className="type-row">
-              <span className="type-name">
-                {'\uD83D\uDCA8'} Pressure Cooker
-              </span>
-              <div className="type-bar-bg">
-                <div
-                  className="type-bar-fill"
-                  style={{
-                    background: '#DD6B20',
-                    width: `${(cookerCount / 7) * 100}%`,
-                  }}
-                />
-              </div>
-              <span className="type-count">{cookerCount} / 7</span>
-            </div>
-            <div className="type-row">
-              <span className="type-name">
-                {'\uD83E\uDDCA'} Stonewall
-              </span>
-              <div className="type-bar-bg">
-                <div
-                  className="type-bar-fill"
-                  style={{
-                    background: '#3182CE',
-                    width: `${(stoneCount / 7) * 100}%`,
-                  }}
-                />
-              </div>
-              <span className="type-count">{stoneCount} / 7</span>
-            </div>
-          </div>
-          <div
-            style={{
-              fontSize: '0.82rem',
-              color: 'var(--muted)',
-              textAlign: 'center',
-            }}
-          >
-            {totalChecked} of {GRAND_TOTAL} items checked across all sections
-          </div>
-        </div>
-
         {/* PART 1 */}
         <div className="big-divider">Part 1 {'\u00B7'} Your Reactivity Type</div>
         {SECTIONS.filter((s) => part1Groups.includes(s.group)).map(
@@ -592,6 +563,57 @@ export default function ChecklistPage() {
           renderSection
         )}
 
+        {/* SUBMIT FORM */}
+        <div className="card no-print" style={{ marginTop: 36 }}>
+          <div className="card-header">
+            <h2>Save Your Results</h2>
+            <div className="subtitle">
+              Enter your details so we can review your checklist before your
+              session
+            </div>
+          </div>
+          <div className="card-body">
+            <form onSubmit={handleSubmit}>
+              <div className="form-field">
+                <label htmlFor="fullName">Full Name</label>
+                <input
+                  id="fullName"
+                  type="text"
+                  required
+                  placeholder="Your full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  disabled={submitted}
+                />
+              </div>
+              <div className="form-field">
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={submitted}
+                />
+              </div>
+              <button
+                type="submit"
+                className="print-btn"
+                disabled={submitting || submitted}
+                style={{ opacity: submitting ? 0.6 : 1 }}
+              >
+                {submitted
+                  ? '\u2705 Saved!'
+                  : submitting
+                    ? 'Saving...'
+                    : '\uD83D\uDDA8\uFE0F Save & Print My Results'}
+              </button>
+            </form>
+          </div>
+        </div>
+
         {/* REFLECTION */}
         <div className="reflection-box">
           <h2>Reflection</h2>
@@ -618,12 +640,6 @@ export default function ChecklistPage() {
               the low-thousands range USD.
             </em>
           </div>
-          <button
-            className="print-btn no-print"
-            onClick={() => window.print()}
-          >
-            {'\uD83D\uDDA8\uFE0F'} Print My Results
-          </button>
         </div>
       </div>
     </>
@@ -675,38 +691,6 @@ const pageStyles = `
     align-items: center;
     justify-content: center;
     gap: 14px;
-  }
-
-  .logo-icon {
-    width: 52px; height: 52px;
-    background: var(--orange);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-  }
-
-  .logo-text { text-align: left; }
-
-  .logo-text .hic {
-    font-family: 'Lora', serif;
-    font-weight: 700;
-    font-size: 1.3rem;
-    color: var(--blue);
-    letter-spacing: 2px;
-  }
-
-  .logo-text .parenting {
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: var(--orange);
-    letter-spacing: 1px;
-  }
-
-  .logo-text .education {
-    font-size: 0.75rem;
-    color: var(--muted);
-    letter-spacing: 3px;
-    text-transform: uppercase;
   }
 
   .progress-bar-wrap {
@@ -993,60 +977,6 @@ const pageStyles = `
     border-radius: 2px;
   }
 
-  .progress-summary {
-    background: white;
-    border-radius: 16px;
-    padding: 28px;
-    margin-bottom: 28px;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border);
-  }
-
-  .progress-summary h3 {
-    font-family: 'Lora', serif;
-    font-size: 1.1rem;
-    color: var(--dark);
-    margin-bottom: 20px;
-  }
-
-  .type-progress { margin-bottom: 16px; }
-
-  .type-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-
-  .type-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    width: 160px;
-    flex-shrink: 0;
-  }
-
-  .type-bar-bg {
-    flex: 1;
-    height: 10px;
-    background: #EEE;
-    border-radius: 5px;
-    overflow: hidden;
-  }
-
-  .type-bar-fill {
-    height: 100%;
-    border-radius: 5px;
-    transition: width 0.4s ease;
-  }
-
-  .type-count {
-    font-size: 0.8rem;
-    color: var(--muted);
-    width: 50px;
-    text-align: right;
-    flex-shrink: 0;
-  }
-
   .reflection-box {
     background: linear-gradient(135deg, var(--blue), #2A5480);
     color: white;
@@ -1099,10 +1029,43 @@ const pageStyles = `
     box-shadow: 0 6px 20px rgba(245,166,35,0.35);
   }
 
+  .form-field {
+    margin-bottom: 16px;
+  }
+
+  .form-field label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--dark);
+    margin-bottom: 6px;
+  }
+
+  .form-field input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 0.93rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--soft-bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color 0.2s;
+  }
+
+  .form-field input:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+
+  .form-field input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   @media (max-width: 600px) {
     .hero h1 { font-size: 1.5rem; }
     .card-body { padding: 16px 18px; }
     .card-header { padding: 18px 18px 14px; }
-    .type-name { width: 120px; font-size: 0.78rem; }
   }
 `

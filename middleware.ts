@@ -62,6 +62,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/invite') ||
     pathname.startsWith('/api/surveys') ||
+    pathname === '/api/checklist/submit' ||
     pathname === '/api/sales/backfill' ||
     pathname === '/api/spc/backfill-csv' ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))

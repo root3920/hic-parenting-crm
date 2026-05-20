@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Call } from '@/types'
-import { Video, Mail, Phone, Calendar, User, Tag, ExternalLink, ClipboardCheck, ChevronDown, Check, Loader2 } from 'lucide-react'
+import { Video, Mail, Phone, Calendar, User, Tag, ExternalLink, ClipboardCheck, ChevronDown, Check, Loader2, FileCheck, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { formatFullDateInTimezone } from '@/lib/timezones'
@@ -46,6 +46,37 @@ const STATUS_DOT: Record<string, string> = {
   'No show':     'bg-amber-500',
 }
 
+const CHECKLIST_SECTION_LABELS: Record<string, string> = {
+  firecracker: '\u{1F525} The Firecracker / Fire Alarm Pattern',
+  cooker: '\u{1F4A8} The Pressure Cooker Pattern',
+  stonewall: '\u{1F9CA} The Stonewall Parent',
+  'child-mirroring': '1. Mirroring Behaviors',
+  'child-desensitization': '2. Desensitization to Reactivity',
+  'child-poking': '3. \u201CPoking the Bear\u201D Behaviors',
+  'child-scanning': '4. Emotional Scanning Behaviors',
+  'child-shutdown': '5. Shutdown & Emotional Disconnection',
+  'child-impact': '6. Emotional Impact on the Child',
+  'co-micro': '1. Micromanaging & Policing Dynamic',
+  'co-undermined': '2. Feeling Undermined / \u201CNever Good Enough\u201D',
+  'co-both': '3. Reactive vs. Reactive Dynamic',
+  'co-shutdown': '4. Shutdown / Stonewalling Dynamic',
+  'co-impact': '5. Emotional Impact on the Relationship',
+}
+
+const CHECKLIST_PART_GROUPS: { title: string; groups: string[] }[] = [
+  { title: 'Part 1 \u00B7 Your Reactivity Type', groups: ['firecracker', 'cooker', 'stonewall'] },
+  { title: 'Part 2 \u00B7 Emotional Impact on Children', groups: ['child-mirroring', 'child-desensitization', 'child-poking', 'child-scanning', 'child-shutdown', 'child-impact'] },
+  { title: 'Part 3 \u00B7 Co-Parenting Dynamic', groups: ['co-micro', 'co-undermined', 'co-both', 'co-shutdown', 'co-impact'] },
+]
+
+interface ChecklistSubmission {
+  id: string
+  full_name: string
+  email: string
+  checked_items: Record<string, string[]>
+  submitted_at: string
+}
+
 function formatReportedAt(dateStr: string) {
   const d = new Date(dateStr)
   return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -83,12 +114,26 @@ export function CallDetailModal({ call, onClose, onStatusChange }: Props) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
 
+  const [checklist, setChecklist] = useState<ChecklistSubmission | null>(null)
+  const [checklistLoading, setChecklistLoading] = useState(false)
+
   // Reset local state whenever the modal opens for a different call
   useEffect(() => {
     if (call) {
       setLocalStatus(call.status)
       setPendingStatus(null)
       setDropdownOpen(false)
+      setChecklist(null)
+
+      // Fetch checklist submission for this call's email
+      if (call.email) {
+        setChecklistLoading(true)
+        fetch(`/api/checklist/by-call?email=${encodeURIComponent(call.email)}`)
+          .then((r) => r.json())
+          .then((data) => setChecklist(data.submission ?? null))
+          .catch(() => setChecklist(null))
+          .finally(() => setChecklistLoading(false))
+      }
     }
   }, [call?.id])
 
@@ -299,6 +344,67 @@ export function CallDetailModal({ call, onClose, onStatusChange }: Props) {
               )}
             </div>
           )}
+
+          {/* Checklist */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <FileCheck className="h-4 w-4 text-orange-500" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-400">Reactivity Checklist</p>
+            </div>
+
+            {checklistLoading && (
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading checklist...
+              </div>
+            )}
+
+            {!checklistLoading && !checklist && (
+              <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg px-3 py-3">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">No checklist submitted yet.</p>
+                <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
+                  <Link2 className="h-3 w-3" />
+                  <span className="select-all">dashboard.hicparenting.com/checklist</span>
+                </div>
+              </div>
+            )}
+
+            {!checklistLoading && checklist && (
+              <div className="space-y-3">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  Submitted by <span className="font-medium text-zinc-600 dark:text-zinc-300">{checklist.full_name}</span> {'\u00B7'} {formatReportedAt(checklist.submitted_at)}
+                </p>
+                <div className="max-h-60 overflow-y-auto space-y-3 pr-1">
+                  {CHECKLIST_PART_GROUPS.map((part) => {
+                    const groupsWithItems = part.groups.filter(
+                      (g) => checklist.checked_items[g]?.length > 0
+                    )
+                    if (groupsWithItems.length === 0) return null
+                    return (
+                      <div key={part.title}>
+                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5">{part.title}</p>
+                        {groupsWithItems.map((group) => (
+                          <div key={group} className="mb-2">
+                            <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              {CHECKLIST_SECTION_LABELS[group]}
+                            </p>
+                            <ul className="space-y-0.5">
+                              {checklist.checked_items[group].map((item, i) => (
+                                <li key={i} className="flex items-start gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+                                  <span className="text-green-500 mt-0.5 shrink-0">{'\u2713'}</span>
+                                  {item}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Footer */}
           <div className="text-xs text-zinc-400 dark:text-zinc-500 pt-2 border-t border-zinc-100 dark:border-zinc-800">
