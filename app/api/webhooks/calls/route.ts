@@ -59,9 +59,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
-    console.log('=== CALLS WEBHOOK RAW BODY ===')
-    console.log(JSON.stringify(body, null, 2))
-    console.log('==============================')
+    console.log('=== CALLS WEBHOOK PAYLOAD ===', JSON.stringify(body, null, 2))
 
     // Extract key fields
     const appointmentId  = body?.calendar?.appointmentId
