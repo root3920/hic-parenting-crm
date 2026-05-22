@@ -479,6 +479,12 @@ export default function ContactsPage() {
   const [dateFilter, setDateFilter] = useState<DateFilter>('all')
   const [statusEditId, setStatusEditId] = useState<string | null>(null)
 
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const PAGE_SIZE = 50
+
   // Modal state
   const [showAddModal, setShowAddModal] = useState(false)
   const [editContact, setEditContact] = useState<Contact | null>(null)
@@ -490,22 +496,38 @@ export default function ContactsPage() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  // Fetch contacts
+  // Reset to page 1 when filters change
   useEffect(() => {
-    async function load() {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) {
-        console.error('Error loading contacts:', error)
-        toast.error('Failed to load contacts')
-      }
-      setContacts((data as Contact[]) ?? [])
-      setLoading(false)
+    setPage(1)
+  }, [search, statusFilter, tagFilter, dateFilter])
+
+  // Fetch contacts via API with pagination
+  const fetchContacts = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    params.set('page', String(page))
+    params.set('limit', String(PAGE_SIZE))
+    if (search) params.set('search', search)
+    if (statusFilter !== 'All') params.set('status', statusFilter)
+    if (tagFilter !== 'All') params.set('tag', tagFilter)
+    if (dateFilter !== 'all') params.set('date', dateFilter)
+
+    try {
+      const res = await fetch(`/api/contacts?${params}`)
+      if (!res.ok) throw new Error('Failed to fetch')
+      const json = await res.json()
+      setContacts(json.data as Contact[])
+      setTotal(json.total)
+      setTotalPages(json.totalPages)
+    } catch {
+      toast.error('Failed to load contacts')
     }
-    load()
-  }, [supabase])
+    setLoading(false)
+  }, [page, search, statusFilter, tagFilter, dateFilter])
+
+  useEffect(() => {
+    fetchContacts()
+  }, [fetchContacts])
 
   // Realtime subscription
   useEffect(() => {
@@ -516,17 +538,21 @@ export default function ContactsPage() {
         { event: 'INSERT', schema: 'public', table: 'contacts' },
         (payload) => {
           const newContact = payload.new as Contact
-          setContacts((prev) => {
-            if (prev.some((c) => c.id === newContact.id)) return prev
-            return [newContact, ...prev]
-          })
+          // Only prepend if on page 1 with no filters to avoid confusion
+          if (page === 1 && !search && statusFilter === 'All' && tagFilter === 'All' && dateFilter === 'all') {
+            setContacts((prev) => {
+              if (prev.some((c) => c.id === newContact.id)) return prev
+              return [newContact, ...prev.slice(0, PAGE_SIZE - 1)]
+            })
+            setTotal((prev) => prev + 1)
+          }
           toast.success(`New contact: ${newContact.full_name}`)
         }
       )
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase])
+  }, [supabase, page, search, statusFilter, tagFilter, dateFilter])
 
   // Status update (shared between table inline and detail modal)
   const updateStatus = useCallback(async (id: string, newStatus: ContactStatus) => {
@@ -576,9 +602,9 @@ export default function ContactsPage() {
       toast.error('Failed to add contact: ' + error.message)
       return
     }
-    setContacts((prev) => [data as Contact, ...prev])
     setShowAddModal(false)
     toast.success('Contact added')
+    fetchContacts()
   }
 
   // Edit contact
@@ -622,10 +648,9 @@ export default function ContactsPage() {
       toast.error('Failed to update: ' + (body.error || 'Unknown error'))
       return
     }
-    const updated = await res.json()
-    setContacts((prev) => prev.map((c) => (c.id === editContact.id ? { ...c, ...updated } : c)))
     setEditContact(null)
     toast.success('Contact updated')
+    fetchContacts()
   }
 
   // Delete contact
@@ -636,9 +661,9 @@ export default function ContactsPage() {
       toast.error('Error deleting contact')
       return
     }
-    setContacts((prev) => prev.filter((c) => c.id !== id))
     setDetailContact(null)
     toast.success('Contact deleted')
+    fetchContacts()
   }
 
   // Tag management
@@ -672,48 +697,14 @@ export default function ContactsPage() {
     else toast.success('Tag removed')
   }
 
-  // Filtered contacts
-  const filtered = useMemo(() => {
-    let list = contacts
-
-    if (dateFilter !== 'all') {
-      const now = Date.now()
-      const ms =
-        dateFilter === 'today' ? 24 * 60 * 60 * 1000
-        : dateFilter === '7d' ? 7 * 24 * 60 * 60 * 1000
-        : 30 * 24 * 60 * 60 * 1000
-      list = list.filter((c) => now - new Date(c.created_at).getTime() < ms)
-    }
-
-    if (statusFilter !== 'All') {
-      list = list.filter((c) => c.status === statusFilter)
-    }
-
-    if (tagFilter !== 'All') {
-      if (tagFilter === 'No tags') {
-        list = list.filter((c) => !c.tags || c.tags.length === 0)
-      } else {
-        list = list.filter((c) => c.tags && c.tags.includes(tagFilter))
-      }
-    }
-
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (c) =>
-          c.full_name.toLowerCase().includes(q) ||
-          (c.email && c.email.toLowerCase().includes(q))
-      )
-    }
-
-    return list
-  }, [contacts, search, statusFilter, tagFilter, dateFilter])
-
-  // KPI values
-  const totalCount = contacts.length
+  // KPI values from current page data
   const newCount = contacts.filter((c) => c.status === 'New').length
   const callBookedCount = contacts.filter((c) => c.status === 'Call Booked').length
   const enrolledCount = contacts.filter((c) => c.status === 'Enrolled').length
+
+  // Pagination helpers
+  const rangeStart = (page - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(page * PAGE_SIZE, total)
 
   return (
     <PageTransition>
@@ -726,7 +717,7 @@ export default function ContactsPage() {
 
       {/* KPI Cards */}
       <KPICardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <KPICard title="Total Contacts" value={totalCount} loading={loading} icon={<Users className="h-4 w-4" />} />
+        <KPICard title="Total Contacts" value={total} loading={loading} icon={<Users className="h-4 w-4" />} />
         <KPICard title="New" value={newCount} loading={loading} icon={<UserPlus className="h-4 w-4" />} className="ring-1 ring-blue-200 dark:ring-blue-800" />
         <KPICard title="Call Booked" value={callBookedCount} loading={loading} icon={<PhoneCall className="h-4 w-4" />} />
         <KPICard title="Enrolled" value={enrolledCount} loading={loading} icon={<GraduationCap className="h-4 w-4" />} />
@@ -797,7 +788,7 @@ export default function ContactsPage() {
             <div key={i} className="h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : contacts.length === 0 ? (
         <EmptyState title="No contacts found" description="Adjust your filters or wait for new leads from Go High Level." />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -815,7 +806,7 @@ export default function ContactsPage() {
               </tr>
             </TableHeader>
             <TableBody>
-              {filtered.map((contact, idx) => (
+              {contacts.map((contact, idx) => (
                 <AnimatedTableRow
                   key={contact.id}
                   custom={idx}
@@ -832,7 +823,7 @@ export default function ContactsPage() {
                   )}
                   onClick={() => setDetailContact(contact)}
                 >
-                  <TableCell className="text-center text-xs text-zinc-400">{idx + 1}</TableCell>
+                  <TableCell className="text-center text-xs text-zinc-400">{rangeStart + idx}</TableCell>
                   <TableCell className="font-medium text-zinc-900 dark:text-zinc-100">
                     <div className="flex items-center gap-2">
                       {contact.full_name}
@@ -907,6 +898,38 @@ export default function ContactsPage() {
               ))}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && contacts.length > 0 && totalPages > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Showing {rangeStart}–{rangeEnd} of {total} contacts
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="text-xs h-8 px-3"
+            >
+              Previous
+            </Button>
+            <span className="text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="text-xs h-8 px-3"
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 
