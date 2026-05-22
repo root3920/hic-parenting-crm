@@ -20,6 +20,7 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/surveys':            ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'],
   '/calendar':           ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'],
   '/settings':           ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'],
+  '/careers':            ['admin'],
 }
 
 const ROLE_HOME: Record<UserRole, string> = {
@@ -57,12 +58,13 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes — no auth required
-  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback', '/apply', '/checklist']
+  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback', '/apply', '/checklist', '/careers/dm-setter']
   if (
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/invite') ||
     pathname.startsWith('/api/surveys') ||
     pathname === '/api/checklist/submit' ||
+    pathname === '/api/careers/apply' ||
     pathname === '/api/sales/backfill' ||
     pathname === '/api/spc/backfill-csv' ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))

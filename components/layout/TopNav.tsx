@@ -21,6 +21,7 @@ import {
   ClipboardList,
   Contact,
   CalendarDays,
+  Briefcase,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -53,6 +54,7 @@ const ALL_NAV_ITEMS = [
   { href: '/contacts',     label: 'Contacts',     icon: Contact,         roles: ['admin', 'setter'] as UserRole[] },
   { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
   { href: '/calendar',     label: 'Calendar',     icon: CalendarDays,    roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
+  { href: '/careers',      label: 'Careers',      icon: Briefcase,       roles: ['admin'] as UserRole[] },
 ]
 
 // Quick-action menu items filtered by role
