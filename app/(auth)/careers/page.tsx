@@ -38,7 +38,16 @@ interface Application {
   status: string
   notes: string | null
   created_at: string
+  // Closer-specific fields
+  past_sales_performance: string | null
+  best_month_cash_collected: number | null
+  sales_methodologies: string | null
+  objection_handling: string | null
+  closing_superpower: string | null
+  crm_tools_proficient: string | null
 }
+
+type PositionFilter = 'all' | 'dm_setter' | 'closer'
 
 type StatusFilter = 'all' | 'pending' | 'reviewing' | 'approved' | 'rejected'
 
@@ -72,6 +81,7 @@ export default function CareersAdminPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [positionFilter, setPositionFilter] = useState<PositionFilter>('all')
   const [search, setSearch] = useState('')
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
 
@@ -79,6 +89,7 @@ export default function CareersAdminPage() {
     setLoading(true)
     const params = new URLSearchParams()
     if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (positionFilter !== 'all') params.set('position', positionFilter)
     if (search) params.set('search', search)
 
     const res = await fetch(`/api/careers/applications?${params}`)
@@ -87,7 +98,7 @@ export default function CareersAdminPage() {
       setApplications(data)
     }
     setLoading(false)
-  }, [statusFilter, search])
+  }, [statusFilter, positionFilter, search])
 
   useEffect(() => {
     fetchApplications()
@@ -140,6 +151,23 @@ export default function CareersAdminPage() {
               }`}
             >
               {s}
+            </button>
+          ))}
+        </div>
+
+        {/* Position tabs */}
+        <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
+          {([['all', 'All Positions'], ['dm_setter', 'DM Setter'], ['closer', 'Closer']] as [PositionFilter, string][]).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setPositionFilter(value)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                positionFilter === value
+                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+              }`}
+            >
+              {label}
             </button>
           ))}
         </div>
@@ -215,6 +243,9 @@ export default function CareersAdminPage() {
                   <div className="mt-3 flex items-center gap-2 flex-wrap">
                     <Badge className={`text-[10px] px-2 py-0.5 capitalize ${STATUS_COLORS[app.status] || STATUS_COLORS.pending}`}>
                       {app.status}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px] px-2 py-0.5">
+                      {app.position === 'closer' ? 'Closer' : 'DM Setter'}
                     </Badge>
                     {app.english_level && (
                       <Badge variant="outline" className="text-[10px] px-2 py-0.5">
@@ -359,6 +390,24 @@ function ApplicationModal({
           <TextSection title="Communication Style" content={app.communication_style} />
           <TextSection title="Biggest Strength" content={app.biggest_strength} />
           <TextSection title="2-Year Vision" content={app.five_year_vision} />
+
+          {/* Closer-specific sections */}
+          {app.position === 'closer' && (
+            <>
+              <TextSection title="Past Sales Performance" content={app.past_sales_performance} />
+              {app.best_month_cash_collected != null && (
+                <div>
+                  <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Best Month Cash Collected</h3>
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300">${Number(app.best_month_cash_collected).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</p>
+                </div>
+              )}
+              <TextSection title="Sales Methodologies" content={app.sales_methodologies} />
+              <TextSection title="Objection Handling Response" content={app.objection_handling} />
+              <TextSection title="Closing Superpower" content={app.closing_superpower} />
+              <TextSection title="CRM Tools Proficient" content={app.crm_tools_proficient} />
+            </>
+          )}
+
           <TextSection title="Additional Comments" content={app.additional_comments} />
         </div>
 

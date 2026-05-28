@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   const body = await request.json()
 
   const {
+    position,
     full_name,
     email,
     country_timezone,
@@ -37,14 +38,21 @@ export async function POST(request: Request) {
     confirmed_remote,
     additional_comments,
     video_url,
+    // Closer-specific fields
+    past_sales_performance,
+    best_month_cash_collected,
+    sales_methodologies,
+    objection_handling,
+    closing_superpower,
+    crm_tools_proficient,
   } = body
 
   if (!full_name || !email || !country_timezone || !phone || !video_url || !confirmed_job_description || !confirmed_remote) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const { error } = await supabase.from('job_applications').insert({
-    position: 'dm_setter',
+  const insertData: Record<string, unknown> = {
+    position: position === 'closer' ? 'closer' : 'dm_setter',
     full_name,
     email,
     country_timezone,
@@ -66,7 +74,19 @@ export async function POST(request: Request) {
     confirmed_remote,
     additional_comments,
     video_url,
-  })
+  }
+
+  // Add closer-specific fields only for closer applications
+  if (position === 'closer') {
+    insertData.past_sales_performance = past_sales_performance
+    insertData.best_month_cash_collected = best_month_cash_collected
+    insertData.sales_methodologies = sales_methodologies
+    insertData.objection_handling = objection_handling
+    insertData.closing_superpower = closing_superpower
+    insertData.crm_tools_proficient = crm_tools_proficient
+  }
+
+  const { error } = await supabase.from('job_applications').insert(insertData)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
