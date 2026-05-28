@@ -54,7 +54,8 @@
       "Bash(ls -la /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/equipo/)",
       "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *.sql -o -name schema* -o -name *migration* \\\\\\))",
       "Bash(find /Users/federicoalarconu/hic-dashboard/app -path \"*/\\(auth\\)/*\" -name \"page.tsx\")",
-      "Bash(ls -la /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/)"
+      "Bash(ls -la /Users/federicoalarconu/hic-dashboard/app/\\\\\\(auth\\\\\\)/)",
+      "Bash(head:*)"
     ]
   }
 }

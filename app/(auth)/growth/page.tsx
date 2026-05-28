@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -530,7 +530,7 @@ function NewReportTab({ onSaved }: { onSaved: () => void }) {
       <FormSection number="01" title="Session information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Client name" required>
-            <input value={clientName} onChange={e => setClientName(e.target.value)} required className={inputClass} placeholder="Full client name" />
+            <ClientCombobox value={clientName} onChange={setClientName} />
           </FormField>
           <FormField label="Coach name" required>
             <input value={coachName} onChange={e => setCoachName(e.target.value)} required className={inputClass} placeholder="Your name" />
@@ -653,6 +653,113 @@ function NewReportTab({ onSaved }: { onSaved: () => void }) {
         )}
       </AnimatePresence>
     </form>
+  )
+}
+
+/* ─── Client Combobox ────────────────────────────────────────── */
+
+interface ActiveStudent {
+  id: string
+  first_name: string
+  last_name: string | null
+  email: string | null
+}
+
+function ClientCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [students, setStudents] = useState<ActiveStudent[]>([])
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState(value)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch('/api/students/active')
+      .then(r => r.ok ? r.json() : [])
+      .then(setStudents)
+      .catch(() => {})
+  }, [])
+
+  // Sync external value changes into the search field
+  useEffect(() => { setSearch(value) }, [value])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filtered = useMemo(() => {
+    if (!search) return students
+    const q = search.toLowerCase()
+    return students.filter(s => {
+      const full = `${s.first_name} ${s.last_name || ''}`.toLowerCase()
+      const email = (s.email || '').toLowerCase()
+      return full.includes(q) || email.includes(q)
+    })
+  }, [students, search])
+
+  function handleSelect(s: ActiveStudent) {
+    const fullName = `${s.first_name} ${s.last_name || ''}`.trim()
+    onChange(fullName)
+    setSearch(fullName)
+    setOpen(false)
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value
+    setSearch(v)
+    onChange(v)
+    if (!open) setOpen(true)
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+        <input
+          ref={inputRef}
+          value={search}
+          onChange={handleInputChange}
+          onFocus={() => setOpen(true)}
+          required
+          className={`${inputClass} pl-9`}
+          placeholder="Search or type client name..."
+          autoComplete="off"
+        />
+      </div>
+
+      <AnimatePresence>
+        {open && filtered.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-50 top-full mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg"
+          >
+            {filtered.map(s => {
+              const fullName = `${s.first_name} ${s.last_name || ''}`.trim()
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => handleSelect(s)}
+                  className="w-full text-left px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+                >
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{fullName}</p>
+                  {s.email && <p className="text-xs text-zinc-400 dark:text-zinc-500">{s.email}</p>}
+                </button>
+              )
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
