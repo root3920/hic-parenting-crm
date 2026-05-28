@@ -452,7 +452,7 @@ function NewReportTab({ onSaved }: { onSaved: () => void }) {
   const [coachName, setCoachName] = useState('')
   const [sessionNumber, setSessionNumber] = useState('')
   const [sessionDate, setSessionDate] = useState('')
-  const [coachingType, setCoachingType] = useState<'Individual' | 'Couple'>('Individual')
+  const [coachingType, setCoachingType] = useState<'Individual' | 'Group'>('Individual')
 
   const [connSelfScore, setConnSelfScore] = useState<number | null>(null)
   const [connSelfNote, setConnSelfNote] = useState('')
@@ -544,9 +544,9 @@ function NewReportTab({ onSaved }: { onSaved: () => void }) {
         </div>
         <FormField label="Coaching type">
           <SegmentToggle
-            options={['Individual', 'Couple']}
+            options={['Individual', 'Group']}
             value={coachingType}
-            onChange={v => setCoachingType(v as 'Individual' | 'Couple')}
+            onChange={v => setCoachingType(v as 'Individual' | 'Group')}
           />
         </FormField>
       </FormSection>
