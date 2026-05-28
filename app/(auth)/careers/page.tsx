@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users } from 'lucide-react'
+import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -84,6 +84,7 @@ export default function CareersAdminPage() {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('all')
   const [search, setSearch] = useState('')
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   const fetchApplications = useCallback(async () => {
     setLoading(true)
@@ -118,9 +119,15 @@ export default function CareersAdminPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Job Applications</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Review and manage incoming applications</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Job Applications</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Review and manage incoming applications</p>
+        </div>
+        <Button variant="outline" className="gap-2" onClick={() => setShowShareModal(true)}>
+          <Share2 className="h-4 w-4" />
+          Share Forms
+        </Button>
       </div>
 
       {/* KPI Cards */}
@@ -268,6 +275,13 @@ export default function CareersAdminPage() {
           ))}
         </div>
       )}
+
+      {/* Share Forms Modal */}
+      <AnimatePresence>
+        {showShareModal && (
+          <ShareFormsModal onClose={() => setShowShareModal(false)} />
+        )}
+      </AnimatePresence>
 
       {/* Profile Modal */}
       <AnimatePresence>
@@ -443,6 +457,96 @@ function ApplicationModal({
           <Button onClick={handleSave} disabled={saving} className="w-full md:w-auto">
             {saving ? 'Saving...' : 'Save Changes'}
           </Button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/* ─── Share Forms Modal ───────────────────────────────────────── */
+
+const FORM_LINKS = [
+  { label: 'DM Setter Application', url: 'https://dashboard.hicparenting.com/careers/dm-setter' },
+  { label: 'Closer Application', url: 'https://dashboard.hicparenting.com/careers/closer' },
+]
+
+function ShareFormsModal({ onClose }: { onClose: () => void }) {
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+
+  async function handleCopy(url: string, idx: number) {
+    await navigator.clipboard.writeText(url)
+    setCopiedIdx(idx)
+    setTimeout(() => setCopiedIdx(null), 2000)
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Share Application Forms</h2>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+            <X className="h-5 w-5 text-zinc-500" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {FORM_LINKS.map((form, idx) => (
+            <div
+              key={idx}
+              className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-4 space-y-3"
+            >
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{form.label}</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 break-all leading-relaxed">{form.url}</p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 gap-1.5 text-xs"
+                  onClick={() => handleCopy(form.url, idx)}
+                >
+                  {copiedIdx === idx ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+                <a
+                  href={form.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1"
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-1.5 text-xs"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open
+                  </Button>
+                </a>
+              </div>
+            </div>
+          ))}
         </div>
       </motion.div>
     </motion.div>
