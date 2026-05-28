@@ -529,8 +529,11 @@ function NewReportTab({ onSaved }: { onSaved: () => void }) {
       {/* Section 01 — Session Info */}
       <FormSection number="01" title="Session information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Client name" required>
-            <ClientCombobox value={clientName} onChange={setClientName} />
+          <FormField label={coachingType === 'Group' ? 'Cohort' : 'Client name'} required>
+            {coachingType === 'Group'
+              ? <CohortSelect value={clientName} onChange={setClientName} />
+              : <ClientCombobox value={clientName} onChange={setClientName} />
+            }
           </FormField>
           <FormField label="Coach name" required>
             <input value={coachName} onChange={e => setCoachName(e.target.value)} required className={inputClass} placeholder="Your name" />
@@ -546,7 +549,7 @@ function NewReportTab({ onSaved }: { onSaved: () => void }) {
           <SegmentToggle
             options={['Individual', 'Group']}
             value={coachingType}
-            onChange={v => setCoachingType(v as 'Individual' | 'Group')}
+            onChange={v => { setCoachingType(v as 'Individual' | 'Group'); setClientName('') }}
           />
         </FormField>
       </FormSection>
@@ -663,6 +666,33 @@ interface ActiveStudent {
   first_name: string
   last_name: string | null
   email: string | null
+  type: string | null
+}
+
+function CohortSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [cohorts, setCohorts] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch('/api/students/active?view=cohorts')
+      .then(r => r.ok ? r.json() : [])
+      .then(setCohorts)
+      .catch(() => {})
+  }, [])
+
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        required
+        className={inputClass}
+      >
+        <option value="" disabled>Select a cohort</option>
+        {cohorts.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+    </div>
+  )
 }
 
 function ClientCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -673,7 +703,7 @@ function ClientCombobox({ value, onChange }: { value: string; onChange: (v: stri
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetch('/api/students/active')
+    fetch('/api/students/active?type=1:1')
       .then(r => r.ok ? r.json() : [])
       .then(setStudents)
       .catch(() => {})
