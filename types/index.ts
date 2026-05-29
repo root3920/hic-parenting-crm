@@ -174,6 +174,8 @@ export interface SetterDailyReport {
   spc_invites: number
   spc_new: number
   spc_interested: number
+  // Conversaciones activas
+  active_conversations: number
   // Downsell SPC
   dq_detected: number
   dq_spc_offered: number

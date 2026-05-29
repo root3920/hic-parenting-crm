@@ -221,9 +221,9 @@ export default function SetterDashboardPage() {
           notes:             r.notas ?? '',
           highs:             Array.isArray(r.highs) ? r.highs.join(', ') : (r.highs ?? ''),
           lows:              Array.isArray(r.lows)  ? r.lows.join(', ')  : (r.lows  ?? ''),
+          active_conversations: r.active_conversations ?? 0,
           dq_detected:       r.dq_detected ?? 0,
           dq_spc_offered:    r.dq_spc_offered ?? 0,
-          spc_downsell_proposed: r.spc_downsell_proposed ?? 0,
           source:            'Formulario' as const,
         })),
       ].sort((a, b) => b.date.localeCompare(a.date))
@@ -279,9 +279,9 @@ export default function SetterDashboardPage() {
     const avgPerf = filtered.length > 0
       ? filtered.reduce((acc: number, r: Row) => acc + r.performance_score, 0) / filtered.length
       : NaN
+    const totalActiveConversations = sumField(filtered, 'active_conversations')
     const totalDqDetected = sumField(filtered, 'dq_detected')
     const totalDqSpcOffered = sumField(filtered, 'dq_spc_offered')
-    const totalDownsellProposed = sumField(filtered, 'spc_downsell_proposed')
     return {
       totalConvos,
       totalFollowups,
@@ -289,9 +289,9 @@ export default function SetterDashboardPage() {
       totalBooked,
       avgPerf,
       bookingPct: fmtPct(safeDiv(totalBooked, totalProposed) * 100),
+      totalActiveConversations,
       totalDqDetected,
       totalDqSpcOffered,
-      totalDownsellProposed,
     }
   }, [filtered])
 
@@ -465,6 +465,7 @@ export default function SetterDashboardPage() {
             {/* ── Section 2: Volume Stats ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <VolumeCard label="Total Convos" value={volume.totalConvos} sub="Meta: 80–90/week" />
+              <VolumeCard label="Active Convos" value={volume.totalActiveConversations} sub="Conversations still active" />
               <VolumeCard
                 label="Follow-ups"
                 value={volume.totalFollowups}
@@ -487,7 +488,6 @@ export default function SetterDashboardPage() {
                 value={volume.totalDqSpcOffered}
                 sub={`${fmtPct(safeDiv(volume.totalDqSpcOffered, volume.totalDqDetected) * 100)} de DQ`}
               />
-              <VolumeCard label="Downsell SPC propuestos" value={volume.totalDownsellProposed} />
             </div>
 
             {/* ── Section 3: Charts ── */}

@@ -28,6 +28,7 @@ interface FormState {
   hours_worked: string
   // Conversaciones
   total_convos: string
+  active_conversations: string
   followups: string
   inbound: string
   outbound: string
@@ -47,7 +48,6 @@ interface FormState {
   // Downsell SPC
   dq_detected: string
   dq_spc_offered: string
-  spc_downsell_proposed: string
   // Autoevaluación
   performance_score: number
   highs: string[]
@@ -59,10 +59,10 @@ const initialState: FormState = {
   date: today(),
   setter_name: '',
   hours_worked: '8',
-  total_convos: '', followups: '', inbound: '', outbound: '', no_reply: '', new_leads: '',
+  total_convos: '', active_conversations: '', followups: '', inbound: '', outbound: '', no_reply: '', new_leads: '',
   calls_proposed: '', calls_booked: '', calls_no_reply: '', calls_followup: '',
   qual_apps: '', disqual_apps: '', waiting: '', requalified: 'N/A', disqual_reasons: [],
-  dq_detected: '', dq_spc_offered: '', spc_downsell_proposed: '',
+  dq_detected: '', dq_spc_offered: '',
   performance_score: 7, highs: [], lows: [], notas: '',
 }
 
@@ -183,6 +183,7 @@ export default function NuevoReporteSetterPage() {
       setter_name: form.setter_name,
       hours_worked: n(form.hours_worked),
       total_convos: n(form.total_convos),
+      active_conversations: n(form.active_conversations),
       followups: n(form.followups),
       inbound: n(form.inbound),
       outbound: n(form.outbound),
@@ -199,7 +200,6 @@ export default function NuevoReporteSetterPage() {
       disqual_reasons: form.disqual_reasons.length ? form.disqual_reasons : null,
       dq_detected: n(form.dq_detected),
       dq_spc_offered: n(form.dq_spc_offered),
-      spc_downsell_proposed: n(form.spc_downsell_proposed),
       performance_score: form.performance_score,
       highs: form.highs.length ? form.highs : null,
       lows: form.lows.length ? form.lows : null,
@@ -288,6 +288,11 @@ export default function NuevoReporteSetterPage() {
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div><FieldLabel>Total convos</FieldLabel><NumberInput value={form.total_convos} onChange={(v) => set('total_convos', v)} /></div>
               <div>
+                <FieldLabel>Conversaciones activas</FieldLabel>
+                <NumberInput value={form.active_conversations} onChange={(v) => set('active_conversations', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">De las conversaciones de hoy, ¿cuántas siguen activas y contestando?</p>
+              </div>
+              <div>
                 <FieldLabel>Follow-ups done today</FieldLabel>
                 <NumberInput value={form.followups} onChange={(v) => set('followups', v)} />
                 <p className="text-[10px] text-zinc-400 mt-1">Conversations with leads you&apos;ve contacted before</p>
@@ -345,14 +350,13 @@ export default function NuevoReporteSetterPage() {
               label="Downsell SPC"
               sub="DQ → SPC tracking"
             />
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div><FieldLabel>Descualificados detectados</FieldLabel><NumberInput value={form.dq_detected} onChange={(v) => set('dq_detected', v)} /></div>
               <div>
                 <FieldLabel>DQ a los que les ofreciste SPC</FieldLabel>
                 <NumberInput value={form.dq_spc_offered} onChange={(v) => set('dq_spc_offered', v)} />
                 <p className="text-[10px] text-zinc-400 mt-1">De los descualificados de hoy, ¿a cuántos les ofreciste el SPC?</p>
               </div>
-              <div><FieldLabel>Propuestas de Downsell SPC (general)</FieldLabel><NumberInput value={form.spc_downsell_proposed} onChange={(v) => set('spc_downsell_proposed', v)} /></div>
             </div>
           </SectionCard>
 
