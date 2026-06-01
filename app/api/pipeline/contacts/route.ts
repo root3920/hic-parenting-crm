@@ -14,162 +14,135 @@ const STAGE_NAMES: Record<number, string> = {
   5: 'Graduated PWU',
 }
 
-function calculateAutoStage(
-  purchases: { offer_title: string; date: string }[],
-  hasCall: boolean
-): number {
-  const titles = purchases.map((p) => p.offer_title.toLowerCase())
+const PAGE_SIZE = 1000
 
-  const hasPWU = titles.some((t) => t.includes('parenting with understanding'))
-  if (hasPWU) return 5
-
-  const hasSPC = titles.some((t) => t.includes('secure parent collective'))
-  if (hasSPC) return 4
-
-  if (hasCall) return 3
-
-  const hasRSC = titles.some((t) => t.includes('raising secure children'))
-  if (hasRSC) return 2
-
-  return 1
+/** Fetch all rows from a table, paginating past the 1000-row Supabase limit. */
+async function fetchAll<T>(
+  table: string,
+  select: string,
+  orderCol?: string
+): Promise<T[]> {
+  const all: T[] = []
+  let from = 0
+  while (true) {
+    let q = supabase.from(table).select(select).range(from, from + PAGE_SIZE - 1)
+    if (orderCol) q = q.order(orderCol, { ascending: false })
+    const { data, error } = await q
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all.push(...(data as T[]))
+    if (data.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return all
 }
 
 export async function GET() {
-  // 1. Get all distinct buyers from completed transactions
-  const { data: transactions, error: txErr } = await supabase
-    .from('transactions')
-    .select('buyer_email, buyer_name, buyer_phone, offer_title, date')
-    .eq('status', 'completed')
-    .order('date', { ascending: false })
+  try {
+    // 1. Read all value_ladder_contacts (the source of truth after backfill)
+    const vlContacts = await fetchAll<{
+      buyer_email: string
+      buyer_name: string | null
+      current_stage: number
+      manual_override: boolean
+      setter_assigned: string | null
+      last_contacted_at: string | null
+      product_proposed: string | null
+      notes: string | null
+    }>('value_ladder_contacts', 'buyer_email, buyer_name, current_stage, manual_override, setter_assigned, last_contacted_at, product_proposed, notes')
 
-  if (txErr) {
-    return NextResponse.json({ error: txErr.message }, { status: 500 })
-  }
-
-  // 2. Get all calls
-  const { data: calls, error: callErr } = await supabase
-    .from('calls')
-    .select('email, start_date, status')
-
-  if (callErr) {
-    return NextResponse.json({ error: callErr.message }, { status: 500 })
-  }
-
-  // 3. Get existing overrides
-  const { data: overrides } = await supabase
-    .from('value_ladder_contacts')
-    .select('*')
-
-  const overrideMap = new Map(
-    (overrides ?? []).map((o: Record<string, unknown>) => [
-      (o.buyer_email as string).toLowerCase(),
-      o,
-    ])
-  )
-
-  // Build call lookup by email
-  const callMap = new Map<string, { start_date: string; status: string }>()
-  for (const call of calls ?? []) {
-    if (!call.email) continue
-    const key = call.email.toLowerCase()
-    const existing = callMap.get(key)
-    if (!existing || call.start_date > existing.start_date) {
-      callMap.set(key, { start_date: call.start_date, status: call.status })
+    if (vlContacts.length === 0) {
+      return NextResponse.json({
+        data: [],
+        stage_names: STAGE_NAMES,
+        counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        total: 0,
+        needs_backfill: true,
+      })
     }
-  }
 
-  // Group transactions by buyer_email
-  const buyerMap = new Map<
-    string,
-    {
+    // 2. Fetch latest transaction per buyer for display (only need most recent)
+    //    We fetch all completed transactions and group client-side, paginated.
+    const transactions = await fetchAll<{
+      buyer_email: string
       buyer_name: string
       buyer_phone: string | null
-      purchases: { offer_title: string; date: string }[]
-    }
-  >()
+      offer_title: string
+      date: string
+    }>('transactions', 'buyer_email, buyer_name, buyer_phone, offer_title, date', 'date')
 
-  for (const tx of transactions ?? []) {
-    if (!tx.buyer_email) continue
-    const key = tx.buyer_email.toLowerCase()
-    if (!buyerMap.has(key)) {
-      buyerMap.set(key, {
-        buyer_name: tx.buyer_name,
-        buyer_phone: tx.buyer_phone ?? null,
-        purchases: [],
-      })
+    // Build latest-purchase + phone lookup
+    const txMap = new Map<string, { offer_title: string; date: string; buyer_phone: string | null }>()
+    // transactions are ordered by date desc, so first occurrence per email is the latest
+    for (const tx of transactions) {
+      if (!tx.buyer_email) continue
+      const key = tx.buyer_email.toLowerCase()
+      if (!txMap.has(key)) {
+        txMap.set(key, {
+          offer_title: tx.offer_title,
+          date: tx.date,
+          buyer_phone: tx.buyer_phone ?? null,
+        })
+      }
     }
-    buyerMap.get(key)!.purchases.push({
-      offer_title: tx.offer_title,
-      date: tx.date,
+
+    // 3. Fetch calls for call_info display (paginated)
+    const calls = await fetchAll<{
+      email: string | null
+      start_date: string
+      status: string
+    }>('calls', 'email, start_date, status')
+
+    const callMap = new Map<string, { start_date: string; status: string }>()
+    for (const call of calls) {
+      if (!call.email) continue
+      const key = call.email.toLowerCase()
+      const existing = callMap.get(key)
+      if (!existing || call.start_date > existing.start_date) {
+        callMap.set(key, { start_date: call.start_date, status: call.status })
+      }
+    }
+
+    // 4. Build response
+    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    const data = vlContacts.map((vlc) => {
+      const email = vlc.buyer_email.toLowerCase()
+      const tx = txMap.get(email)
+      const call = callMap.get(email)
+      const stage = vlc.current_stage
+      counts[stage] = (counts[stage] || 0) + 1
+
+      return {
+        buyer_email: vlc.buyer_email,
+        buyer_name: vlc.buyer_name ?? tx?.offer_title ?? null,
+        buyer_phone: tx?.buyer_phone ?? null,
+        display_stage: stage,
+        auto_stage: stage, // after backfill, current_stage IS the auto stage (unless manual)
+        manual_override: vlc.manual_override,
+        setter_assigned: vlc.setter_assigned,
+        last_contacted_at: vlc.last_contacted_at,
+        product_proposed: vlc.product_proposed,
+        notes: vlc.notes,
+        latest_purchase: tx ? { offer_title: tx.offer_title, date: tx.date } : null,
+        call_info: call ?? null,
+      }
     })
-  }
 
-  // 4. Build pipeline contacts
-  const contacts = []
-  const upsertRows: {
-    buyer_email: string
-    buyer_name: string | null
-    current_stage: number
-  }[] = []
-
-  for (const [email, buyer] of Array.from(buyerMap.entries())) {
-    const hasCall = callMap.has(email)
-    const autoStage = calculateAutoStage(buyer.purchases, hasCall)
-    const override = overrideMap.get(email) as Record<string, unknown> | undefined
-
-    const manualOverride = override?.manual_override === true
-    const displayStage = manualOverride
-      ? (override!.current_stage as number)
-      : autoStage
-
-    contacts.push({
-      buyer_email: email,
-      buyer_name: buyer.buyer_name,
-      buyer_phone: buyer.buyer_phone,
-      display_stage: displayStage,
-      auto_stage: autoStage,
-      manual_override: manualOverride,
-      setter_assigned: (override?.setter_assigned as string) ?? null,
-      last_contacted_at: (override?.last_contacted_at as string) ?? null,
-      product_proposed: (override?.product_proposed as string) ?? null,
-      notes: (override?.notes as string) ?? null,
-      latest_purchase: buyer.purchases[0] ?? null,
-      call_info: callMap.get(email) ?? null,
+    // Sort by stage asc, then name
+    data.sort((a, b) => {
+      if (a.display_stage !== b.display_stage) return a.display_stage - b.display_stage
+      return (a.buyer_name ?? '').localeCompare(b.buyer_name ?? '')
     })
 
-    // Queue upsert for contacts not yet in the table (don't overwrite manual overrides)
-    if (!override) {
-      upsertRows.push({
-        buyer_email: email,
-        buyer_name: buyer.buyer_name,
-        current_stage: autoStage,
-      })
-    }
+    return NextResponse.json({
+      data,
+      stage_names: STAGE_NAMES,
+      counts,
+      total: data.length,
+      needs_backfill: false,
+    })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
-
-  // 5. Upsert new contacts into value_ladder_contacts
-  if (upsertRows.length > 0) {
-    await supabase
-      .from('value_ladder_contacts')
-      .upsert(upsertRows, { onConflict: 'buyer_email', ignoreDuplicates: true })
-  }
-
-  // Sort by display_stage ascending, then name
-  contacts.sort((a, b) => {
-    if (a.display_stage !== b.display_stage) return a.display_stage - b.display_stage
-    return (a.buyer_name ?? '').localeCompare(b.buyer_name ?? '')
-  })
-
-  return NextResponse.json({
-    data: contacts,
-    stage_names: STAGE_NAMES,
-    counts: {
-      1: contacts.filter((c) => c.display_stage === 1).length,
-      2: contacts.filter((c) => c.display_stage === 2).length,
-      3: contacts.filter((c) => c.display_stage === 3).length,
-      4: contacts.filter((c) => c.display_stage === 4).length,
-      5: contacts.filter((c) => c.display_stage === 5).length,
-    },
-    total: contacts.length,
-  })
 }

@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
   Search, X, GripVertical, ShoppingBag, BookOpen, PhoneCall,
-  Crown, GraduationCap, LayoutGrid, List, User, Clock, ChevronDown,
+  Crown, GraduationCap, LayoutGrid, List, Clock, RefreshCw, Loader2,
 } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
@@ -495,9 +495,11 @@ function ActivityModal({
 
 export default function ContactsPage() {
   const { profile } = useProfile()
+  const isAdmin = profile?.role === 'admin'
   const { names: setterNames } = useTeamMembers('setter')
   const [contacts, setContacts] = useState<PipelineContact[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'kanban' | 'list'>('kanban')
   const [stageFilter, setStageFilter] = useState<Stage | 'all'>('all')
@@ -506,10 +508,27 @@ export default function ContactsPage() {
   const [selectedContact, setSelectedContact] = useState<PipelineContact | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [counts, setCounts] = useState<Record<number, number>>({})
+  const [backfillDone, setBackfillDone] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
+
+  const runBackfill = useCallback(async () => {
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/pipeline/backfill', { method: 'POST' })
+      if (!res.ok) throw new Error('Backfill failed')
+      const json = await res.json()
+      toast.success(`Synced ${json.total} contacts (${json.processed} updated) in ${(json.duration_ms / 1000).toFixed(1)}s`)
+      return true
+    } catch {
+      toast.error('Failed to sync pipeline contacts')
+      return false
+    } finally {
+      setSyncing(false)
+    }
+  }, [])
 
   const fetchContacts = useCallback(async () => {
     setLoading(true)
@@ -519,15 +538,47 @@ export default function ContactsPage() {
       const json = await res.json()
       setContacts(json.data)
       setCounts(json.counts)
+
+      // Auto-backfill if fewer than 1000 records (initial population)
+      if (!backfillDone && (json.needs_backfill || json.total < 1000)) {
+        setBackfillDone(true)
+        const success = await runBackfill()
+        if (success) {
+          // Re-fetch after backfill
+          const res2 = await fetch('/api/pipeline/contacts')
+          if (res2.ok) {
+            const json2 = await res2.json()
+            setContacts(json2.data)
+            setCounts(json2.counts)
+          }
+        }
+      }
     } catch {
       toast.error('Failed to load pipeline contacts')
     }
     setLoading(false)
-  }, [])
+  }, [backfillDone, runBackfill])
 
   useEffect(() => {
     fetchContacts()
   }, [fetchContacts])
+
+  async function handleSync() {
+    const success = await runBackfill()
+    if (success) {
+      // Re-fetch contacts after sync
+      try {
+        const res = await fetch('/api/pipeline/contacts')
+        if (res.ok) {
+          const json = await res.json()
+          setContacts(json.data)
+          setCounts(json.counts)
+        }
+      } catch {
+        // fetchContacts will handle error display
+      }
+    }
+  }
 
   // Filter contacts
   const filtered = useMemo(() => {
@@ -712,6 +763,22 @@ export default function ContactsPage() {
     <PageTransition>
       <PageHeader title="Value Ladder Pipeline" description="Escalera de valor · Low Ticket → PWU">
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSync}
+              disabled={syncing}
+              className="gap-1.5 text-xs"
+            >
+              {syncing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              {syncing ? 'Syncing...' : 'Sync'}
+            </Button>
+          )}
           <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
             <button
               onClick={() => setView('kanban')}
