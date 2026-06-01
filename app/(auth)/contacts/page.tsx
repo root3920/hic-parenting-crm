@@ -147,8 +147,8 @@ function SortableContactCard({
     opacity: isDragging ? 0.4 : 1,
   }
 
-  const stage = contact.display_stage as Stage
-  const cfg = STAGE_CONFIG[stage]
+  const stage = (contact.display_stage ?? 1) as Stage
+  const cfg = STAGE_CONFIG[stage] ?? STAGE_CONFIG[1]
 
   return (
     <div
@@ -186,7 +186,7 @@ function SortableContactCard({
             </div>
           </div>
 
-          {contact.latest_purchase && (
+          {contact.latest_purchase?.offer_title && (
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-1.5">
               {contact.latest_purchase.offer_title.length > 35
                 ? contact.latest_purchase.offer_title.slice(0, 35) + '...'
@@ -250,7 +250,8 @@ function KanbanColumn({
   onCardClick: (c: PipelineContact) => void
 }) {
   const cfg = STAGE_CONFIG[stage]
-  const emails = contacts.map((c) => c.buyer_email)
+  const safeContacts = contacts ?? []
+  const emails = safeContacts.map((c) => c.buyer_email)
 
   return (
     <div className="flex flex-col min-w-[280px] w-[280px] shrink-0">
@@ -261,7 +262,7 @@ function KanbanColumn({
             <h3 className={cn('text-sm font-semibold', cfg.color)}>{cfg.name}</h3>
           </div>
           <span className={cn('text-xs font-bold px-2 py-0.5 rounded-full', cfg.badge)}>
-            {contacts.length}
+            {safeContacts.length}
           </span>
         </div>
       </div>
@@ -270,14 +271,14 @@ function KanbanColumn({
         data-stage={stage}
       >
         <SortableContext items={emails} strategy={verticalListSortingStrategy}>
-          {contacts.map((contact) => (
+          {safeContacts.map((contact) => (
             <SortableContactCard
               key={contact.buyer_email}
               contact={contact}
               onClick={() => onCardClick(contact)}
             />
           ))}
-          {contacts.length === 0 && (
+          {safeContacts.length === 0 && (
             <div className="text-center py-8 text-xs text-zinc-400">
               No contacts in this stage
             </div>
@@ -364,28 +365,33 @@ function ActivityModal({
         </div>
 
         {/* Latest purchase */}
-        {contact.latest_purchase && (
+        {contact?.latest_purchase?.offer_title && (
           <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 mb-4">
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Latest Purchase</p>
             <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
               {contact.latest_purchase.offer_title}
             </p>
-            <p className="text-xs text-zinc-400">
-              {new Date(contact.latest_purchase.date).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric',
-              })}
-            </p>
+            {contact.latest_purchase.date && (
+              <p className="text-xs text-zinc-400">
+                {new Date(contact.latest_purchase.date).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                })}
+              </p>
+            )}
           </div>
         )}
 
         {/* Call info */}
-        {contact.call_info && (
+        {contact?.call_info?.status && (
           <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 mb-4">
             <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Call Info</p>
             <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-              {contact.call_info.status} — {new Date(contact.call_info.start_date).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-              })}
+              {contact.call_info.status}
+              {contact.call_info.start_date && (
+                <> — {new Date(contact.call_info.start_date).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                })}</>
+              )}
             </p>
           </div>
         )}
@@ -396,7 +402,7 @@ function ActivityModal({
             Stage
           </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-            Auto: Stage {contact.auto_stage} — {STAGE_CONFIG[contact.auto_stage as Stage].name}
+            Auto: Stage {contact.auto_stage ?? '?'} — {STAGE_CONFIG[(contact.auto_stage ?? 1) as Stage]?.name ?? 'Unknown'}
             {contact.manual_override && (
               <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">(manual override active)</span>
             )}
@@ -436,7 +442,7 @@ function ActivityModal({
               </label>
               <select className={inputCls} value={setter} onChange={(e) => setSetter(e.target.value)}>
                 <option value="">Unassigned</option>
-                {setterNames.map((name) => (
+                {(setterNames ?? []).map((name) => (
                   <option key={name} value={name}>{name}</option>
                 ))}
               </select>
@@ -598,13 +604,13 @@ export default function ContactsPage() {
 
   // Filter contacts
   const filtered = useMemo(() => {
-    let result = contacts
+    let result = contacts ?? []
     if (search) {
       const q = search.toLowerCase()
       result = result.filter(
         (c) =>
           (c.buyer_name ?? '').toLowerCase().includes(q) ||
-          c.buyer_email.toLowerCase().includes(q)
+          (c.buyer_email ?? '').toLowerCase().includes(q)
       )
     }
     if (stageFilter !== 'all') {
@@ -618,7 +624,7 @@ export default function ContactsPage() {
 
   // Sort for list view
   const sorted = useMemo(() => {
-    const arr = [...filtered]
+    const arr = [...(filtered ?? [])]
     if (sortBy === 'name') {
       arr.sort((a, b) => (a.buyer_name ?? '').localeCompare(b.buyer_name ?? ''))
     } else if (sortBy === 'last_contacted') {
@@ -637,7 +643,7 @@ export default function ContactsPage() {
   // Group by stage for kanban
   const byStage = useMemo(() => {
     const map: Record<Stage, PipelineContact[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] }
-    for (const c of filtered) {
+    for (const c of (filtered ?? [])) {
       const s = c.display_stage as Stage
       if (map[s]) map[s].push(c)
     }
@@ -655,7 +661,7 @@ export default function ContactsPage() {
     if (!over) return
 
     const email = active.id as string
-    const contact = contacts.find((c) => c.buyer_email === email)
+    const contact = (contacts ?? []).find((c) => c.buyer_email === email)
     if (!contact) return
 
     // Determine target stage from the over element
@@ -663,7 +669,7 @@ export default function ContactsPage() {
     let targetStage: number | null = null
 
     // Check if dropped over another card
-    const overContact = contacts.find((c) => c.buyer_email === over.id)
+    const overContact = (contacts ?? []).find((c) => c.buyer_email === over.id)
     if (overContact) {
       targetStage = overContact.display_stage
     }
@@ -677,7 +683,7 @@ export default function ContactsPage() {
 
     // Optimistic update
     setContacts((prev) =>
-      prev.map((c) =>
+      (prev ?? []).map((c) =>
         c.buyer_email === email
           ? { ...c, display_stage: targetStage!, manual_override: true }
           : c
@@ -708,7 +714,7 @@ export default function ContactsPage() {
 
   async function handleSaveStage(email: string, stage: number) {
     setContacts((prev) =>
-      prev.map((c) =>
+      (prev ?? []).map((c) =>
         c.buyer_email === email
           ? { ...c, display_stage: stage, manual_override: true }
           : c
@@ -752,7 +758,7 @@ export default function ContactsPage() {
       if (!res.ok) throw new Error()
       toast.success('Activity saved')
       setContacts((prev) =>
-        prev.map((c) =>
+        (prev ?? []).map((c) =>
           c.buyer_email === email ? { ...c, ...data } : c
         )
       )
@@ -895,7 +901,7 @@ export default function ContactsPage() {
           className="text-xs rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
         >
           <option value="all">All Setters</option>
-          {uniqueSetters.map((s) => (
+          {(uniqueSetters ?? []).map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
@@ -926,7 +932,7 @@ export default function ContactsPage() {
           title="Error loading pipeline"
           description={error}
         />
-      ) : contacts.length === 0 ? (
+      ) : (contacts ?? []).length === 0 ? (
         <EmptyState
           title="No pipeline contacts"
           description="Contacts will appear here automatically from completed transactions."
@@ -944,7 +950,7 @@ export default function ContactsPage() {
               <KanbanColumn
                 key={stage}
                 stage={stage}
-                contacts={byStage[stage]}
+                contacts={byStage[stage] ?? []}
                 onCardClick={setSelectedContact}
               />
             ))}
@@ -971,9 +977,9 @@ export default function ContactsPage() {
               </tr>
             </TableHeader>
             <TableBody>
-              {sorted.map((contact, idx) => {
-                const stage = contact.display_stage as Stage
-                const cfg = STAGE_CONFIG[stage]
+              {(sorted ?? []).map((contact, idx) => {
+                const stage = (contact.display_stage ?? 1) as Stage
+                const cfg = STAGE_CONFIG[stage] ?? STAGE_CONFIG[1]
                 return (
                   <AnimatedTableRow
                     key={contact.buyer_email}
@@ -1062,7 +1068,7 @@ export default function ContactsPage() {
       {selectedContact && (
         <ActivityModal
           contact={selectedContact}
-          setterNames={setterNames}
+          setterNames={setterNames ?? []}
           onClose={() => setSelectedContact(null)}
           onSaveStage={handleSaveStage}
           onSaveActivity={handleSaveActivity}
