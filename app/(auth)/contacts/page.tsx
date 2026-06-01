@@ -5,8 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { KPICard } from '@/components/shared/KPICard'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { formatDate } from '@/lib/utils'
-import { Contact, ContactNote } from '@/types'
+import { PipelineContact } from '@/types'
 import {
   Table,
   TableBody,
@@ -17,8 +16,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
-  Search, ExternalLink, Users, UserPlus, PhoneCall, GraduationCap,
-  Plus, Pencil, Trash2, X, Mail, Phone, Clock, MessageSquare, Tag,
+  Search, X, GripVertical, ShoppingBag, BookOpen, PhoneCall,
+  Crown, GraduationCap, LayoutGrid, List, User, Clock, ChevronDown,
 } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { KPICardGrid } from '@/components/motion/KPICardGrid'
@@ -26,438 +25,464 @@ import { AnimatedTableRow } from '@/components/motion/AnimatedTableRow'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
+import { useTeamMembers } from '@/hooks/useTeamMembers'
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 export const dynamic = 'force-dynamic'
 
-const STATUSES = ['New', 'Contacted', 'Engaged', 'Call Proposed', 'Call Booked', 'Enrolled'] as const
-type ContactStatus = (typeof STATUSES)[number]
+// ── Stage config ─────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<ContactStatus, string> = {
-  'New':           'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800',
-  'Contacted':     'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
-  'Engaged':       'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border border-orange-200 dark:border-orange-800',
-  'Call Proposed': 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800',
-  'Call Booked':   'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border border-green-200 dark:border-green-800',
-  'Enrolled':      'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
+const STAGES = [1, 2, 3, 4, 5] as const
+type Stage = (typeof STAGES)[number]
+
+const STAGE_CONFIG: Record<Stage, {
+  name: string
+  color: string
+  border: string
+  bg: string
+  badge: string
+  icon: React.ReactNode
+}> = {
+  1: {
+    name: 'Low Ticket',
+    color: 'text-zinc-600 dark:text-zinc-400',
+    border: 'border-zinc-400',
+    bg: 'bg-zinc-50 dark:bg-zinc-900/50',
+    badge: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700',
+    icon: <ShoppingBag className="h-4 w-4" />,
+  },
+  2: {
+    name: 'Raising Secure Children',
+    color: 'text-blue-600 dark:text-blue-400',
+    border: 'border-blue-400',
+    bg: 'bg-blue-50/50 dark:bg-blue-950/20',
+    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800',
+    icon: <BookOpen className="h-4 w-4" />,
+  },
+  3: {
+    name: 'Call Booked',
+    color: 'text-amber-600 dark:text-amber-400',
+    border: 'border-amber-400',
+    bg: 'bg-amber-50/50 dark:bg-amber-950/20',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
+    icon: <PhoneCall className="h-4 w-4" />,
+  },
+  4: {
+    name: 'SPC Member',
+    color: 'text-purple-600 dark:text-purple-400',
+    border: 'border-purple-400',
+    bg: 'bg-purple-50/50 dark:bg-purple-950/20',
+    badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800',
+    icon: <Crown className="h-4 w-4" />,
+  },
+  5: {
+    name: 'Graduated PWU',
+    color: 'text-green-600 dark:text-green-400',
+    border: 'border-green-400',
+    bg: 'bg-green-50/50 dark:bg-green-950/20',
+    badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border border-green-200 dark:border-green-800',
+    icon: <GraduationCap className="h-4 w-4" />,
+  },
 }
 
-const TAG_COLORS: Record<string, string> = {
-  'SPC Member':     'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  'SPC Trial':      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  'PWU Student':    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-  'PWU Graduate':   'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-  'Call Scheduled': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+const PRODUCT_OPTIONS = [
+  'Raising Secure Children',
+  'Call Booking',
+  'SPC Membership',
+  'PWU Program',
+]
+
+function formatRelativeDate(d: string | null) {
+  if (!d) return 'Never'
+  const diff = Date.now() - new Date(d).getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days}d ago`
+  if (days < 30) return `${Math.floor(days / 7)}w ago`
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-const ALL_TAGS = [
-  'SPC Member', 'SPC Trial', 'SPC Cancelled', 'PWU Student', 'PWU Graduate',
-  'Call Scheduled', 'Hot Lead', 'Cold Lead', 'Do Not Contact', 'VIP', 'Referral',
-] as const
-
-const TAG_FILTER_OPTIONS = ['All', 'SPC Member', 'SPC Trial', 'PWU Student', 'PWU Graduate', 'No tags'] as const
-type TagFilter = (typeof TAG_FILTER_OPTIONS)[number]
-
-type DateFilter = 'today' | '7d' | '30d' | 'all'
-
-interface ContactForm {
-  first_name: string
-  last_name: string
-  email: string
-  phone: string
-  owner: string
-  status: ContactStatus
-  ghl_id: string
+function getInitials(name: string | null) {
+  if (!name) return '?'
+  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
-const emptyForm: ContactForm = {
-  first_name: '', last_name: '', email: '', phone: '',
-  owner: '', status: 'New', ghl_id: '',
-}
+// ── Sortable Contact Card (Kanban) ──────────────────────────────────────
 
-function isNew24h(createdAt: string) {
-  return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000
-}
-
-function formatDateTime(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
-
-function noteBorderCls(createdAt: string) {
-  const diff = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-  if (diff < 3) return 'border-green-400 bg-green-50 dark:bg-green-900/10'
-  if (diff < 7) return 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/10'
-  return 'border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800/60'
-}
-
-function TagPills({ tags, max = 2 }: { tags: string[]; max?: number }) {
-  if (!tags || tags.length === 0) return <span className="text-xs text-zinc-400">—</span>
-  const shown = tags.slice(0, max)
-  const extra = tags.length - max
-  return (
-    <div className="flex flex-wrap gap-1">
-      {shown.map((tag) => (
-        <span key={tag} className={cn('inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium', TAG_COLORS[tag] || 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400')}>
-          {tag}
-        </span>
-      ))}
-      {extra > 0 && <span className="text-[10px] text-zinc-400">+{extra}</span>}
-    </div>
-  )
-}
-
-// ── Contact Form Modal ──────────────────────────────────────────────────
-
-function ContactFormModal({
-  title,
-  form,
-  saving,
-  onChange,
-  onSave,
-  onClose,
+function SortableContactCard({
+  contact,
+  onClick,
 }: {
-  title: string
-  form: ContactForm
-  saving: boolean
-  onChange: <K extends keyof ContactForm>(key: K, value: ContactForm[K]) => void
-  onSave: () => void
-  onClose: () => void
+  contact: PipelineContact
+  onClick: () => void
 }) {
-  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: contact.buyer_email })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  const stage = contact.display_stage as Stage
+  const cfg = STAGE_CONFIG[stage]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
-            <X className="h-4 w-4 text-zinc-500" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
-              First Name <span className="text-red-500">*</span>
-            </label>
-            <input className={inputCls} value={form.first_name} onChange={(e) => onChange('first_name', e.target.value)} placeholder="John" />
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onClick}
+      className={cn(
+        'bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800',
+        'p-3 cursor-pointer hover:shadow-md transition-shadow',
+        'border-l-4',
+        cfg.border
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <button
+          {...attributes}
+          {...listeners}
+          className="mt-0.5 text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-400 cursor-grab active:cursor-grabbing"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-600 dark:text-zinc-400 shrink-0">
+              {getInitials(contact.buyer_name)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                {contact.buyer_name || 'Unknown'}
+              </p>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                {contact.buyer_email}
+              </p>
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Last Name</label>
-            <input className={inputCls} value={form.last_name} onChange={(e) => onChange('last_name', e.target.value)} placeholder="Doe" />
+
+          {contact.latest_purchase && (
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-1.5">
+              {contact.latest_purchase.offer_title.length > 35
+                ? contact.latest_purchase.offer_title.slice(0, 35) + '...'
+                : contact.latest_purchase.offer_title}
+            </p>
+          )}
+
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatRelativeDate(contact.last_contacted_at)}
+            </span>
+            {contact.setter_assigned && (
+              <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full font-medium">
+                {contact.setter_assigned}
+              </span>
+            )}
+            {contact.product_proposed && (
+              <span className="text-[10px] bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-medium">
+                {contact.product_proposed}
+              </span>
+            )}
           </div>
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Email</label>
-          <input type="email" className={inputCls} value={form.email} onChange={(e) => onChange('email', e.target.value)} placeholder="john@example.com" />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Phone</label>
-          <input className={inputCls} value={form.phone} onChange={(e) => onChange('phone', e.target.value)} placeholder="+1 555 123 4567" />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Owner</label>
-          <input className={inputCls} value={form.owner} onChange={(e) => onChange('owner', e.target.value)} placeholder="Optional" />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">Status</label>
-            <select className={inputCls} value={form.status} onChange={(e) => onChange('status', e.target.value as ContactStatus)}>
-              {STATUSES.map((s) => (<option key={s} value={s}>{s}</option>))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">GHL ID</label>
-            <input className={inputCls} value={form.ghl_id} onChange={(e) => onChange('ghl_id', e.target.value)} placeholder="Optional" />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button size="sm" onClick={onSave} disabled={saving || !form.first_name.trim()} className="bg-blue-600 hover:bg-blue-700 text-white">
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
         </div>
       </div>
     </div>
   )
 }
 
-// ── Contact Detail Modal ────────────────────────────────────────────────
+// ── Drag Overlay Card ───────────────────────────────────────────────────
 
-function ContactDetailModal({
-  contact,
-  onClose,
-  onEdit,
-  onDelete,
-  onStatusChange,
-  onAddTag,
-  onRemoveTag,
-  authorName,
+function DragOverlayCard({ contact }: { contact: PipelineContact }) {
+  return (
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-blue-300 dark:border-blue-700 p-3 shadow-xl w-72">
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-[10px] font-bold text-blue-600 dark:text-blue-400">
+          {getInitials(contact.buyer_name)}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+            {contact.buyer_name || 'Unknown'}
+          </p>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+            {contact.buyer_email}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Kanban Column (droppable) ───────────────────────────────────────────
+
+function KanbanColumn({
+  stage,
+  contacts,
+  onCardClick,
 }: {
-  contact: Contact
-  onClose: () => void
-  onEdit: () => void
-  onDelete: () => void
-  onStatusChange: (id: string, status: ContactStatus) => void
-  onAddTag: (id: string, tag: string) => void
-  onRemoveTag: (id: string, tag: string) => void
-  authorName: string
+  stage: Stage
+  contacts: PipelineContact[]
+  onCardClick: (c: PipelineContact) => void
 }) {
-  const supabase = useMemo(() => createClient(), [])
-  const [notes, setNotes] = useState<ContactNote[]>([])
-  const [noteText, setNoteText] = useState('')
-  const [addingNote, setAddingNote] = useState(false)
-  const [loadingNotes, setLoadingNotes] = useState(true)
+  const cfg = STAGE_CONFIG[stage]
+  const emails = contacts.map((c) => c.buyer_email)
 
-  const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
-  const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
-  const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
+  return (
+    <div className="flex flex-col min-w-[280px] w-[280px] shrink-0">
+      <div className={cn('border-t-4 rounded-t-lg px-3 py-2.5', cfg.border, cfg.bg)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={cfg.color}>{cfg.icon}</span>
+            <h3 className={cn('text-sm font-semibold', cfg.color)}>{cfg.name}</h3>
+          </div>
+          <span className={cn('text-xs font-bold px-2 py-0.5 rounded-full', cfg.badge)}>
+            {contacts.length}
+          </span>
+        </div>
+      </div>
+      <div
+        className="flex-1 bg-zinc-50/50 dark:bg-zinc-950/30 border border-t-0 border-zinc-200 dark:border-zinc-800 rounded-b-lg p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-320px)] min-h-[200px]"
+        data-stage={stage}
+      >
+        <SortableContext items={emails} strategy={verticalListSortingStrategy}>
+          {contacts.map((contact) => (
+            <SortableContactCard
+              key={contact.buyer_email}
+              contact={contact}
+              onClick={() => onCardClick(contact)}
+            />
+          ))}
+          {contacts.length === 0 && (
+            <div className="text-center py-8 text-xs text-zinc-400">
+              No contacts in this stage
+            </div>
+          )}
+        </SortableContext>
+      </div>
+    </div>
+  )
+}
 
-  // Fetch notes
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('contact_notes')
-        .select('*')
-        .eq('contact_id', contact.id)
-        .order('created_at', { ascending: false })
-      setNotes((data as ContactNote[]) ?? [])
-      setLoadingNotes(false)
-    }
-    load()
-  }, [supabase, contact.id])
+// ── Activity Modal ──────────────────────────────────────────────────────
 
-  async function handleAddNote() {
-    if (!noteText.trim()) return
-    setAddingNote(true)
-    const { data, error } = await supabase
-      .from('contact_notes')
-      .insert({
-        contact_id: contact.id,
-        author_name: authorName,
-        note: noteText.trim(),
-      })
-      .select()
-      .single()
-    setAddingNote(false)
+function ActivityModal({
+  contact,
+  setterNames,
+  onClose,
+  onSaveStage,
+  onSaveActivity,
+}: {
+  contact: PipelineContact
+  setterNames: string[]
+  onClose: () => void
+  onSaveStage: (email: string, stage: number) => void
+  onSaveActivity: (email: string, data: {
+    setter_assigned: string
+    last_contacted_at: string
+    product_proposed: string
+    notes: string
+  }) => void
+}) {
+  const [stageVal, setStageVal] = useState(contact.display_stage)
+  const [setter, setSetter] = useState(contact.setter_assigned ?? '')
+  const [lastContacted, setLastContacted] = useState(
+    contact.last_contacted_at
+      ? new Date(contact.last_contacted_at).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+  )
+  const [product, setProduct] = useState(contact.product_proposed ?? '')
+  const [notes, setNotes] = useState(contact.notes ?? '')
+  const [saving, setSaving] = useState(false)
 
-    if (error) {
-      toast.error('Failed to add note: ' + error.message)
-      return
-    }
-    setNotes((prev) => [data as ContactNote, ...prev])
-    setNoteText('')
+  const stage = contact.display_stage as Stage
+
+  async function handleSaveActivity() {
+    setSaving(true)
+    await onSaveActivity(contact.buyer_email, {
+      setter_assigned: setter,
+      last_contacted_at: lastContacted ? new Date(lastContacted).toISOString() : '',
+      product_proposed: product,
+      notes,
+    })
+    setSaving(false)
   }
 
-  const initials = contact.full_name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  async function handleSaveStage() {
+    if (stageVal !== contact.display_stage) {
+      onSaveStage(contact.buyer_email, stageVal)
+    }
+  }
+
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
         {/* Header */}
-        <div className="flex items-start gap-4 mb-6 -mt-1">
-          <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-lg font-bold text-blue-600 dark:text-blue-300 shrink-0">
-            {initials}
+        <div className="flex items-start gap-3 mb-5">
+          <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-base font-bold text-zinc-600 dark:text-zinc-400 shrink-0">
+            {getInitials(contact.buyer_name)}
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-              {contact.full_name}
+              {contact.buyer_name || 'Unknown'}
             </h3>
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {(contact.tags || []).map((tag) => (
-                <span key={tag} className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium', TAG_COLORS[tag] || 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400')}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-          {/* Actions */}
-          <div className="flex items-center gap-1 shrink-0">
-            <button onClick={onEdit} className="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit">
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button onClick={onDelete} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete">
-              <Trash2 className="h-4 w-4" />
-            </button>
-            {contact.ghl_id && (
-              <a
-                href={`https://app.hicparenting.com/v2/location/E9DtRyrhRO9Ce7h1D0u7/contacts/detail/${contact.ghl_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                title="Open in GHL"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">{contact.buyer_email}</p>
+            {contact.buyer_phone && (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{contact.buyer_phone}</p>
             )}
-            <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors ml-1">
-              <X className="h-4 w-4" />
-            </button>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
+            <X className="h-4 w-4 text-zinc-500" />
+          </button>
+        </div>
+
+        {/* Latest purchase */}
+        {contact.latest_purchase && (
+          <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 mb-4">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Latest Purchase</p>
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              {contact.latest_purchase.offer_title}
+            </p>
+            <p className="text-xs text-zinc-400">
+              {new Date(contact.latest_purchase.date).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+              })}
+            </p>
+          </div>
+        )}
+
+        {/* Call info */}
+        {contact.call_info && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Call Info</p>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              {contact.call_info.status} — {new Date(contact.call_info.start_date).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+              })}
+            </p>
+          </div>
+        )}
+
+        {/* Stage */}
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2">
+            Stage
+          </p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+            Auto: Stage {contact.auto_stage} — {STAGE_CONFIG[contact.auto_stage as Stage].name}
+            {contact.manual_override && (
+              <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">(manual override active)</span>
+            )}
+          </p>
+          <div className="flex items-center gap-2">
+            <select
+              className={inputCls}
+              value={stageVal}
+              onChange={(e) => setStageVal(Number(e.target.value))}
+            >
+              {STAGES.map((s) => (
+                <option key={s} value={s}>
+                  Stage {s} — {STAGE_CONFIG[s].name}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              onClick={handleSaveStage}
+              disabled={stageVal === contact.display_stage}
+              className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+            >
+              Move
+            </Button>
           </div>
         </div>
 
-        {/* Body: two columns */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* LEFT: Key Info */}
-          <div>
-            <p className={sectionLabel}>Contact Info</p>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className={rowLabel}>Email</span>
-                {contact.email ? (
-                  <a href={`mailto:${contact.email}`} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-                    <Mail className="h-3 w-3" />
-                    {contact.email}
-                  </a>
-                ) : (
-                  <span className={rowValue}>—</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center">
-                <span className={rowLabel}>Phone</span>
-                {contact.phone ? (
-                  <a href={`tel:${contact.phone}`} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-                    <Phone className="h-3 w-3" />
-                    {contact.phone}
-                  </a>
-                ) : (
-                  <span className={rowValue}>—</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center">
-                <span className={rowLabel}>Status</span>
-                <select
-                  className="text-xs rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                  value={contact.status}
-                  onChange={(e) => onStatusChange(contact.id, e.target.value as ContactStatus)}
-                >
-                  {STATUSES.map((s) => (<option key={s} value={s}>{s}</option>))}
-                </select>
-              </div>
-              <div className="flex justify-between"><span className={rowLabel}>Owner</span><span className={rowValue}>{contact.owner || '—'}</span></div>
-              <div className="flex justify-between"><span className={rowLabel}>GHL ID</span><span className={rowValue}>{contact.ghl_id || '—'}</span></div>
-              <div className="flex justify-between"><span className={rowLabel}>Created</span><span className={rowValue}>{formatDate(contact.created_at)}</span></div>
-              {contact.spc_status && (
-                <div className="flex justify-between"><span className={rowLabel}>SPC Status</span><span className={rowValue}>{contact.spc_status}</span></div>
-              )}
-              {contact.pwu_cohort && (
-                <div className="flex justify-between"><span className={rowLabel}>PWU Cohort</span><span className={rowValue}>{contact.pwu_cohort}</span></div>
-              )}
-              {contact.source && (
-                <div className="flex justify-between"><span className={rowLabel}>Source</span><span className={rowValue}>{contact.source}</span></div>
-              )}
-            </div>
-
-            {/* Tags section (editable) */}
-            <div className="mt-5">
-              <p className={sectionLabel}>
-                <Tag className="h-3 w-3 inline mr-1" />
-                Tags
-              </p>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {(contact.tags || []).length === 0 && (
-                  <span className="text-xs text-zinc-400 italic">No tags</span>
-                )}
-                {(contact.tags || []).map((tag) => (
-                  <span key={tag} className={cn('inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium', TAG_COLORS[tag] || 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400')}>
-                    {tag}
-                    <button
-                      onClick={() => onRemoveTag(contact.id, tag)}
-                      className="hover:text-red-500 transition-colors text-current opacity-60 hover:opacity-100"
-                      title="Remove tag"
-                    >
-                      &times;
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <select
-                className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onAddTag(contact.id, e.target.value)
-                    e.target.value = ''
-                  }
-                }}
-              >
-                <option value="" disabled>+ Add tag...</option>
-                {ALL_TAGS.filter((t) => !(contact.tags || []).includes(t)).map((t) => (
-                  <option key={t} value={t}>{t}</option>
+        {/* Setter Activity */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">
+            Setter Activity
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+                Setter Assigned
+              </label>
+              <select className={inputCls} value={setter} onChange={(e) => setSetter(e.target.value)}>
+                <option value="">Unassigned</option>
+                {setterNames.map((name) => (
+                  <option key={name} value={name}>{name}</option>
                 ))}
               </select>
             </div>
-          </div>
 
-          {/* RIGHT: Notes */}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2 mb-3">
-              <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />
-              <p className={cn(sectionLabel, 'mb-0')}>Contact Notes</p>
+            <div>
+              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+                Last Contacted
+              </label>
+              <input type="date" className={inputCls} value={lastContacted} onChange={(e) => setLastContacted(e.target.value)} />
             </div>
 
-            <div className="flex-1 space-y-2 max-h-72 overflow-y-auto pr-1 mb-4">
-              {loadingNotes ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (<div key={i} className="h-14 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />))}
-                </div>
-              ) : notes.length === 0 ? (
-                <div className="text-center py-10 text-zinc-400 text-xs">
-                  No notes yet. Add the first contact note below.
-                </div>
-              ) : (
-                notes.map((note) => (
-                  <div key={note.id} className={cn('rounded-xl p-3 border-l-4', noteBorderCls(note.created_at))}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{note.author_name}</span>
-                      <span className="text-xs text-zinc-400 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatDateTime(note.created_at)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">{note.note}</p>
-                  </div>
-                ))
-              )}
+            <div>
+              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+                Product Proposed
+              </label>
+              <select className={inputCls} value={product} onChange={(e) => setProduct(e.target.value)}>
+                <option value="">None</option>
+                {PRODUCT_OPTIONS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4">
+            <div>
+              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+                Notes
+              </label>
               <textarea
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault()
-                    handleAddNote()
-                  }
-                }}
-                placeholder="Add a contact note... (⌘+Enter to save)"
+                className={cn(inputCls, 'resize-none')}
                 rows={3}
-                className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-none"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add notes about this contact..."
               />
-              <div className="flex justify-end mt-2">
-                <button
-                  onClick={handleAddNote}
-                  disabled={!noteText.trim() || addingNote}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
-                  style={{ backgroundColor: '#185FA5' }}
-                >
-                  <MessageSquare className="h-3 w-3" />
-                  {addingNote ? 'Saving...' : 'Add Note'}
-                </button>
-              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button
+                size="sm"
+                onClick={handleSaveActivity}
+                disabled={saving}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {saving ? 'Saving...' : 'Save Activity'}
+              </Button>
             </div>
           </div>
         </div>
@@ -469,505 +494,490 @@ function ContactDetailModal({
 // ── Main Page ───────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
-  const supabase = useMemo(() => createClient(), [])
   const { profile } = useProfile()
-  const [contacts, setContacts] = useState<Contact[]>([])
+  const { names: setterNames } = useTeamMembers('setter')
+  const [contacts, setContacts] = useState<PipelineContact[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<ContactStatus | 'All'>('All')
-  const [tagFilter, setTagFilter] = useState<TagFilter>('All')
-  const [dateFilter, setDateFilter] = useState<DateFilter>('all')
-  const [statusEditId, setStatusEditId] = useState<string | null>(null)
+  const [view, setView] = useState<'kanban' | 'list'>('kanban')
+  const [stageFilter, setStageFilter] = useState<Stage | 'all'>('all')
+  const [setterFilter, setSetterFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'stage' | 'name' | 'last_contacted'>('stage')
+  const [selectedContact, setSelectedContact] = useState<PipelineContact | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [counts, setCounts] = useState<Record<number, number>>({})
 
-  // Pagination state
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const PAGE_SIZE = 50
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
 
-  // Modal state
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [editContact, setEditContact] = useState<Contact | null>(null)
-  const [detailContact, setDetailContact] = useState<Contact | null>(null)
-  const [form, setForm] = useState<ContactForm>(emptyForm)
-  const [saving, setSaving] = useState(false)
-
-  function setField<K extends keyof ContactForm>(key: K, value: ContactForm[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }))
-  }
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setPage(1)
-  }, [search, statusFilter, tagFilter, dateFilter])
-
-  // Fetch contacts via API with pagination
   const fetchContacts = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams()
-    params.set('page', String(page))
-    params.set('limit', String(PAGE_SIZE))
-    if (search) params.set('search', search)
-    if (statusFilter !== 'All') params.set('status', statusFilter)
-    if (tagFilter !== 'All') params.set('tag', tagFilter)
-    if (dateFilter !== 'all') params.set('date', dateFilter)
-
     try {
-      const res = await fetch(`/api/contacts?${params}`)
+      const res = await fetch('/api/pipeline/contacts')
       if (!res.ok) throw new Error('Failed to fetch')
       const json = await res.json()
-      setContacts(json.data as Contact[])
-      setTotal(json.total)
-      setTotalPages(json.totalPages)
+      setContacts(json.data)
+      setCounts(json.counts)
     } catch {
-      toast.error('Failed to load contacts')
+      toast.error('Failed to load pipeline contacts')
     }
     setLoading(false)
-  }, [page, search, statusFilter, tagFilter, dateFilter])
+  }, [])
 
   useEffect(() => {
     fetchContacts()
   }, [fetchContacts])
 
-  // Realtime subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel('contacts-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'contacts' },
-        (payload) => {
-          const newContact = payload.new as Contact
-          // Only prepend if on page 1 with no filters to avoid confusion
-          if (page === 1 && !search && statusFilter === 'All' && tagFilter === 'All' && dateFilter === 'all') {
-            setContacts((prev) => {
-              if (prev.some((c) => c.id === newContact.id)) return prev
-              return [newContact, ...prev.slice(0, PAGE_SIZE - 1)]
-            })
-            setTotal((prev) => prev + 1)
-          }
-          toast.success(`New contact: ${newContact.full_name}`)
+  // Filter contacts
+  const filtered = useMemo(() => {
+    let result = contacts
+    if (search) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        (c) =>
+          (c.buyer_name ?? '').toLowerCase().includes(q) ||
+          c.buyer_email.toLowerCase().includes(q)
+      )
+    }
+    if (stageFilter !== 'all') {
+      result = result.filter((c) => c.display_stage === stageFilter)
+    }
+    if (setterFilter !== 'all') {
+      result = result.filter((c) => c.setter_assigned === setterFilter)
+    }
+    return result
+  }, [contacts, search, stageFilter, setterFilter])
+
+  // Sort for list view
+  const sorted = useMemo(() => {
+    const arr = [...filtered]
+    if (sortBy === 'name') {
+      arr.sort((a, b) => (a.buyer_name ?? '').localeCompare(b.buyer_name ?? ''))
+    } else if (sortBy === 'last_contacted') {
+      arr.sort((a, b) => {
+        if (!a.last_contacted_at && !b.last_contacted_at) return 0
+        if (!a.last_contacted_at) return 1
+        if (!b.last_contacted_at) return -1
+        return new Date(b.last_contacted_at).getTime() - new Date(a.last_contacted_at).getTime()
+      })
+    } else {
+      arr.sort((a, b) => a.display_stage - b.display_stage)
+    }
+    return arr
+  }, [filtered, sortBy])
+
+  // Group by stage for kanban
+  const byStage = useMemo(() => {
+    const map: Record<Stage, PipelineContact[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] }
+    for (const c of filtered) {
+      const s = c.display_stage as Stage
+      if (map[s]) map[s].push(c)
+    }
+    return map
+  }, [filtered])
+
+  // Drag and drop handlers
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string)
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    setActiveId(null)
+    const { active, over } = event
+    if (!over) return
+
+    const email = active.id as string
+    const contact = contacts.find((c) => c.buyer_email === email)
+    if (!contact) return
+
+    // Determine target stage from the over element
+    // over.id could be another card's email or a stage droppable
+    let targetStage: number | null = null
+
+    // Check if dropped over another card
+    const overContact = contacts.find((c) => c.buyer_email === over.id)
+    if (overContact) {
+      targetStage = overContact.display_stage
+    }
+
+    // If dropped on the column droppable area (data-stage attr)
+    if (!targetStage && over.data?.current) {
+      targetStage = over.data.current.stage
+    }
+
+    if (!targetStage || targetStage === contact.display_stage) return
+
+    // Optimistic update
+    setContacts((prev) =>
+      prev.map((c) =>
+        c.buyer_email === email
+          ? { ...c, display_stage: targetStage!, manual_override: true }
+          : c
+      )
+    )
+    setCounts((prev) => ({
+      ...prev,
+      [contact.display_stage]: (prev[contact.display_stage] || 1) - 1,
+      [targetStage!]: (prev[targetStage!] || 0) + 1,
+    }))
+
+    try {
+      const res = await fetch(
+        `/api/pipeline/contacts/${encodeURIComponent(email)}/stage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stage: targetStage }),
         }
       )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [supabase, page, search, statusFilter, tagFilter, dateFilter])
-
-  // Status update (shared between table inline and detail modal)
-  const updateStatus = useCallback(async (id: string, newStatus: ContactStatus) => {
-    const res = await fetch(`/api/contacts/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
-    if (!res.ok) {
-      toast.error('Failed to update status')
-      return
+      if (!res.ok) throw new Error()
+      toast.success(`Moved to ${STAGE_CONFIG[targetStage as Stage].name}`)
+    } catch {
+      toast.error('Failed to update stage')
+      fetchContacts()
     }
-    const updated = await res.json()
-    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)))
-    setDetailContact((prev) => prev && prev.id === id ? { ...prev, ...updated } : prev)
-    setStatusEditId(null)
-  }, [])
-
-  // Add contact
-  function openAddModal() {
-    setForm(emptyForm)
-    setEditContact(null)
-    setShowAddModal(true)
   }
 
-  async function handleAdd() {
-    if (!form.first_name.trim()) return
-    setSaving(true)
-    const full_name = `${form.first_name} ${form.last_name}`.trim()
-    const { data, error } = await supabase
-      .from('contacts')
-      .insert({
-        first_name: form.first_name || null,
-        last_name: form.last_name || null,
-        full_name,
-        email: form.email || null,
-        phone: form.phone || null,
-        owner: form.owner || null,
-        status: form.status,
-        ghl_id: form.ghl_id || null,
-      })
-      .select()
-      .single()
-    setSaving(false)
-
-    if (error) {
-      toast.error('Failed to add contact: ' + error.message)
-      return
+  async function handleSaveStage(email: string, stage: number) {
+    setContacts((prev) =>
+      prev.map((c) =>
+        c.buyer_email === email
+          ? { ...c, display_stage: stage, manual_override: true }
+          : c
+      )
+    )
+    try {
+      const res = await fetch(
+        `/api/pipeline/contacts/${encodeURIComponent(email)}/stage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stage }),
+        }
+      )
+      if (!res.ok) throw new Error()
+      toast.success(`Moved to ${STAGE_CONFIG[stage as Stage].name}`)
+      setSelectedContact((prev) =>
+        prev?.buyer_email === email
+          ? { ...prev, display_stage: stage, manual_override: true }
+          : prev
+      )
+    } catch {
+      toast.error('Failed to update stage')
+      fetchContacts()
     }
-    setShowAddModal(false)
-    toast.success('Contact added')
-    fetchContacts()
   }
 
-  // Edit contact
-  function openEditModal(contact: Contact) {
-    setForm({
-      first_name: contact.first_name || '',
-      last_name: contact.last_name || '',
-      email: contact.email || '',
-      phone: contact.phone || '',
-      owner: contact.owner || '',
-      status: (contact.status as ContactStatus) || 'New',
-      ghl_id: contact.ghl_id || '',
-    })
-    setEditContact(contact)
-    setShowAddModal(false)
-    setDetailContact(null)
-  }
-
-  async function handleEdit() {
-    if (!editContact || !form.first_name.trim()) return
-    setSaving(true)
-    const full_name = `${form.first_name} ${form.last_name}`.trim()
-    const res = await fetch(`/api/contacts/${editContact.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        first_name: form.first_name || null,
-        last_name: form.last_name || null,
-        full_name,
-        email: form.email || null,
-        phone: form.phone || null,
-        owner: form.owner || null,
-        status: form.status,
-        ghl_id: form.ghl_id || null,
-      }),
-    })
-    setSaving(false)
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      toast.error('Failed to update: ' + (body.error || 'Unknown error'))
-      return
+  async function handleSaveActivity(
+    email: string,
+    data: { setter_assigned: string; last_contacted_at: string; product_proposed: string; notes: string }
+  ) {
+    try {
+      const res = await fetch(
+        `/api/pipeline/contacts/${encodeURIComponent(email)}/activity`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        }
+      )
+      if (!res.ok) throw new Error()
+      toast.success('Activity saved')
+      setContacts((prev) =>
+        prev.map((c) =>
+          c.buyer_email === email ? { ...c, ...data } : c
+        )
+      )
+      setSelectedContact((prev) =>
+        prev?.buyer_email === email ? { ...prev, ...data } : prev
+      )
+    } catch {
+      toast.error('Failed to save activity')
     }
-    setEditContact(null)
-    toast.success('Contact updated')
-    fetchContacts()
   }
 
-  // Delete contact
-  async function handleDelete(id: string) {
-    if (!confirm('Delete this contact? This cannot be undone.')) return
-    const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' })
-    if (!res.ok) {
-      toast.error('Error deleting contact')
-      return
-    }
-    setDetailContact(null)
-    toast.success('Contact deleted')
-    fetchContacts()
-  }
+  const draggedContact = activeId ? contacts.find((c) => c.buyer_email === activeId) : null
 
-  // Tag management
-  async function handleAddTag(id: string, tag: string) {
-    const contact = contacts.find((c) => c.id === id)
-    if (!contact || (contact.tags || []).includes(tag)) return
-    const newTags = [...(contact.tags || []), tag]
-    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, tags: newTags } : c)))
-    setDetailContact((prev) => prev && prev.id === id ? { ...prev, tags: newTags } : prev)
-    const res = await fetch(`/api/contacts/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tags: newTags }),
+  // Unique setters for filter
+  const uniqueSetters = useMemo(() => {
+    const s = new Set<string>()
+    contacts.forEach((c) => {
+      if (c.setter_assigned) s.add(c.setter_assigned)
     })
-    if (!res.ok) toast.error('Failed to add tag')
-    else toast.success(`Tag added: ${tag}`)
-  }
-
-  async function handleRemoveTag(id: string, tag: string) {
-    const contact = contacts.find((c) => c.id === id)
-    if (!contact) return
-    const newTags = (contact.tags || []).filter((t) => t !== tag)
-    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, tags: newTags } : c)))
-    setDetailContact((prev) => prev && prev.id === id ? { ...prev, tags: newTags } : prev)
-    const res = await fetch(`/api/contacts/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tags: newTags }),
-    })
-    if (!res.ok) toast.error('Failed to remove tag')
-    else toast.success('Tag removed')
-  }
-
-  // KPI values from current page data
-  const newCount = contacts.filter((c) => c.status === 'New').length
-  const callBookedCount = contacts.filter((c) => c.status === 'Call Booked').length
-  const enrolledCount = contacts.filter((c) => c.status === 'Enrolled').length
-
-  // Pagination helpers
-  const rangeStart = (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
+    return Array.from(s).sort()
+  }, [contacts])
 
   return (
     <PageTransition>
-      <PageHeader title="Contacts" description="Lead pipeline from Go High Level">
-        <Button onClick={openAddModal} className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5" size="sm">
-          <Plus className="h-4 w-4" />
-          Add Contact
-        </Button>
+      <PageHeader title="Value Ladder Pipeline" description="Escalera de valor · Low Ticket → PWU">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setView('kanban')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                view === 'kanban'
+                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+              )}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Kanban
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                view === 'list'
+                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+              )}
+            >
+              <List className="h-3.5 w-3.5" />
+              List
+            </button>
+          </div>
+        </div>
       </PageHeader>
 
       {/* KPI Cards */}
-      <KPICardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <KPICard title="Total Contacts" value={total} loading={loading} icon={<Users className="h-4 w-4" />} />
-        <KPICard title="New" value={newCount} loading={loading} icon={<UserPlus className="h-4 w-4" />} className="ring-1 ring-blue-200 dark:ring-blue-800" />
-        <KPICard title="Call Booked" value={callBookedCount} loading={loading} icon={<PhoneCall className="h-4 w-4" />} />
-        <KPICard title="Enrolled" value={enrolledCount} loading={loading} icon={<GraduationCap className="h-4 w-4" />} />
+      <KPICardGrid className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        {STAGES.map((s) => {
+          const cfg = STAGE_CONFIG[s]
+          return (
+            <KPICard
+              key={s}
+              title={cfg.name}
+              value={counts[s] ?? 0}
+              loading={loading}
+              icon={cfg.icon}
+              className={cn('ring-1', {
+                'ring-zinc-200 dark:ring-zinc-700': s === 1,
+                'ring-blue-200 dark:ring-blue-800': s === 2,
+                'ring-amber-200 dark:ring-amber-800': s === 3,
+                'ring-purple-200 dark:ring-purple-800': s === 4,
+                'ring-green-200 dark:ring-green-800': s === 5,
+              })}
+            />
+          )
+        })}
       </KPICardGrid>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-          <Input placeholder="Search name or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Input
+            placeholder="Search name or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
 
-        {/* Status filter */}
+        {/* Stage filter pills */}
         <div className="flex flex-wrap gap-1.5">
-          {(['All', ...STATUSES] as const).map((s) => (
+          <button
+            onClick={() => setStageFilter('all')}
+            className={cn(
+              'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+              stageFilter === 'all'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'
+            )}
+          >
+            All
+          </button>
+          {STAGES.map((s) => (
             <button
               key={s}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => setStageFilter(s)}
               className={cn(
                 'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                statusFilter === s
+                stageFilter === s
                   ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                   : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'
               )}
             >
-              {s}
+              {STAGE_CONFIG[s].name}
             </button>
           ))}
         </div>
 
-        {/* Tag filter */}
+        {/* Setter filter */}
         <select
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value as TagFilter)}
+          value={setterFilter}
+          onChange={(e) => setSetterFilter(e.target.value)}
           className="text-xs rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
         >
-          {TAG_FILTER_OPTIONS.map((t) => (<option key={t} value={t}>{t === 'All' ? 'All Types' : t}</option>))}
+          <option value="all">All Setters</option>
+          {uniqueSetters.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
         </select>
 
-        {/* Date filter */}
-        <div className="flex gap-1.5 ml-auto">
-          {([
-            ['today', 'Today'],
-            ['7d', '7d'],
-            ['30d', '30d'],
-            ['all', 'All'],
-          ] as [DateFilter, string][]).map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => setDateFilter(val)}
-              className={cn(
-                'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                dateFilter === val
-                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* Sort (list view) */}
+        {view === 'list' && (
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="text-xs rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 ml-auto"
+          >
+            <option value="stage">Sort by Stage</option>
+            <option value="name">Sort by Name</option>
+            <option value="last_contacted">Sort by Last Contacted</option>
+          </select>
+        )}
       </div>
 
-      {/* Table */}
+      {/* Content */}
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-16 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
           ))}
         </div>
       ) : contacts.length === 0 ? (
-        <EmptyState title="No contacts found" description="Adjust your filters or wait for new leads from Go High Level." />
+        <EmptyState
+          title="No pipeline contacts"
+          description="Contacts will appear here automatically from completed transactions."
+        />
+      ) : view === 'kanban' ? (
+        /* ── KANBAN VIEW ── */
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {STAGES.map((stage) => (
+              <KanbanColumn
+                key={stage}
+                stage={stage}
+                contacts={byStage[stage]}
+                onCardClick={setSelectedContact}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {draggedContact ? <DragOverlayCard contact={draggedContact} /> : null}
+          </DragOverlay>
+        </DndContext>
       ) : (
+        /* ── LIST VIEW ── */
         <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
           <Table>
             <TableHeader>
               <tr className="bg-zinc-50 dark:bg-zinc-900/50">
-                <TableHead className="w-10 text-center">#</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead>Stage</TableHead>
+                <TableHead>Latest Purchase</TableHead>
+                <TableHead>Call</TableHead>
+                <TableHead>Setter</TableHead>
+                <TableHead>Last Contacted</TableHead>
+                <TableHead>Product Proposed</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
-              {contacts.map((contact, idx) => (
-                <AnimatedTableRow
-                  key={contact.id}
-                  custom={idx}
-                  variants={{
-                    hidden: { opacity: 0, x: -8 },
-                    visible: (i: number) => ({ opacity: 1, x: 0, transition: { delay: i * 0.04, duration: 0.2, ease: 'easeOut' as const } }),
-                  }}
-                  initial="hidden"
-                  animate="visible"
-                  className={cn(
-                    'cursor-pointer',
-                    contact.status === 'New' && 'bg-blue-50/60 dark:bg-blue-950/20 border-l-4 border-l-blue-400',
-                    contact.status !== 'New' && 'border-l-4 border-l-transparent'
-                  )}
-                  onClick={() => setDetailContact(contact)}
-                >
-                  <TableCell className="text-center text-xs text-zinc-400">{rangeStart + idx}</TableCell>
-                  <TableCell className="font-medium text-zinc-900 dark:text-zinc-100">
-                    <div className="flex items-center gap-2">
-                      {contact.full_name}
-                      {isNew24h(contact.created_at) && (
-                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500 text-white leading-none">
-                          NEW
+              {sorted.map((contact, idx) => {
+                const stage = contact.display_stage as Stage
+                const cfg = STAGE_CONFIG[stage]
+                return (
+                  <AnimatedTableRow
+                    key={contact.buyer_email}
+                    custom={idx}
+                    variants={{
+                      hidden: { opacity: 0, x: -8 },
+                      visible: (i: number) => ({
+                        opacity: 1,
+                        x: 0,
+                        transition: { delay: i * 0.03, duration: 0.2, ease: 'easeOut' as const },
+                      }),
+                    }}
+                    initial="hidden"
+                    animate="visible"
+                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                    onClick={() => setSelectedContact(contact)}
+                  >
+                    <TableCell className="font-medium text-zinc-900 dark:text-zinc-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-600 dark:text-zinc-400 shrink-0">
+                          {getInitials(contact.buyer_name)}
+                        </div>
+                        {contact.buyer_name || 'Unknown'}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {contact.buyer_email}
+                    </TableCell>
+                    <TableCell>
+                      <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', cfg.badge)}>
+                        {cfg.name}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-zinc-600 dark:text-zinc-400 max-w-[200px] truncate">
+                      {contact.latest_purchase?.offer_title ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {contact.call_info ? (
+                        <span className="text-amber-600 dark:text-amber-400 text-xs font-medium">
+                          {contact.call_info.status}
                         </span>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-zinc-600 dark:text-zinc-400">{contact.email || '—'}</TableCell>
-                  <TableCell className="text-sm text-zinc-600 dark:text-zinc-400">{contact.phone || '—'}</TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <TagPills tags={contact.tags || []} />
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {statusEditId === contact.id ? (
-                      <select
-                        autoFocus
-                        className="text-xs rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                        value={contact.status}
-                        onChange={(e) => updateStatus(contact.id, e.target.value as ContactStatus)}
-                        onBlur={() => setStatusEditId(null)}
-                      >
-                        {STATUSES.map((s) => (<option key={s} value={s}>{s}</option>))}
-                      </select>
-                    ) : (
-                      <button
-                        onClick={() => setStatusEditId(contact.id)}
-                        className={cn(
-                          'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity',
-                          STATUS_COLORS[contact.status as ContactStatus] ?? STATUS_COLORS['New']
-                        )}
-                        title="Click to change status"
-                      >
-                        {contact.status}
-                      </button>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-zinc-500 dark:text-zinc-400">{formatDate(contact.created_at)}</TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1">
-                      {contact.ghl_id && (
-                        <a
-                          href={`https://app.hicparenting.com/v2/location/E9DtRyrhRO9Ce7h1D0u7/contacts/detail/${contact.ghl_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Button variant="outline" size="sm" className="gap-1 text-xs h-7 px-2">
-                            Contact
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </a>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {contact.setter_assigned ? (
+                        <span className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-medium">
+                          {contact.setter_assigned}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
                       )}
-                      <button
-                        onClick={() => openEditModal(contact)}
-                        className="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                        title="Edit"
+                    </TableCell>
+                    <TableCell className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {formatRelativeDate(contact.last_contacted_at)}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {contact.product_proposed ? (
+                        <span className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                          {contact.product_proposed}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 px-2"
+                        onClick={() => setSelectedContact(contact)}
                       >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(contact.id)}
-                        className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </TableCell>
-                </AnimatedTableRow>
-              ))}
+                        Log Activity
+                      </Button>
+                    </TableCell>
+                  </AnimatedTableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>
       )}
 
-      {/* Pagination */}
-      {!loading && contacts.length > 0 && totalPages > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Showing {rangeStart}–{rangeEnd} of {total} contacts
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="text-xs h-8 px-3"
-            >
-              Previous
-            </Button>
-            <span className="text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="text-xs h-8 px-3"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Add Contact Modal */}
-      {showAddModal && (
-        <ContactFormModal
-          title="Add Contact"
-          form={form}
-          saving={saving}
-          onChange={setField}
-          onSave={handleAdd}
-          onClose={() => setShowAddModal(false)}
-        />
-      )}
-
-      {/* Edit Contact Modal */}
-      {editContact && (
-        <ContactFormModal
-          title="Edit Contact"
-          form={form}
-          saving={saving}
-          onChange={setField}
-          onSave={handleEdit}
-          onClose={() => setEditContact(null)}
-        />
-      )}
-
-      {/* Detail Modal */}
-      {detailContact && (
-        <ContactDetailModal
-          contact={detailContact}
-          onClose={() => setDetailContact(null)}
-          onEdit={() => openEditModal(detailContact)}
-          onDelete={() => handleDelete(detailContact.id)}
-          onStatusChange={updateStatus}
-          onAddTag={handleAddTag}
-          onRemoveTag={handleRemoveTag}
-          authorName={profile?.full_name || 'Unknown'}
+      {/* Activity Modal */}
+      {selectedContact && (
+        <ActivityModal
+          contact={selectedContact}
+          setterNames={setterNames}
+          onClose={() => setSelectedContact(null)}
+          onSaveStage={handleSaveStage}
+          onSaveActivity={handleSaveActivity}
         />
       )}
     </PageTransition>

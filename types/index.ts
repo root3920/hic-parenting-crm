@@ -446,3 +446,18 @@ export interface ContactNote {
   note: string
   created_at: string
 }
+
+export interface PipelineContact {
+  buyer_email: string
+  buyer_name: string | null
+  buyer_phone: string | null
+  display_stage: number
+  auto_stage: number
+  manual_override: boolean
+  setter_assigned: string | null
+  last_contacted_at: string | null
+  product_proposed: string | null
+  notes: string | null
+  latest_purchase: { offer_title: string; date: string } | null
+  call_info: { start_date: string; status: string } | null
+}
