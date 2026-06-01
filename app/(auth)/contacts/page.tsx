@@ -499,6 +499,7 @@ export default function ContactsPage() {
   const { names: setterNames } = useTeamMembers('setter')
   const [contacts, setContacts] = useState<PipelineContact[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'kanban' | 'list'>('kanban')
@@ -530,31 +531,48 @@ export default function ContactsPage() {
     }
   }, [])
 
+  /** Safely parse pipeline API response, always returning arrays. */
+  function parsePipelineResponse(json: Record<string, unknown>) {
+    return {
+      data: (Array.isArray(json?.data) ? json.data : []) as PipelineContact[],
+      counts: (json?.counts ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }) as Record<number, number>,
+      total: (typeof json?.total === 'number' ? json.total : 0) as number,
+      needs_backfill: json?.needs_backfill === true,
+    }
+  }
+
   const fetchContacts = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/pipeline/contacts')
-      if (!res.ok) throw new Error('Failed to fetch')
-      const json = await res.json()
-      setContacts(json.data)
-      setCounts(json.counts)
+      const json = await res.json().catch(() => ({}))
+      const parsed = parsePipelineResponse(json)
+      setContacts(parsed.data)
+      setCounts(parsed.counts)
 
       // Auto-backfill if fewer than 1000 records (initial population)
-      if (!backfillDone && (json.needs_backfill || json.total < 1000)) {
+      if (!backfillDone && (parsed.needs_backfill || parsed.total < 1000)) {
         setBackfillDone(true)
         const success = await runBackfill()
         if (success) {
           // Re-fetch after backfill
-          const res2 = await fetch('/api/pipeline/contacts')
-          if (res2.ok) {
-            const json2 = await res2.json()
-            setContacts(json2.data)
-            setCounts(json2.counts)
+          try {
+            const res2 = await fetch('/api/pipeline/contacts')
+            const json2 = await res2.json().catch(() => ({}))
+            const parsed2 = parsePipelineResponse(json2)
+            setContacts(parsed2.data)
+            setCounts(parsed2.counts)
+          } catch {
+            // silently ignore re-fetch failure after backfill
           }
         }
       }
     } catch {
+      setError('Failed to load pipeline contacts')
       toast.error('Failed to load pipeline contacts')
+      setContacts([])
+      setCounts({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 })
     }
     setLoading(false)
   }, [backfillDone, runBackfill])
@@ -566,16 +584,14 @@ export default function ContactsPage() {
   async function handleSync() {
     const success = await runBackfill()
     if (success) {
-      // Re-fetch contacts after sync
       try {
         const res = await fetch('/api/pipeline/contacts')
-        if (res.ok) {
-          const json = await res.json()
-          setContacts(json.data)
-          setCounts(json.counts)
-        }
+        const json = await res.json().catch(() => ({}))
+        const parsed = parsePipelineResponse(json)
+        setContacts(parsed.data)
+        setCounts(parsed.counts)
       } catch {
-        // fetchContacts will handle error display
+        // silently ignore, user already saw the sync toast
       }
     }
   }
@@ -748,12 +764,12 @@ export default function ContactsPage() {
     }
   }
 
-  const draggedContact = activeId ? contacts.find((c) => c.buyer_email === activeId) : null
+  const draggedContact = activeId ? (contacts ?? []).find((c) => c.buyer_email === activeId) ?? null : null
 
   // Unique setters for filter
   const uniqueSetters = useMemo(() => {
     const s = new Set<string>()
-    contacts.forEach((c) => {
+    ;(contacts ?? []).forEach((c) => {
       if (c.setter_assigned) s.add(c.setter_assigned)
     })
     return Array.from(s).sort()
@@ -905,6 +921,11 @@ export default function ContactsPage() {
             <div key={i} className="h-16 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
           ))}
         </div>
+      ) : error ? (
+        <EmptyState
+          title="Error loading pipeline"
+          description={error}
+        />
       ) : contacts.length === 0 ? (
         <EmptyState
           title="No pipeline contacts"

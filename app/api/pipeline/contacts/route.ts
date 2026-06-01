@@ -143,6 +143,13 @@ export async function GET() {
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({
+      error: message,
+      data: [],
+      stage_names: STAGE_NAMES,
+      counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      total: 0,
+      needs_backfill: false,
+    }, { status: 500 })
   }
 }
