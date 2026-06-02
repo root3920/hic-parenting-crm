@@ -314,6 +314,13 @@ function ApplyForm() {
         <Image src="/logo.png" alt="HIC Parenting" width={140} height={40} />
       </div>
 
+      {/* Subtitle — only on Question 1 */}
+      {step === 0 && (
+        <p className="mb-5 max-w-[500px] text-center text-[14px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+          Answer the following questions so we prepare for our session with you. You will see our calendar to book your free private session at the end of the questionnaire.
+        </p>
+      )}
+
       {/* Card */}
       <div className="w-full max-w-[600px] bg-white dark:bg-zinc-900 rounded-2xl shadow-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         {/* Progress bar */}
@@ -477,12 +484,7 @@ function ApplyForm() {
         </div>
       </div>
 
-      {/* Setter info if present */}
-      {calendarName && (
-        <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-500">
-          Calendar: {calendarName}
-        </p>
-      )}
+      {/* Calendar name hidden */}
 
       <style jsx global>{`
         .phone-input-wrapper .PhoneInputInput {
