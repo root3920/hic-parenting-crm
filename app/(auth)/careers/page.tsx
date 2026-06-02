@@ -45,9 +45,23 @@ interface Application {
   objection_handling: string | null
   closing_superpower: string | null
   crm_tools_proficient: string | null
+  // CSM-specific fields
+  linkedin_url: string | null
+  resume_url: string | null
+  tools_used: string[] | null
+  clients_managed_range: string | null
+  prioritization_answer: string | null
+  difficult_situation: string | null
+  welcome_message: string | null
+  missed_session_message: string | null
+  client_not_working_response: string | null
+  csm_responsibility: string | null
+  re_engagement_steps: string | null
+  culture_fit_why: string | null
+  excites_most: string | null
 }
 
-type PositionFilter = 'all' | 'dm_setter' | 'closer'
+type PositionFilter = 'all' | 'dm_setter' | 'closer' | 'csm'
 
 type StatusFilter = 'all' | 'pending' | 'reviewing' | 'approved' | 'rejected'
 
@@ -164,7 +178,7 @@ export default function CareersAdminPage() {
 
         {/* Position tabs */}
         <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
-          {([['all', 'All Positions'], ['dm_setter', 'DM Setter'], ['closer', 'Closer']] as [PositionFilter, string][]).map(([value, label]) => (
+          {([['all', 'All Positions'], ['dm_setter', 'DM Setter'], ['closer', 'Closer'], ['csm', 'CSM']] as [PositionFilter, string][]).map(([value, label]) => (
             <button
               key={value}
               onClick={() => setPositionFilter(value)}
@@ -252,7 +266,7 @@ export default function CareersAdminPage() {
                       {app.status}
                     </Badge>
                     <Badge variant="outline" className="text-[10px] px-2 py-0.5">
-                      {app.position === 'closer' ? 'Closer' : 'DM Setter'}
+                      {app.position === 'closer' ? 'Closer' : app.position === 'csm' ? 'CSM' : 'DM Setter'}
                     </Badge>
                     {app.english_level && (
                       <Badge variant="outline" className="text-[10px] px-2 py-0.5">
@@ -422,6 +436,52 @@ function ApplicationModal({
             </>
           )}
 
+          {/* CSM-specific sections */}
+          {app.position === 'csm' && (
+            <>
+              {(app.linkedin_url || app.resume_url) && (
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Links</h3>
+                  {app.linkedin_url && (
+                    <a href={app.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline flex items-center gap-1.5">
+                      <ExternalLink className="h-3.5 w-3.5" /> LinkedIn Profile
+                    </a>
+                  )}
+                  {app.resume_url && (
+                    <a href={app.resume_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline flex items-center gap-1.5">
+                      <ExternalLink className="h-3.5 w-3.5" /> Resume
+                    </a>
+                  )}
+                </div>
+              )}
+              {app.tools_used && app.tools_used.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Tools Used</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {app.tools_used.map(tool => (
+                      <Badge key={tool} variant="outline" className="text-xs px-2 py-0.5">{tool}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {app.clients_managed_range && (
+                <div>
+                  <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Clients Managed at Once</h3>
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300">{app.clients_managed_range}</p>
+                </div>
+              )}
+              <TextSection title="Prioritization Answer" content={app.prioritization_answer} />
+              <TextSection title="Difficult Client Situation" content={app.difficult_situation} />
+              <TextSection title="Welcome Message Written" content={app.welcome_message} />
+              <TextSection title="Missed Session Message Written" content={app.missed_session_message} />
+              <TextSection title="Client Objection Response" content={app.client_not_working_response} />
+              <TextSection title="CSM Responsibility" content={app.csm_responsibility} />
+              <TextSection title="Re-engagement Steps" content={app.re_engagement_steps} />
+              <TextSection title="Why HIC Parenting (Culture Fit)" content={app.culture_fit_why} />
+              <TextSection title="What Excites Most" content={app.excites_most} />
+            </>
+          )}
+
           <TextSection title="Additional Comments" content={app.additional_comments} />
         </div>
 
@@ -468,6 +528,7 @@ function ApplicationModal({
 const FORM_LINKS = [
   { label: 'DM Setter Application', url: 'https://dashboard.hicparenting.com/careers/dm-setter' },
   { label: 'Closer Application', url: 'https://dashboard.hicparenting.com/careers/closer' },
+  { label: 'Client Success Manager Application', url: 'https://dashboard.hicparenting.com/careers/csm' },
 ]
 
 function ShareFormsModal({ onClose }: { onClose: () => void }) {
@@ -488,7 +549,7 @@ function ShareFormsModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <motion.div
-        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
@@ -502,7 +563,7 @@ function ShareFormsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FORM_LINKS.map((form, idx) => (
             <div
               key={idx}

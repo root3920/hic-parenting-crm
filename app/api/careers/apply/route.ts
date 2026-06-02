@@ -45,6 +45,20 @@ export async function POST(request: Request) {
     objection_handling,
     closing_superpower,
     crm_tools_proficient,
+    // CSM-specific fields
+    linkedin_url,
+    resume_url,
+    tools_used,
+    clients_managed_range,
+    prioritization_answer,
+    difficult_situation,
+    welcome_message,
+    missed_session_message,
+    client_not_working_response,
+    csm_responsibility,
+    re_engagement_steps,
+    culture_fit_why,
+    excites_most,
   } = body
 
   if (!full_name || !email || !country_timezone || !phone || !video_url || !confirmed_job_description || !confirmed_remote) {
@@ -52,7 +66,7 @@ export async function POST(request: Request) {
   }
 
   const insertData: Record<string, unknown> = {
-    position: position === 'closer' ? 'closer' : 'dm_setter',
+    position: position === 'closer' ? 'closer' : position === 'csm' ? 'csm' : 'dm_setter',
     full_name,
     email,
     country_timezone,
@@ -84,6 +98,23 @@ export async function POST(request: Request) {
     insertData.objection_handling = objection_handling
     insertData.closing_superpower = closing_superpower
     insertData.crm_tools_proficient = crm_tools_proficient
+  }
+
+  // Add CSM-specific fields only for CSM applications
+  if (position === 'csm') {
+    insertData.linkedin_url = linkedin_url
+    insertData.resume_url = resume_url
+    insertData.tools_used = tools_used
+    insertData.clients_managed_range = clients_managed_range
+    insertData.prioritization_answer = prioritization_answer
+    insertData.difficult_situation = difficult_situation
+    insertData.welcome_message = welcome_message
+    insertData.missed_session_message = missed_session_message
+    insertData.client_not_working_response = client_not_working_response
+    insertData.csm_responsibility = csm_responsibility
+    insertData.re_engagement_steps = re_engagement_steps
+    insertData.culture_fit_why = culture_fit_why
+    insertData.excites_most = excites_most
   }
 
   const { error } = await supabase.from('job_applications').insert(insertData)
