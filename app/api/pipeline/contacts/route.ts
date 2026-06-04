@@ -15,17 +15,25 @@ const STAGE_NAMES: Record<number, string> = {
 }
 
 const PAGE_SIZE = 1000
+const CUTOFF_DATE = '2025-01-01'
 
 /** Fetch all rows from a table, paginating past the 1000-row Supabase limit. */
 async function fetchAll<T>(
   table: string,
   select: string,
-  orderCol?: string
+  orderCol?: string,
+  filters?: { column: string; op: 'eq' | 'gte'; value: string }[]
 ): Promise<T[]> {
   const all: T[] = []
   let from = 0
   while (true) {
     let q = supabase.from(table).select(select).range(from, from + PAGE_SIZE - 1)
+    if (filters) {
+      for (const f of filters) {
+        if (f.op === 'eq') q = q.eq(f.column, f.value)
+        else if (f.op === 'gte') q = q.gte(f.column, f.value)
+      }
+    }
     if (orderCol) q = q.order(orderCol, { ascending: false })
     const { data, error } = await q
     if (error) throw error
@@ -61,15 +69,22 @@ export async function GET() {
       })
     }
 
-    // 2. Fetch latest transaction per buyer for display (only need most recent)
-    //    We fetch all completed transactions and group client-side, paginated.
+    // 2. Fetch transactions from 2025-01-01 onwards for display, paginated.
     const transactions = await fetchAll<{
       buyer_email: string
       buyer_name: string
       buyer_phone: string | null
       offer_title: string
       date: string
-    }>('transactions', 'buyer_email, buyer_name, buyer_phone, offer_title, date', 'date')
+    }>(
+      'transactions',
+      'buyer_email, buyer_name, buyer_phone, offer_title, date',
+      'date',
+      [
+        { column: 'status', op: 'eq', value: 'completed' },
+        { column: 'date', op: 'gte', value: CUTOFF_DATE },
+      ]
+    )
 
     // Build latest-purchase + phone lookup
     const txMap = new Map<string, { offer_title: string; date: string; buyer_phone: string | null }>()

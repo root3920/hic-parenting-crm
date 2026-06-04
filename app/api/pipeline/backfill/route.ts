@@ -8,6 +8,7 @@ const supabase = createClient(
 
 const BATCH_SIZE = 500
 const PAGE_SIZE = 1000 // Supabase max per request
+const CUTOFF_DATE = '2025-01-01'
 
 function calculateAutoStage(
   titles: string[],
@@ -26,7 +27,7 @@ function calculateAutoStage(
 async function fetchAllRows<T>(
   table: string,
   select: string,
-  filters?: { column: string; op: 'eq'; value: string }[],
+  filters?: { column: string; op: 'eq' | 'gte'; value: string }[],
   orderBy?: string
 ): Promise<T[]> {
   const all: T[] = []
@@ -40,7 +41,8 @@ async function fetchAllRows<T>(
 
     if (filters) {
       for (const f of filters) {
-        query = query.eq(f.column, f.value)
+        if (f.op === 'eq') query = query.eq(f.column, f.value)
+        else if (f.op === 'gte') query = query.gte(f.column, f.value)
       }
     }
     if (orderBy) {
@@ -66,7 +68,7 @@ export async function POST() {
   const start = Date.now()
 
   try {
-    // 1. Fetch ALL completed transactions (paginated)
+    // 1. Fetch completed transactions from 2025-01-01 onwards (paginated)
     const transactions = await fetchAllRows<{
       buyer_email: string
       buyer_name: string
@@ -76,7 +78,10 @@ export async function POST() {
     }>(
       'transactions',
       'buyer_email, buyer_name, buyer_phone, offer_title, date',
-      [{ column: 'status', op: 'eq', value: 'completed' }],
+      [
+        { column: 'status', op: 'eq', value: 'completed' },
+        { column: 'date', op: 'gte', value: CUTOFF_DATE },
+      ],
       'date'
     )
 
@@ -165,12 +170,35 @@ export async function POST() {
       processed += batch.length
     }
 
+    // 6. Cleanup: remove contacts whose buyer_email has no completed transaction from 2025+
+    const validEmails = new Set(Array.from(buyerMap.keys()))
+    const toDelete = existing
+      .filter((e) => !validEmails.has(e.buyer_email.toLowerCase()))
+      .map((e) => e.buyer_email)
+
+    let deleted = 0
+    for (let i = 0; i < toDelete.length; i += BATCH_SIZE) {
+      const batch = toDelete.slice(i, i + BATCH_SIZE)
+      const { error } = await supabase
+        .from('value_ladder_contacts')
+        .delete()
+        .in('buyer_email', batch)
+      if (error) {
+        return NextResponse.json(
+          { error: `Cleanup batch failed: ${error.message}` },
+          { status: 500 }
+        )
+      }
+      deleted += batch.length
+    }
+
     const duration = Date.now() - start
 
     return NextResponse.json({
       processed,
       total: buyerMap.size,
       skipped_manual: existing.filter((e) => e.manual_override).length,
+      deleted_pre2025: deleted,
       duration_ms: duration,
     })
   } catch (err: unknown) {
