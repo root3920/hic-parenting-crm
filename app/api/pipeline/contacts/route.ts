@@ -124,13 +124,48 @@ export async function GET() {
       }
     }
 
-    // 4. Build response
+    // 3b. Fetch active SPC members to recalculate stage 4 live
+    const spcMembers = await fetchAll<{
+      email: string
+    }>(
+      'spc_members',
+      'email',
+      undefined,
+      [{ column: 'status', op: 'eq', value: 'active' }]
+    )
+    const activeSpcEmails = new Set<string>()
+    for (const m of spcMembers) {
+      if (m.email) activeSpcEmails.add(m.email.toLowerCase())
+    }
+
+    // 4. Build response — recalculate stage 4 from spc_members on every read
     const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
     const data = vlContacts.map((vlc) => {
       const email = vlc.buyer_email.toLowerCase()
       const tx = txMap.get(email)
       const call = callMap.get(email)
-      const stage = vlc.current_stage
+      const isActiveSpc = activeSpcEmails.has(email)
+      let stage = vlc.current_stage
+
+      // Recalculate stage 4 from spc_members (source of truth)
+      if (!vlc.manual_override) {
+        if (stage === 4 && !isActiveSpc) {
+          // Was stage 4 but no longer active in SPC — demote
+          if (call) stage = 3
+          else {
+            const titles = (transactions
+              .filter((t) => t.buyer_email && t.buyer_email.toLowerCase() === email)
+              .map((t) => t.offer_title.toLowerCase()))
+            if (titles.some((t) => t.includes('raising secure children'))) stage = 2
+            else stage = 1
+          }
+        } else if (stage < 4 && isActiveSpc) {
+          // Is active SPC but wasn't marked as stage 4 — promote
+          stage = 4
+        }
+        // Stage 5 (PWU) always takes precedence, never demote from 5
+      }
+
       counts[stage] = (counts[stage] || 0) + 1
 
       return {
@@ -138,7 +173,7 @@ export async function GET() {
         buyer_name: vlc.buyer_name ?? tx?.offer_title ?? null,
         buyer_phone: tx?.buyer_phone ?? null,
         display_stage: stage,
-        auto_stage: stage, // after backfill, current_stage IS the auto stage (unless manual)
+        auto_stage: stage,
         manual_override: vlc.manual_override,
         setter_assigned: vlc.setter_assigned,
         last_contacted_at: vlc.last_contacted_at,
