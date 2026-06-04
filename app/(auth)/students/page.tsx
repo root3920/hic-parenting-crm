@@ -2110,23 +2110,6 @@ export default function StudentsPage() {
           </div>
         </PageHeader>
 
-        {tab === 'sessions' ? (
-          <SessionsCalendarContent
-            year={calYear}
-            month={calMonth}
-            sessions={calSessions}
-            loading={calLoading}
-            onPrevMonth={() => { if (calMonth === 0) { setCalYear(calYear - 1); setCalMonth(11) } else setCalMonth(calMonth - 1) }}
-            onNextMonth={() => { if (calMonth === 11) { setCalYear(calYear + 1); setCalMonth(0) } else setCalMonth(calMonth + 1) }}
-            onToday={() => { setCalYear(new Date().getFullYear()); setCalMonth(new Date().getMonth()) }}
-            onSelectSession={setCalDetailSession}
-            onSelectStudent={(s) => {
-              const found = students.find((st) => st.id === s.id)
-              if (found) setSelectedStudent(found)
-            }}
-          />
-        ) : (
-        <>
         {/* Payment Plans Dashboard */}
         <PaymentPlansDashboard data={ppData} loading={ppLoading} />
 
@@ -2146,7 +2129,66 @@ export default function StudentsPage() {
           ))}
         </div>
 
-        {/* Split layout */}
+        {/* Tabs bar — always visible */}
+        <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 overflow-x-auto">
+            {tabs.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => { setTab(key); setSidebarCohort('all') }}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors',
+                  tab === key
+                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {tab !== 'sessions' && (
+            <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 shrink-0">
+              {([
+                { v: 'list' as ViewMode, Icon: List, title: 'List view' },
+                { v: 'card' as ViewMode, Icon: LayoutGrid, title: 'Card view' },
+                { v: 'table' as ViewMode, Icon: Table2, title: 'Table view' },
+              ]).map(({ v, Icon, title }) => (
+                <button
+                  key={v}
+                  title={title}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    'p-1.5 rounded-md transition-colors',
+                    view === v
+                      ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tab content */}
+        {tab === 'sessions' ? (
+          <SessionsCalendarContent
+            year={calYear}
+            month={calMonth}
+            sessions={calSessions}
+            loading={calLoading}
+            onPrevMonth={() => { if (calMonth === 0) { setCalYear(calYear - 1); setCalMonth(11) } else setCalMonth(calMonth - 1) }}
+            onNextMonth={() => { if (calMonth === 11) { setCalYear(calYear + 1); setCalMonth(0) } else setCalMonth(calMonth + 1) }}
+            onToday={() => { setCalYear(new Date().getFullYear()); setCalMonth(new Date().getMonth()) }}
+            onSelectSession={setCalDetailSession}
+            onSelectStudent={(s) => {
+              const found = students.find((st) => st.id === s.id)
+              if (found) setSelectedStudent(found)
+            }}
+          />
+        ) : (
         <div className={cn('flex gap-4', tab === 'group' ? 'items-start' : '')}>
 
           {/* ── Cohort Sidebar (group tab only) ── */}
@@ -2207,47 +2249,6 @@ export default function StudentsPage() {
 
           {/* ── Main Panel ── */}
           <div className="flex-1 min-w-0">
-
-            {/* Tabs + view toggle */}
-            <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
-              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 overflow-x-auto">
-                {tabs.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => { setTab(key); setSidebarCohort('all') }}
-                    className={cn(
-                      'px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors',
-                      tab === key
-                        ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 shrink-0">
-                {([
-                  { v: 'list' as ViewMode, Icon: List, title: 'List view' },
-                  { v: 'card' as ViewMode, Icon: LayoutGrid, title: 'Card view' },
-                  { v: 'table' as ViewMode, Icon: Table2, title: 'Table view' },
-                ]).map(({ v, Icon, title }) => (
-                  <button
-                    key={v}
-                    title={title}
-                    onClick={() => setView(v)}
-                    className={cn(
-                      'p-1.5 rounded-md transition-colors',
-                      view === v
-                        ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* Search & filters */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -2342,7 +2343,6 @@ export default function StudentsPage() {
             )}
           </div>
         </div>
-        </>
         )}
       </div>
 
