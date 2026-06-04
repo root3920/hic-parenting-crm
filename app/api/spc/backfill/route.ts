@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: txErr.message }, { status: 500 })
     }
 
-    const transactions = allTxs ?? []
+    // Exclude Open House transactions — they are not real SPC memberships
+    const transactions = (allTxs ?? []).filter(
+      (t: { offer_title: string }) => !t.offer_title?.toLowerCase().includes('open house')
+    )
 
     // ── 2. Fetch existing members and cancellation emails ────────────────────
     const [{ data: existingMembers }, { data: existingCancels }] = await Promise.all([

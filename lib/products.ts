@@ -13,6 +13,9 @@ export function getCanonicalProduct(offerTitle: string): string {
   if (t.includes('parenting with understanding') || t.includes('pwu coaching'))
     return 'Parenting With Understanding — Individual'
 
+  if (t.includes('open house'))
+    return 'Open House — Secure Parent Collective'
+
   if (t.includes('secure parent collective') || t.includes('spc'))
     return 'Secure Parent Collective'
 
@@ -45,9 +48,6 @@ export function getCanonicalProduct(offerTitle: string): string {
 
   if (t.includes('raising secure'))
     return 'Raising Secure Children'
-
-  if (t.includes('open house'))
-    return 'Open House — Secure Parent Collective'
 
   if (t.includes('advance mentorship'))
     return 'Advance Mentorship Program'

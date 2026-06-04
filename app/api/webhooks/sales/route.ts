@@ -142,7 +142,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Auto-sync SPC member on new sale ──────────────────────────────────────
-    if (canonical === 'Secure Parent Collective' && buyer_email) {
+    // Skip Open House buyers — they are not real SPC members
+    const isOpenHouse = offer_tittle?.toLowerCase().includes('open house')
+    if (canonical === 'Secure Parent Collective' && buyer_email && !isOpenHouse) {
       const costNum = parseFloat(cost) || 0
       const spcProvider = source === 'Kajabi' ? 'Kajabi' : 'Stripe'
 
@@ -343,7 +345,7 @@ export async function POST(req: NextRequest) {
     // ── Sync contact record ──────────────────────────────────────────────
     if (buyer_email) {
       try {
-        if (canonical === 'Secure Parent Collective') {
+        if (canonical === 'Secure Parent Collective' && !isOpenHouse) {
           const costNum2 = parseFloat(cost) || 0
           if (costNum2 === 0) {
             await syncContact(supabase, {

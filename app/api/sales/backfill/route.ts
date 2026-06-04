@@ -123,7 +123,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (canonical === 'Secure Parent Collective' && r.buyer_email) {
+      const isOpenHouse = r.offer_title?.toLowerCase().includes('open house')
+      if (canonical === 'Secure Parent Collective' && r.buyer_email && !isOpenHouse) {
         const spcProvider = r.source === 'Kajabi' ? 'Kajabi' : 'Stripe'
 
         if (costNum === 0) {
