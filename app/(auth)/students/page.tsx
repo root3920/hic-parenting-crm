@@ -13,13 +13,14 @@ import {
   Phone, Mail, Calendar, Clock, MessageSquare, ExternalLink,
   CreditCard, List, LayoutGrid, Table2, ArrowUpDown,
   Users, CheckCircle2, AlertCircle, DollarSign, TrendingUp, ChevronDown, ChevronUp,
+  ChevronLeft, ChevronRight, Video, XCircle, UserX,
 } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { getCanonicalProduct } from '@/lib/products'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import type { PwuStudent, StudentNote, Transaction, StudentPaymentPlan } from '@/types'
+import type { PwuStudent, StudentNote, Transaction, StudentPaymentPlan, CoachingSession } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -174,11 +175,27 @@ interface PaymentPlanFormData {
 
 // ─── Student Profile Modal ────────────────────────────────────────────────────
 
+function SessionStatusBadge({ status }: { status: CoachingSession['status'] }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    scheduled:  { label: 'Scheduled',  cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+    completed:  { label: 'Completed',  cls: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
+    cancelled:  { label: 'Cancelled',  cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
+    no_show:    { label: 'No Show',    cls: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+  }
+  const { label, cls } = map[status] ?? map.scheduled
+  return (
+    <span className={cn('inline-flex px-1.5 py-0.5 rounded-full text-xs font-semibold', cls)}>
+      {label}
+    </span>
+  )
+}
+
 function StudentProfileModal({
   student,
   notes,
   transactions,
   paymentPlan,
+  sessions,
   onClose,
   onEdit,
   onGraduate,
@@ -188,11 +205,13 @@ function StudentProfileModal({
   onCohortDateChange,
   onStudentUpdate,
   onSavePaymentPlan,
+  onSessionsChange,
 }: {
   student: PwuStudent
   notes: StudentNote[]
   transactions: Transaction[]
   paymentPlan: StudentPaymentPlan | null
+  sessions: CoachingSession[]
   onClose: () => void
   onEdit: (s: PwuStudent) => void
   onGraduate: (s: PwuStudent) => void
@@ -202,9 +221,13 @@ function StudentProfileModal({
   onCohortDateChange: (date: string) => Promise<void>
   onStudentUpdate: (updated: PwuStudent) => void
   onSavePaymentPlan: (data: PaymentPlanFormData) => Promise<void>
+  onSessionsChange: () => void
 }) {
   const [newNote, setNewNote] = useState('')
   const [addingNote, setAddingNote] = useState(false)
+  const [showSessionForm, setShowSessionForm] = useState(false)
+  const [sessionForm, setSessionForm] = useState({ date: '', time: '10:00', duration: 60, type: 'individual' as 'individual' | 'group', notes: '' })
+  const [savingSession, setSavingSession] = useState(false)
   const [showPlanForm, setShowPlanForm] = useState(false)
   const [planForm, setPlanForm] = useState<PaymentPlanFormData>(() => ({
     total_installments: paymentPlan?.total_installments ?? 6,
@@ -231,6 +254,58 @@ function StudentProfileModal({
     setSavingPlan(false)
     setShowPlanForm(false)
   }
+
+  async function handleScheduleSession(e: React.FormEvent) {
+    e.preventDefault()
+    if (!sessionForm.date) { toast.error('Date is required'); return }
+    setSavingSession(true)
+    const sessionDate = new Date(`${sessionForm.date}T${sessionForm.time}:00`).toISOString()
+    const res = await fetch('/api/students/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: student.id,
+        session_date: sessionDate,
+        duration_minutes: sessionForm.duration,
+        session_type: sessionForm.type,
+        notes: sessionForm.notes,
+      }),
+    })
+    setSavingSession(false)
+    if (!res.ok) { toast.error('Failed to schedule session'); return }
+    toast.success('Session scheduled')
+    setShowSessionForm(false)
+    setSessionForm({ date: '', time: '10:00', duration: 60, type: 'individual', notes: '' })
+    onSessionsChange()
+  }
+
+  async function handleSessionAction(sessionId: string, action: 'completed' | 'no_show' | 'cancelled' | 'delete') {
+    if (action === 'delete') {
+      const res = await fetch(`/api/students/sessions/${sessionId}`, { method: 'DELETE' })
+      if (!res.ok) { toast.error('Failed to delete session'); return }
+      toast.success('Session deleted')
+    } else {
+      const res = await fetch(`/api/students/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: action }),
+      })
+      if (!res.ok) { toast.error('Failed to update session'); return }
+      toast.success('Session updated')
+    }
+    onSessionsChange()
+  }
+
+  const now = new Date()
+  const nextSession = sessions
+    .filter((s) => s.status === 'scheduled' && new Date(s.session_date) >= now)
+    .sort((a, b) => new Date(a.session_date).getTime() - new Date(b.session_date).getTime())[0] ?? null
+  const pastSessions = sessions
+    .filter((s) => s.status !== 'scheduled' || new Date(s.session_date) < now)
+    .sort((a, b) => new Date(b.session_date).getTime() - new Date(a.session_date).getTime())
+  const upcomingSessions = sessions
+    .filter((s) => s.status === 'scheduled' && new Date(s.session_date) >= now && s.id !== nextSession?.id)
+    .sort((a, b) => new Date(a.session_date).getTime() - new Date(b.session_date).getTime())
 
   const paidCount = transactions.filter((t) => t.status === 'completed').length
   const remaining = paymentPlan ? Math.max(0, paymentPlan.total_installments - paidCount) : 0
@@ -565,6 +640,196 @@ function StudentProfileModal({
             )}
           </div>
 
+          {/* Coaching Sessions */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className={cn(sectionLabel, 'mb-0 flex items-center gap-1.5')}>
+                <Video className="h-3.5 w-3.5" /> Coaching Sessions
+              </p>
+              {!showSessionForm && (
+                <button
+                  onClick={() => setShowSessionForm(true)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <Plus className="h-3 w-3" /> Schedule Session
+                </button>
+              )}
+            </div>
+
+            {/* Next session */}
+            {nextSession ? (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-3">
+                <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Next Session</p>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  {new Date(nextSession.session_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  {' at '}
+                  {new Date(nextSession.session_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                  {nextSession.duration_minutes} min · {nextSession.session_type === 'individual' ? 'Individual' : 'Group'}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 mb-3 text-center">
+                <p className="text-xs text-zinc-400">No session scheduled</p>
+              </div>
+            )}
+
+            {/* Schedule form */}
+            {showSessionForm && (
+              <form onSubmit={handleScheduleSession} className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-3 mb-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-1">Date</label>
+                    <input
+                      type="date" required
+                      value={sessionForm.date}
+                      onChange={(e) => setSessionForm((f) => ({ ...f, date: e.target.value }))}
+                      className={cn(inputCls, 'text-xs')}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-1">Time</label>
+                    <input
+                      type="time" required
+                      value={sessionForm.time}
+                      onChange={(e) => setSessionForm((f) => ({ ...f, time: e.target.value }))}
+                      className={cn(inputCls, 'text-xs')}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-1">Duration</label>
+                    <select
+                      value={sessionForm.duration}
+                      onChange={(e) => setSessionForm((f) => ({ ...f, duration: Number(e.target.value) }))}
+                      className={cn(inputCls, 'text-xs')}
+                    >
+                      <option value={30}>30 min</option>
+                      <option value={45}>45 min</option>
+                      <option value={60}>60 min</option>
+                      <option value={90}>90 min</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 mb-1">Type</label>
+                    <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-700 rounded-lg p-0.5">
+                      {(['individual', 'group'] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setSessionForm((f) => ({ ...f, type: t }))}
+                          className={cn(
+                            'flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors',
+                            sessionForm.type === t
+                              ? 'bg-white dark:bg-zinc-600 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                              : 'text-zinc-500 dark:text-zinc-400'
+                          )}
+                        >
+                          {t === 'individual' ? 'Individual' : 'Group'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Notes (optional)</label>
+                  <textarea
+                    value={sessionForm.notes}
+                    onChange={(e) => setSessionForm((f) => ({ ...f, notes: e.target.value }))}
+                    className={cn(inputCls, 'text-xs resize-none')}
+                    rows={2}
+                    placeholder="Session topic, agenda..."
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSessionForm(false)}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingSession}
+                    className="px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
+                    style={{ backgroundColor: '#185FA5' }}
+                  >
+                    {savingSession ? 'Saving…' : 'Schedule'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Upcoming sessions */}
+            {upcomingSessions.length > 0 && (
+              <div className="space-y-1.5 mb-3">
+                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Upcoming</p>
+                {upcomingSessions.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2">
+                    <div>
+                      <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                        {new Date(s.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {' · '}
+                        {new Date(s.session_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      </p>
+                      <p className="text-xs text-zinc-400">{s.duration_minutes} min · {s.session_type === 'individual' ? 'Individual' : 'Group'}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleSessionAction(s.id, 'cancelled')} className="p-1 rounded text-zinc-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Cancel">
+                        <XCircle className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => handleSessionAction(s.id, 'delete')} className="p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Session history */}
+            {pastSessions.length > 0 && (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Session History</p>
+                {pastSessions.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                          {new Date(s.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {' · '}
+                          {new Date(s.session_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        </p>
+                        <SessionStatusBadge status={s.status} />
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-0.5">{s.duration_minutes} min · {s.session_type === 'individual' ? 'Individual' : 'Group'}</p>
+                      {s.notes && <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate italic">{s.notes}</p>}
+                    </div>
+                    {s.status === 'scheduled' && (
+                      <div className="flex items-center gap-0.5 ml-2 shrink-0">
+                        <button onClick={() => handleSessionAction(s.id, 'completed')} className="p-1 rounded text-zinc-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" title="Mark Completed">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => handleSessionAction(s.id, 'no_show')} className="p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Mark No Show">
+                          <UserX className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => handleSessionAction(s.id, 'cancelled')} className="p-1 rounded text-zinc-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Mark Cancelled">
+                          <XCircle className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => handleSessionAction(s.id, 'delete')} className="p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Notes field */}
           {student.notes && (
             <div>
@@ -880,7 +1145,7 @@ function ConfirmModal({
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'all' | 'group' | 'individual' | 'graduated' | 'paused'
+type Tab = 'all' | 'group' | 'individual' | 'graduated' | 'paused' | 'sessions'
 type ViewMode = 'list' | 'card' | 'table'
 
 interface StudentActions {
@@ -1212,6 +1477,200 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
   )
 }
 
+// ─── Calendar helpers (shared with sessions tab) ────────────────────────────
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function getMonthDays(year: number, month: number) {
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const startDow = firstDay.getDay()
+  const days: { date: Date; current: boolean }[] = []
+  for (let i = startDow - 1; i >= 0; i--) days.push({ date: new Date(year, month, -i), current: false })
+  for (let d = 1; d <= lastDay.getDate(); d++) days.push({ date: new Date(year, month, d), current: true })
+  while (days.length < 42) {
+    const next = new Date(days[days.length - 1].date)
+    next.setDate(next.getDate() + 1)
+    days.push({ date: next, current: false })
+  }
+  return days
+}
+
+function calDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function calIsToday(d: Date) {
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+}
+
+const SESSION_STATUS_COLORS: Record<string, string> = {
+  scheduled: '#3B82F6',
+  completed: '#10B981',
+  cancelled: '#71717A',
+  no_show:   '#EF4444',
+}
+
+// ─── Sessions Calendar Content ──────────────────────────────────────────────
+
+type CalSession = CoachingSession & { student: { id: string; first_name: string; last_name: string | null; email: string | null } | null }
+
+function SessionsCalendarContent({
+  year, month, sessions, loading,
+  onPrevMonth, onNextMonth, onToday,
+  onSelectSession, onSelectStudent,
+}: {
+  year: number
+  month: number
+  sessions: CalSession[]
+  loading: boolean
+  onPrevMonth: () => void
+  onNextMonth: () => void
+  onToday: () => void
+  onSelectSession: (s: CalSession) => void
+  onSelectStudent: (s: { id: string }) => void
+}) {
+  const days = useMemo(() => getMonthDays(year, month), [year, month])
+
+  const sessionsByDate = useMemo(() => {
+    const map: Record<string, CalSession[]> = {}
+    for (const s of sessions) {
+      const d = new Date(s.session_date)
+      const key = calDateStr(d)
+      if (!map[key]) map[key] = []
+      map[key].push(s)
+    }
+    return map
+  }, [sessions])
+
+  // KPI calculations
+  const kpis = useMemo(() => {
+    const scheduled = sessions.filter((s) => s.status === 'scheduled').length
+    const completed = sessions.filter((s) => s.status === 'completed').length
+    const cancelled = sessions.filter((s) => s.status === 'cancelled').length
+    const noShow = sessions.filter((s) => s.status === 'no_show').length
+    const denom = completed + noShow + cancelled
+    const rate = denom > 0 ? Math.round((completed / denom) * 100) : 0
+    return { scheduled, completed, cancelled, noShow, rate }
+  }, [sessions])
+
+  return (
+    <>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        {[
+          { label: 'Scheduled', value: kpis.scheduled, color: 'text-blue-600 dark:text-blue-400' },
+          { label: 'Completed', value: kpis.completed, color: 'text-green-600 dark:text-green-400' },
+          { label: 'Cancelled', value: kpis.cancelled, color: 'text-zinc-500 dark:text-zinc-400' },
+          { label: 'No Shows', value: kpis.noShow, color: kpis.noShow > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400' },
+          { label: 'Completion Rate', value: `${kpis.rate}%`, color: 'text-zinc-900 dark:text-zinc-100' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">{label}</p>
+            <p className={cn('text-2xl font-bold', color)}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <button onClick={onPrevMonth} className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 w-40 text-center">
+            {MONTH_NAMES[month]} {year}
+          </span>
+          <button onClick={onNextMonth} className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <button onClick={onToday} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+          Today
+        </button>
+      </div>
+
+      {/* Calendar grid */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <div className="grid grid-cols-7 border-b border-zinc-100 dark:border-zinc-800">
+          {DAY_NAMES.map((d) => (
+            <div key={d} className="py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-7">
+            {[...Array(42)].map((_, i) => (
+              <div key={i} className="h-24 border-b border-r border-zinc-50 dark:border-zinc-800/50 p-1">
+                <div className="h-4 w-4 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-7">
+            {days.map(({ date, current }, i) => {
+              const key = calDateStr(date)
+              const daySessions = sessionsByDate[key] ?? []
+              const today = calIsToday(date)
+
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'min-h-[96px] border-b border-r border-zinc-50 dark:border-zinc-800/50 p-1 transition-colors',
+                    !current && 'bg-zinc-50/50 dark:bg-zinc-800/20',
+                  )}
+                >
+                  <span className={cn(
+                    'inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full mb-0.5',
+                    today
+                      ? 'bg-blue-600 text-white'
+                      : current
+                        ? 'text-zinc-700 dark:text-zinc-300'
+                        : 'text-zinc-300 dark:text-zinc-600',
+                  )}>
+                    {date.getDate()}
+                  </span>
+                  <div className="space-y-0.5">
+                    {daySessions.slice(0, 3).map((s) => {
+                      const color = SESSION_STATUS_COLORS[s.status] ?? '#6B7280'
+                      const name = s.student
+                        ? [s.student.first_name, s.student.last_name].filter(Boolean).join(' ')
+                        : 'Unknown'
+                      const time = new Date(s.session_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => onSelectSession(s)}
+                          className="w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate leading-tight transition-opacity hover:opacity-80"
+                          style={{ backgroundColor: `${color}20`, color }}
+                          title={`${name} · ${time}`}
+                        >
+                          {name} · {time}
+                        </button>
+                      )
+                    })}
+                    {daySessions.length > 3 && (
+                      <p className="text-[9px] text-zinc-400 px-1">+{daySessions.length - 3} more</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function StudentsPage() {
@@ -1244,10 +1703,18 @@ export default function StudentsPage() {
   const [profileNotes, setProfileNotes] = useState<StudentNote[]>([])
   const [profileTransactions, setProfileTransactions] = useState<Transaction[]>([])
   const [profilePaymentPlan, setProfilePaymentPlan] = useState<StudentPaymentPlan | null>(null)
+  const [profileSessions, setProfileSessions] = useState<CoachingSession[]>([])
 
   // Payment plans dashboard
   const [ppData, setPpData] = useState<PaymentPlanData | null>(null)
   const [ppLoading, setPpLoading] = useState(true)
+
+  // Sessions calendar
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear())
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth())
+  const [calSessions, setCalSessions] = useState<(CoachingSession & { student: { id: string; first_name: string; last_name: string | null; email: string | null } | null })[]>([])
+  const [calLoading, setCalLoading] = useState(false)
+  const [calDetailSession, setCalDetailSession] = useState<typeof calSessions[number] | null>(null)
 
   const fetchPaymentPlans = useCallback(async () => {
     setPpLoading(true)
@@ -1274,7 +1741,18 @@ export default function StudentsPage() {
     setLoading(false)
   }, [supabase])
 
+  const calMonthKey = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`
+  const fetchCalSessions = useCallback(async () => {
+    setCalLoading(true)
+    try {
+      const res = await fetch(`/api/students/sessions/all?month=${calMonthKey}`)
+      if (res.ok) setCalSessions(await res.json())
+    } catch { /* silent */ }
+    setCalLoading(false)
+  }, [calMonthKey])
+
   useEffect(() => { fetchStudents(); fetchPaymentPlans() }, [fetchStudents, fetchPaymentPlans])
+  useEffect(() => { if (tab === 'sessions') fetchCalSessions() }, [tab, fetchCalSessions])
 
   // Fetch notes, transactions, and payment plan when a student profile is opened
   useEffect(() => {
@@ -1282,6 +1760,7 @@ export default function StudentsPage() {
       setProfileNotes([])
       setProfileTransactions([])
       setProfilePaymentPlan(null)
+      setProfileSessions([])
       return
     }
 
@@ -1291,6 +1770,11 @@ export default function StudentsPage() {
       .eq('student_id', selectedStudent.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => setProfileNotes(data ?? []))
+
+    fetch(`/api/students/sessions?student_id=${selectedStudent.id}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setProfileSessions(data))
+      .catch(() => setProfileSessions([]))
 
     if (selectedStudent.email) {
       supabase
@@ -1595,6 +2079,7 @@ export default function StudentsPage() {
     { key: 'individual', label: 'Individual 1:1' },
     { key: 'graduated', label: 'Graduated' },
     { key: 'paused', label: 'Paused / Refund' },
+    { key: 'sessions', label: 'Sessions' },
   ]
 
   return (
@@ -1625,6 +2110,23 @@ export default function StudentsPage() {
           </div>
         </PageHeader>
 
+        {tab === 'sessions' ? (
+          <SessionsCalendarContent
+            year={calYear}
+            month={calMonth}
+            sessions={calSessions}
+            loading={calLoading}
+            onPrevMonth={() => { if (calMonth === 0) { setCalYear(calYear - 1); setCalMonth(11) } else setCalMonth(calMonth - 1) }}
+            onNextMonth={() => { if (calMonth === 11) { setCalYear(calYear + 1); setCalMonth(0) } else setCalMonth(calMonth + 1) }}
+            onToday={() => { setCalYear(new Date().getFullYear()); setCalMonth(new Date().getMonth()) }}
+            onSelectSession={setCalDetailSession}
+            onSelectStudent={(s) => {
+              const found = students.find((st) => st.id === s.id)
+              if (found) setSelectedStudent(found)
+            }}
+          />
+        ) : (
+        <>
         {/* Payment Plans Dashboard */}
         <PaymentPlansDashboard data={ppData} loading={ppLoading} />
 
@@ -1840,7 +2342,92 @@ export default function StudentsPage() {
             )}
           </div>
         </div>
+        </>
+        )}
       </div>
+
+      {/* ── Session Detail Modal ── */}
+      {calDetailSession && (
+        <Modal title="Session Details" onClose={() => setCalDetailSession(null)}>
+          <div className="space-y-4">
+            {calDetailSession.student && (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-bold text-blue-600 dark:text-blue-300">
+                  {[calDetailSession.student.first_name?.[0], calDetailSession.student.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    {[calDetailSession.student.first_name, calDetailSession.student.last_name].filter(Boolean).join(' ')}
+                  </p>
+                  {calDetailSession.student.email && (
+                    <p className="text-xs text-zinc-400">{calDetailSession.student.email}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-500">Date & Time</span>
+                <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                  {new Date(calDetailSession.session_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  {' at '}
+                  {new Date(calDetailSession.session_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-500">Duration</span>
+                <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">{calDetailSession.duration_minutes} min</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-500">Type</span>
+                <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">{calDetailSession.session_type === 'individual' ? 'Individual' : 'Group'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-500">Status</span>
+                <select
+                  value={calDetailSession.status}
+                  onChange={async (e) => {
+                    const newStatus = e.target.value
+                    const res = await fetch(`/api/students/sessions/${calDetailSession.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: newStatus }),
+                    })
+                    if (res.ok) {
+                      toast.success('Status updated')
+                      setCalDetailSession({ ...calDetailSession, status: newStatus as CoachingSession['status'] })
+                      fetchCalSessions()
+                    } else toast.error('Failed to update')
+                  }}
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200"
+                >
+                  <option value="scheduled">Scheduled</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="no_show">No Show</option>
+                </select>
+              </div>
+            </div>
+            {calDetailSession.notes && (
+              <div>
+                <p className="text-xs text-zinc-500 mb-1">Notes</p>
+                <p className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-2 whitespace-pre-wrap">{calDetailSession.notes}</p>
+              </div>
+            )}
+            {calDetailSession.student && (
+              <button
+                onClick={() => {
+                  const found = students.find((s) => s.id === calDetailSession.student!.id)
+                  if (found) { setCalDetailSession(null); setSelectedStudent(found) }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <ExternalLink className="h-3 w-3" /> View Student
+              </button>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {/* ── Modals ── */}
 
@@ -1850,6 +2437,7 @@ export default function StudentsPage() {
           notes={profileNotes}
           transactions={profileTransactions}
           paymentPlan={profilePaymentPlan}
+          sessions={profileSessions}
           onClose={() => setSelectedStudent(null)}
           onEdit={(s) => { setSelectedStudent(null); setEditTarget(s) }}
           onGraduate={(s) => { setSelectedStudent(null); setGraduateTarget(s) }}
@@ -1862,6 +2450,13 @@ export default function StudentsPage() {
             setSelectedStudent(updated)
           }}
           onSavePaymentPlan={handleSavePaymentPlan}
+          onSessionsChange={() => {
+            if (selectedStudent) {
+              fetch(`/api/students/sessions?student_id=${selectedStudent.id}`)
+                .then((r) => r.ok ? r.json() : [])
+                .then((data) => setProfileSessions(data))
+            }
+          }}
         />
       )}
 

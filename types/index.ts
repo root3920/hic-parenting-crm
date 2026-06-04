@@ -447,6 +447,18 @@ export interface ContactNote {
   created_at: string
 }
 
+export interface CoachingSession {
+  id: string
+  student_id: string
+  session_date: string
+  duration_minutes: number
+  session_type: 'individual' | 'group'
+  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show'
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface PipelineContact {
   buyer_email: string
   buyer_name: string | null
