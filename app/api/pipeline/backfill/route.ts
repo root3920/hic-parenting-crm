@@ -12,12 +12,13 @@ const CUTOFF_DATE = '2025-01-01'
 
 function calculateAutoStage(
   titles: string[],
-  hasCall: boolean
+  hasCall: boolean,
+  isActiveSpc: boolean
 ): number {
   const lower = titles.map((t) => t.toLowerCase())
 
   if (lower.some((t) => t.includes('parenting with understanding'))) return 5
-  if (lower.some((t) => t.includes('secure parent collective'))) return 4
+  if (isActiveSpc) return 4
   if (hasCall) return 3
   if (lower.some((t) => t.includes('raising secure children'))) return 2
   return 1
@@ -68,21 +69,25 @@ export async function POST() {
   const start = Date.now()
 
   try {
-    // 1. Fetch completed transactions from 2025-01-01 onwards (paginated)
-    const transactions = await fetchAllRows<{
+    // 1. Fetch transactions from 2025-01-01 onwards (paginated)
+    //    Include null-status rows (legacy) as completed
+    const allTransactions = await fetchAllRows<{
       buyer_email: string
       buyer_name: string
       buyer_phone: string | null
       offer_title: string
       date: string
+      status: string | null
     }>(
       'transactions',
-      'buyer_email, buyer_name, buyer_phone, offer_title, date',
+      'buyer_email, buyer_name, buyer_phone, offer_title, date, status',
       [
-        { column: 'status', op: 'eq', value: 'completed' },
         { column: 'date', op: 'gte', value: CUTOFF_DATE },
       ],
       'date'
+    )
+    const transactions = allTransactions.filter(
+      (tx) => !tx.status || tx.status === 'completed'
     )
 
     // Build set of valid buyer emails (those with 2025+ completed transactions)
@@ -125,6 +130,20 @@ export async function POST() {
       status: string
     }>('calls', 'email, start_date, status')
 
+    // 3b. Fetch active SPC members
+    const spcMembers = await fetchAllRows<{
+      email: string
+      status: string
+    }>(
+      'spc_members',
+      'email, status',
+      [{ column: 'status', op: 'eq', value: 'active' }]
+    )
+    const activeSpcEmails = new Set<string>()
+    for (const m of spcMembers) {
+      if (m.email) activeSpcEmails.add(m.email.toLowerCase())
+    }
+
     // Rebuild existing map after cleanup (only surviving rows)
     const existingMap = new Map(
       existing
@@ -166,7 +185,8 @@ export async function POST() {
 
     for (const [email, buyer] of Array.from(buyerMap.entries())) {
       const hasCall = callEmails.has(email)
-      const autoStage = calculateAutoStage(buyer.offer_titles, hasCall)
+      const isActiveSpc = activeSpcEmails.has(email)
+      const autoStage = calculateAutoStage(buyer.offer_titles, hasCall, isActiveSpc)
       const prev = existingMap.get(email)
 
       // Skip if manual override is active — don't overwrite their stage

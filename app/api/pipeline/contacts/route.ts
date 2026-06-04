@@ -70,20 +70,26 @@ export async function GET() {
     }
 
     // 2. Fetch transactions from 2025-01-01 onwards for display, paginated.
-    const transactions = await fetchAll<{
+    //    Fetch all statuses then filter client-side to include null status (legacy rows).
+    const allTransactions = await fetchAll<{
       buyer_email: string
       buyer_name: string
       buyer_phone: string | null
       offer_title: string
       date: string
+      status: string | null
     }>(
       'transactions',
-      'buyer_email, buyer_name, buyer_phone, offer_title, date',
+      'buyer_email, buyer_name, buyer_phone, offer_title, date, status',
       'date',
       [
-        { column: 'status', op: 'eq', value: 'completed' },
         { column: 'date', op: 'gte', value: CUTOFF_DATE },
       ]
+    )
+
+    // Only include completed or null-status (legacy) transactions
+    const transactions = allTransactions.filter(
+      (tx) => !tx.status || tx.status === 'completed'
     )
 
     // Build latest-purchase + phone lookup
