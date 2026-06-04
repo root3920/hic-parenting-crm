@@ -85,22 +85,51 @@ export async function POST() {
       'date'
     )
 
-    // 2. Fetch ALL calls (paginated)
-    const calls = await fetchAllRows<{
-      email: string | null
-      start_date: string
-      status: string
-    }>('calls', 'email, start_date, status')
+    // Build set of valid buyer emails (those with 2025+ completed transactions)
+    const validEmailSet = new Set<string>()
+    for (const tx of transactions) {
+      if (tx.buyer_email) validEmailSet.add(tx.buyer_email.toLowerCase())
+    }
 
-    // 3. Fetch existing overrides to avoid clobbering manual_override rows
+    // 2. Cleanup FIRST: delete all value_ladder_contacts not in valid set
     const existing = await fetchAllRows<{
       buyer_email: string
       manual_override: boolean
       current_stage: number
     }>('value_ladder_contacts', 'buyer_email, manual_override, current_stage')
 
+    const toDelete = existing
+      .filter((e) => !validEmailSet.has(e.buyer_email.toLowerCase()))
+      .map((e) => e.buyer_email)
+
+    let deleted = 0
+    for (let i = 0; i < toDelete.length; i += BATCH_SIZE) {
+      const batch = toDelete.slice(i, i + BATCH_SIZE)
+      const { error } = await supabase
+        .from('value_ladder_contacts')
+        .delete()
+        .in('buyer_email', batch)
+      if (error) {
+        return NextResponse.json(
+          { error: `Cleanup batch failed: ${error.message}` },
+          { status: 500 }
+        )
+      }
+      deleted += batch.length
+    }
+
+    // 3. Fetch ALL calls (paginated)
+    const calls = await fetchAllRows<{
+      email: string | null
+      start_date: string
+      status: string
+    }>('calls', 'email, start_date, status')
+
+    // Rebuild existing map after cleanup (only surviving rows)
     const existingMap = new Map(
-      existing.map((e) => [e.buyer_email.toLowerCase(), e])
+      existing
+        .filter((e) => validEmailSet.has(e.buyer_email.toLowerCase()))
+        .map((e) => [e.buyer_email.toLowerCase(), e])
     )
 
     // Build call lookup
@@ -168,28 +197,6 @@ export async function POST() {
         )
       }
       processed += batch.length
-    }
-
-    // 6. Cleanup: remove contacts whose buyer_email has no completed transaction from 2025+
-    const validEmails = new Set(Array.from(buyerMap.keys()))
-    const toDelete = existing
-      .filter((e) => !validEmails.has(e.buyer_email.toLowerCase()))
-      .map((e) => e.buyer_email)
-
-    let deleted = 0
-    for (let i = 0; i < toDelete.length; i += BATCH_SIZE) {
-      const batch = toDelete.slice(i, i + BATCH_SIZE)
-      const { error } = await supabase
-        .from('value_ladder_contacts')
-        .delete()
-        .in('buyer_email', batch)
-      if (error) {
-        return NextResponse.json(
-          { error: `Cleanup batch failed: ${error.message}` },
-          { status: 500 }
-        )
-      }
-      deleted += batch.length
     }
 
     const duration = Date.now() - start
