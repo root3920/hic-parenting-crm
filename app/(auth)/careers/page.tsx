@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check } from 'lucide-react'
+import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -118,6 +118,15 @@ export default function CareersAdminPage() {
   useEffect(() => {
     fetchApplications()
   }, [fetchApplications])
+
+  const deleteApplication = useCallback(async (id: string) => {
+    if (!confirm('Are you sure you want to delete this application? This action cannot be undone.')) return
+    const res = await fetch(`/api/careers/applications/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setApplications(prev => prev.filter(a => a.id !== id))
+      if (selectedApp?.id === id) setSelectedApp(null)
+    }
+  }, [selectedApp])
 
   const kpis = useMemo(() => {
     const total = applications.length
@@ -237,7 +246,14 @@ export default function CareersAdminPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedApp(app)}>
+              <Card className="group hover:shadow-md transition-shadow cursor-pointer relative" onClick={() => setSelectedApp(app)}>
+                <button
+                  onClick={e => { e.stopPropagation(); deleteApplication(app.id) }}
+                  className="absolute top-2 right-2 p-1.5 rounded-md text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  title="Delete application"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10">
