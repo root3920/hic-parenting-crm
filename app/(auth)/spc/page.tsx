@@ -92,7 +92,7 @@ type SelectedMember =
 
 type Tab = 'overview' | 'active' | 'trials' | 'expired' | 'cancellations'
 
-type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'score_desc' | 'last_note_desc'
+type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'next_payment_desc' | 'next_payment_asc' | 'score_desc' | 'last_note_desc'
 type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
 type CancelSort = 'cancelled_desc' | 'cancelled_asc' | 'subscribed_desc' | 'subscribed_asc' | 'days_active_desc'
 type ExpiredSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'score_desc' | 'days_expired_desc'
@@ -1663,6 +1663,8 @@ export default function SpcPage() {
       case 'joined_asc': list.sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? '')); break
       case 'last_payment_desc': list.sort((a, b) => (lastPaymentByEmail[(b.email ?? '').toLowerCase()] ?? '').localeCompare(lastPaymentByEmail[(a.email ?? '').toLowerCase()] ?? '')); break
       case 'last_payment_asc': list.sort((a, b) => (lastPaymentByEmail[(a.email ?? '').toLowerCase()] ?? '').localeCompare(lastPaymentByEmail[(b.email ?? '').toLowerCase()] ?? '')); break
+      case 'next_payment_desc': list.sort((a, b) => (b.next_payment_date ?? '').localeCompare(a.next_payment_date ?? '')); break
+      case 'next_payment_asc': list.sort((a, b) => { if (!a.next_payment_date && !b.next_payment_date) return 0; if (!a.next_payment_date) return 1; if (!b.next_payment_date) return -1; return a.next_payment_date.localeCompare(b.next_payment_date); }); break
       case 'score_desc': list.sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0)); break
       case 'last_note_desc': list.sort((a, b) => (lastNoteByEmail[(b.email ?? '').toLowerCase()] ?? '').localeCompare(lastNoteByEmail[(a.email ?? '').toLowerCase()] ?? '')); break
     }
@@ -2850,6 +2852,8 @@ export default function SpcPage() {
                     <option value="joined_asc">Joined (oldest)</option>
                     <option value="last_payment_desc">Last Payment (newest)</option>
                     <option value="last_payment_asc">Last Payment (oldest)</option>
+                    <option value="next_payment_desc">Next Payment (newest)</option>
+                    <option value="next_payment_asc">Next Payment (oldest)</option>
                     <option value="score_desc">Score (highest)</option>
                     <option value="last_note_desc">Last Note (recent)</option>
                   </select>
@@ -2891,6 +2895,7 @@ export default function SpcPage() {
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead className="hidden md:table-cell">Provider</TableHead>
                         <TableHead className="hidden md:table-cell">Joined</TableHead>
+                        <TableHead className="hidden md:table-cell">Months</TableHead>
                         <TableHead className="hidden md:table-cell">Last Payment</TableHead>
                         <TableHead className="hidden md:table-cell">Next Payment</TableHead>
                         <TableHead className="hidden lg:table-cell">Score</TableHead>
@@ -2924,6 +2929,14 @@ export default function SpcPage() {
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">
+                            {m.joined_at ? (() => {
+                              const joined = new Date(m.joined_at!)
+                              const now = new Date()
+                              const months = (now.getFullYear() - joined.getFullYear()) * 12 + (now.getMonth() - joined.getMonth())
+                              return `${months} mo`
+                            })() : '—'}
+                          </TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">
                             {lastPaymentByEmail[(m.email ?? '').toLowerCase()]
                               ? formatDate(lastPaymentByEmail[(m.email ?? '').toLowerCase()])
