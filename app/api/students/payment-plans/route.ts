@@ -85,12 +85,25 @@ export async function GET() {
     const name = [student?.first_name, student?.last_name].filter(Boolean).join(' ') || 'Unknown'
     const email = student?.email?.toLowerCase() ?? ''
 
-    // Count transactions matching this student's installment amount and start date
-    const actualPaidCount = txRows.filter((tx) =>
+    // All transactions for this student matching installment amount and start date
+    const studentTxs = txRows.filter((tx) =>
       (tx.buyer_email as string).toLowerCase() === email &&
       tx.cost === plan.amount_per_installment &&
       tx.date >= plan.start_date
-    ).length
+    )
+    const actualPaidCount = studentTxs.length
+
+    // Find most recent transaction for this student (any PWU completed tx)
+    const allStudentTxs = txRows.filter((tx) =>
+      (tx.buyer_email as string).toLowerCase() === email
+    )
+    let lastPaymentDate: string | null = null
+    let lastPaymentAmount: number | null = null
+    if (allStudentTxs.length > 0) {
+      const latest = allStudentTxs.reduce((a, b) => a.date > b.date ? a : b)
+      lastPaymentDate = latest.date
+      lastPaymentAmount = latest.cost
+    }
 
     const paid = Math.min(actualPaidCount, plan.total_installments)
     const remaining = plan.total_installments - paid
@@ -135,6 +148,8 @@ export async function GET() {
       actualPaidCount,
       overdueInstallments,
       isOverdue,
+      lastPaymentDate,
+      lastPaymentAmount,
     }
   })
 

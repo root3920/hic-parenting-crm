@@ -1178,6 +1178,8 @@ interface PaymentPlanStudent {
   actualPaidCount: number
   overdueInstallments: number
   isOverdue: boolean
+  lastPaymentDate: string | null
+  lastPaymentAmount: number | null
 }
 
 interface PaymentPlanData {
@@ -1363,6 +1365,8 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
                     <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Student</th>
                     <th className="text-right px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">$/Installment</th>
                     <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Start Date</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Last Payment</th>
+                    <th className="text-right px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Last Amount</th>
                     <th className="text-center px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Paid / Total</th>
                     <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider min-w-[140px]">Progress</th>
                     <th className="text-center px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
@@ -1379,6 +1383,14 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
                       <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{formatCurrency(s.amountPerInstallment)}</td>
                       <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                         {new Date(s.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                        {s.lastPaymentDate
+                          ? new Date(s.lastPaymentDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">
+                        {s.lastPaymentAmount != null ? formatCurrency(s.lastPaymentAmount) : '—'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={cn(
@@ -1426,7 +1438,7 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
                   ))}
                   {sortedStudents.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 dark:text-zinc-500">
+                      <td colSpan={9} className="px-4 py-8 text-center text-zinc-400 dark:text-zinc-500">
                         No students match this filter.
                       </td>
                     </tr>
