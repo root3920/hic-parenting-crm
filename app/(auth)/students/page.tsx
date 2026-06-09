@@ -1027,17 +1027,22 @@ function NewCohortModal({
 }: {
   nextSuggested: number
   onClose: () => void
-  onCreated: (cohort: string) => void
+  onCreated: (cohort: string) => Promise<boolean>
 }) {
   const [num, setNum] = useState(String(nextSuggested))
+  const [saving, setSaving] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const n = num.trim()
     if (!n || isNaN(Number(n))) { toast.error('Enter a valid cohort number'); return }
-    onCreated(n)
-    toast.success(`Cohort ${n} ready. Add students to it.`)
-    onClose()
+    setSaving(true)
+    const ok = await onCreated(n)
+    setSaving(false)
+    if (ok) {
+      toast.success(`Cohort C${n} created`)
+      onClose()
+    }
   }
 
   return (
@@ -1050,8 +1055,8 @@ function NewCohortModal({
           <button type="button" onClick={onClose} className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
             Cancel
           </button>
-          <button type="submit" className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90" style={{ backgroundColor: '#185FA5' }}>
-            Create Cohort
+          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+            {saving ? 'Creating...' : 'Create Cohort'}
           </button>
         </div>
       </form>
@@ -2516,12 +2521,18 @@ export default function StudentsPage() {
           nextSuggested={nextSuggested}
           onClose={() => setCohortOpen(false)}
           onCreated={async (cohort) => {
-            await fetch('/api/students/cohorts', {
+            const res = await fetch('/api/students/cohorts', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ cohort_number: cohort }),
             })
-            setRegisteredCohorts((prev) => Array.from(new Set([...prev, cohort])))
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({ error: 'Failed to create cohort' }))
+              toast.error(body.error ?? 'Failed to create cohort')
+              return false
+            }
+            await fetchCohorts()
+            return true
           }}
         />
       )}
