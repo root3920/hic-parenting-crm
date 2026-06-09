@@ -1717,6 +1717,9 @@ export default function StudentsPage() {
   const [profilePaymentPlan, setProfilePaymentPlan] = useState<StudentPaymentPlan | null>(null)
   const [profileSessions, setProfileSessions] = useState<CoachingSession[]>([])
 
+  // Registered cohorts (from pwu_cohorts table)
+  const [registeredCohorts, setRegisteredCohorts] = useState<string[]>([])
+
   // Payment plans dashboard
   const [ppData, setPpData] = useState<PaymentPlanData | null>(null)
   const [ppLoading, setPpLoading] = useState(true)
@@ -1742,6 +1745,13 @@ export default function StudentsPage() {
     setPpLoading(false)
   }, [])
 
+  const fetchCohorts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/students/cohorts')
+      if (res.ok) setRegisteredCohorts(await res.json())
+    } catch { /* silent */ }
+  }, [])
+
   const fetchStudents = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
@@ -1763,7 +1773,7 @@ export default function StudentsPage() {
     setCalLoading(false)
   }, [calMonthKey])
 
-  useEffect(() => { fetchStudents(); fetchPaymentPlans() }, [fetchStudents, fetchPaymentPlans])
+  useEffect(() => { fetchStudents(); fetchPaymentPlans(); fetchCohorts() }, [fetchStudents, fetchPaymentPlans, fetchCohorts])
   useEffect(() => { if (tab === 'sessions') fetchCalSessions() }, [tab, fetchCalSessions])
 
   // Fetch notes, transactions, and payment plan when a student profile is opened
@@ -1815,8 +1825,9 @@ export default function StudentsPage() {
   // Derived
   const allCohorts = useMemo(() => {
     const s = new Set(students.map((s) => s.cohort))
+    for (const c of registeredCohorts) s.add(c)
     return sortCohorts(Array.from(s))
-  }, [students])
+  }, [students, registeredCohorts])
 
   const groupCohorts = useMemo(() => allCohorts.filter((c) => {
     const lower = c.toLowerCase()
@@ -2504,7 +2515,14 @@ export default function StudentsPage() {
         <NewCohortModal
           nextSuggested={nextSuggested}
           onClose={() => setCohortOpen(false)}
-          onCreated={() => {}}
+          onCreated={async (cohort) => {
+            await fetch('/api/students/cohorts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cohort_number: cohort }),
+            })
+            setRegisteredCohorts((prev) => Array.from(new Set([...prev, cohort])))
+          }}
         />
       )}
       {notesTarget && (
