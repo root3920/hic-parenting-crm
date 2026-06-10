@@ -10,7 +10,9 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { KpiGoalCard } from '@/components/shared/KpiGoalCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
-import { Plus, ChevronLeft, ChevronRight, Download, Trash2 } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Download, Trash2, Pencil } from 'lucide-react'
+import { ChipSelector } from '@/components/shared/ChipSelector'
+import { SegmentedControl } from '@/components/shared/SegmentedControl'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { GOALS } from '@/lib/goals'
@@ -90,6 +92,230 @@ function SourceBadge({ source }: { source: string }) {
   return <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">CSV</span>
 }
 
+const DISQUAL_REASONS = ['Financial', 'Tire kicker', 'Not the decision maker', 'Bad attitude', 'No fit', 'Other']
+const HIGHS_OPTIONS = ['Call proposal', 'Lead filter', 'Empathy', 'Follow-up', 'Objection handling', 'Response speed', 'Close']
+const LOWS_OPTIONS = ['Tire kickers', 'Late follow-up', 'Qualification', 'Time management', 'Communication', 'Low outbound']
+
+function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: () => void; onSaved: (updated: Row) => void }) {
+  const [form, setForm] = useState({
+    date: report.date || '',
+    setter_name: report.setter_name || '',
+    hours_worked: String(report.hours_worked ?? 8),
+    total_convos: String(report.total_convos ?? ''),
+    active_conversations: String(report.active_conversations ?? ''),
+    followups: String(report.followups ?? ''),
+    inbound: String(report.inbound ?? ''),
+    outbound: String(report.outbound ?? ''),
+    no_reply: String(report.no_reply ?? ''),
+    new_leads: String(report.new_leads ?? ''),
+    calls_proposed: String(report.calls_proposed ?? report.call_proposed ?? ''),
+    calls_booked: String(report.calls_booked ?? report.qualified_calls ?? ''),
+    calls_no_reply: String(report.calls_no_reply ?? ''),
+    calls_followup: String(report.calls_followup ?? ''),
+    qual_apps: String(report.qual_apps ?? ''),
+    disqual_apps: String(report.disqual_apps ?? ''),
+    waiting: String(report.waiting ?? ''),
+    requalified: report.requalified || 'N/A',
+    disqual_reasons: Array.isArray(report.disqual_reasons) ? report.disqual_reasons : [],
+    dq_detected: String(report.dq_detected ?? ''),
+    dq_spc_offered: String(report.dq_spc_offered ?? ''),
+    performance_score: report.performance_score ?? 7,
+    highs: Array.isArray(report.highs) ? report.highs : (typeof report.highs === 'string' && report.highs ? report.highs.split(', ') : []),
+    lows: Array.isArray(report.lows) ? report.lows : (typeof report.lows === 'string' && report.lows ? report.lows.split(', ') : []),
+    notas: report.notas ?? report.notes ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [setterOptions, setSetterOptions] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch('/api/profiles?role=setter')
+      .then((r) => r.json())
+      .then(({ profiles }) => {
+        if (profiles) {
+          const names = (profiles as { setter_name: string | null; full_name: string | null; email: string | null }[])
+            .map((p) => p.setter_name || p.full_name || p.email || '')
+            .filter(Boolean)
+          setSetterOptions(names)
+        }
+      })
+  }, [])
+
+  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+  function n(v: string) { return parseInt(v) || 0 }
+
+  async function handleSave() {
+    if (!form.date || !form.setter_name) {
+      toast.error('Date and setter name are required')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/team/setter/reports/${report.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: form.date,
+          setter_name: form.setter_name,
+          hours_worked: n(form.hours_worked),
+          total_convos: n(form.total_convos),
+          active_conversations: n(form.active_conversations),
+          followups: n(form.followups),
+          inbound: n(form.inbound),
+          outbound: n(form.outbound),
+          no_reply: n(form.no_reply),
+          new_leads: n(form.new_leads),
+          calls_proposed: n(form.calls_proposed),
+          calls_booked: n(form.calls_booked),
+          calls_no_reply: n(form.calls_no_reply),
+          calls_followup: n(form.calls_followup),
+          qual_apps: n(form.qual_apps),
+          disqual_apps: n(form.disqual_apps),
+          waiting: n(form.waiting),
+          requalified: form.requalified,
+          disqual_reasons: form.disqual_reasons.length ? form.disqual_reasons : null,
+          dq_detected: n(form.dq_detected),
+          dq_spc_offered: n(form.dq_spc_offered),
+          performance_score: form.performance_score,
+          highs: form.highs.length ? form.highs : null,
+          lows: form.lows.length ? form.lows : null,
+          notas: form.notas || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        toast.error(err.error || 'Error updating report')
+        return
+      }
+      const updated = await res.json()
+      toast.success('Report updated successfully')
+      onSaved(updated)
+    } catch {
+      toast.error('Error updating report')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+
+  return (
+    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="text-base">Edit Report</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4 mt-2">
+        {/* Meta */}
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Date</label>
+            <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Setter</label>
+            <select value={form.setter_name} onChange={(e) => set('setter_name', e.target.value)} className={inputCls}>
+              <option value="">Select setter...</option>
+              {setterOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Hours worked</label>
+            <input type="number" min={0} value={form.hours_worked} onChange={(e) => set('hours_worked', e.target.value)} className={inputCls} />
+          </div>
+        </div>
+
+        {/* Activity */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Activity</p>
+          <div className="grid grid-cols-3 gap-3 mb-2">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Total convos</label><input type="number" min={0} value={form.total_convos} onChange={(e) => set('total_convos', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Active convos</label><input type="number" min={0} value={form.active_conversations} onChange={(e) => set('active_conversations', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Follow-ups</label><input type="number" min={0} value={form.followups} onChange={(e) => set('followups', e.target.value)} className={inputCls} /></div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Inbound</label><input type="number" min={0} value={form.inbound} onChange={(e) => set('inbound', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Outbound</label><input type="number" min={0} value={form.outbound} onChange={(e) => set('outbound', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">No reply</label><input type="number" min={0} value={form.no_reply} onChange={(e) => set('no_reply', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">New leads</label><input type="number" min={0} value={form.new_leads} onChange={(e) => set('new_leads', e.target.value)} className={inputCls} /></div>
+          </div>
+        </div>
+
+        {/* Calls */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-teal-600 mb-2">Calls</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Proposed calls</label><input type="number" min={0} value={form.calls_proposed} onChange={(e) => set('calls_proposed', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Scheduled calls</label><input type="number" min={0} value={form.calls_booked} onChange={(e) => set('calls_booked', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Proposals no reply</label><input type="number" min={0} value={form.calls_no_reply} onChange={(e) => set('calls_no_reply', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">In follow-up</label><input type="number" min={0} value={form.calls_followup} onChange={(e) => set('calls_followup', e.target.value)} className={inputCls} /></div>
+          </div>
+        </div>
+
+        {/* Qualification */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-purple-600 mb-2">Qualification</p>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Qualified</label><input type="number" min={0} value={form.qual_apps} onChange={(e) => set('qual_apps', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Disqualified</label><input type="number" min={0} value={form.disqual_apps} onChange={(e) => set('disqual_apps', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Waiting</label><input type="number" min={0} value={form.waiting} onChange={(e) => set('waiting', e.target.value)} className={inputCls} /></div>
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Requalified</label>
+            <SegmentedControl options={['Yes', 'No', 'N/A']} value={form.requalified} onChange={(v) => set('requalified', v)} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Disqualification reasons</label>
+            <ChipSelector options={DISQUAL_REASONS} value={form.disqual_reasons} onChange={(v) => set('disqual_reasons', v)} color="coral" />
+          </div>
+        </div>
+
+        {/* Downsell SPC */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-orange-600 mb-2">Downsell SPC</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">DQ Detected</label><input type="number" min={0} value={form.dq_detected} onChange={(e) => set('dq_detected', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">DQ con oferta SPC</label><input type="number" min={0} value={form.dq_spc_offered} onChange={(e) => set('dq_spc_offered', e.target.value)} className={inputCls} /></div>
+          </div>
+        </div>
+
+        {/* Performance */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Performance</p>
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Daily performance</label>
+              <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{form.performance_score}/10</span>
+            </div>
+            <input type="range" min={1} max={10} step={1} value={form.performance_score} onChange={(e) => set('performance_score', Number(e.target.value))} className="w-full accent-amber-500" />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">What went well?</label>
+            <ChipSelector options={HIGHS_OPTIONS} value={form.highs} onChange={(v) => set('highs', v)} color="teal" />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">What needs improvement?</label>
+            <ChipSelector options={LOWS_OPTIONS} value={form.lows} onChange={(v) => set('lows', v)} color="amber" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Notes</label>
+            <textarea value={form.notas} onChange={(e) => set('notas', e.target.value)} rows={3} placeholder="Observations, lessons of the day..." className={cn(inputCls, 'resize-none')} />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 mt-4">
+        <button onClick={onClose} className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+          Cancel
+        </button>
+        <button onClick={handleSave} disabled={saving} className="px-4 py-1.5 text-xs rounded-lg text-white font-semibold transition-colors disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+          {saving ? 'Saving...' : 'Save changes'}
+        </button>
+      </div>
+    </DialogContent>
+  )
+}
+
 function ReportDetail({ report, onClose }: { report: Row; onClose: () => void }) {
   void onClose
   const convRate = safeDiv(report.qualified_calls, report.total_convos) * 100
@@ -164,6 +390,7 @@ export default function SetterDashboardPage() {
   const [selectedSetter, setSelectedSetter] = useState('All')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<Row | null>(null)
+  const [editTarget, setEditTarget] = useState<Row | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -576,6 +803,23 @@ export default function SetterDashboardPage() {
                                 >
                                   View
                                 </button>
+                                {r.source === 'Formulario' && (
+                                  profile?.role === 'admin' ||
+                                  (isSetter && r.setter_name.toLowerCase() === (profile?.setter_name || profile?.full_name || '').toLowerCase() && r.date === localDateStr(new Date()))
+                                ) && (
+                                  <button
+                                    onClick={async () => {
+                                      const supabase = createClient()
+                                      const { data } = await supabase.from('setter_daily_reports').select('*').eq('id', r.id).single()
+                                      if (data) setEditTarget(data)
+                                      else toast.error('Could not load report for editing')
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                    title="Edit report"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => setDeleteTarget(r)}
                                   className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
@@ -623,6 +867,38 @@ export default function SetterDashboardPage() {
 
       <Dialog open={!!detailReport} onOpenChange={(open) => { if (!open) setDetailReport(null) }}>
         {detailReport && <ReportDetail report={detailReport} onClose={() => setDetailReport(null)} />}
+      </Dialog>
+
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null) }}>
+        {editTarget && (
+          <EditReportModal
+            report={editTarget}
+            onClose={() => setEditTarget(null)}
+            onSaved={(updated) => {
+              setAllRows((prev) => prev.map((r) =>
+                r.id === updated.id && r.source === 'Formulario'
+                  ? {
+                      ...r,
+                      date: updated.date?.slice(0, 10) ?? r.date,
+                      setter_name: (updated.setter_name ?? '').replace('@', '').trim(),
+                      total_convos: updated.total_convos ?? 0,
+                      followups: updated.followups ?? 0,
+                      call_proposed: updated.calls_proposed ?? 0,
+                      qualified_calls: updated.calls_booked ?? 0,
+                      performance_score: updated.performance_score ?? 0,
+                      notes: updated.notas ?? '',
+                      highs: Array.isArray(updated.highs) ? updated.highs.join(', ') : (updated.highs ?? ''),
+                      lows: Array.isArray(updated.lows) ? updated.lows.join(', ') : (updated.lows ?? ''),
+                      active_conversations: updated.active_conversations ?? 0,
+                      dq_detected: updated.dq_detected ?? 0,
+                      dq_spc_offered: updated.dq_spc_offered ?? 0,
+                    }
+                  : r
+              ))
+              setEditTarget(null)
+            }}
+          />
+        )}
       </Dialog>
 
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
