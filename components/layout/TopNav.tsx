@@ -52,7 +52,7 @@ const ALL_NAV_ITEMS = [
   { href: '/equipo/spc',   label: 'Team',         icon: UsersRound,      roles: ['csm_spc'] as UserRole[] },
   { href: '/finance',      label: 'Finance',      icon: DollarSign,      roles: ['admin'] as UserRole[] },
   { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },
-  { href: '/growth',       label: 'Growth',       icon: Sprout,          roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
+  { href: '/growth',       label: 'Growth',       icon: Sprout,          roles: ['admin', 'closer', 'csm_spc', 'csm_ht'] as UserRole[] },
   { href: '/contacts',     label: 'Contacts',     icon: Contact,         roles: ['admin', 'setter'] as UserRole[] },
   { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
   { href: '/calendar',     label: 'Calendar',     icon: CalendarDays,    roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
