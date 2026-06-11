@@ -282,6 +282,7 @@ function MemberProfileModal({
   onSave,
   onSaveCancellation,
   onDeleteCancellation,
+  onDeleteMember,
   onReactivate,
   memberTransactions,
   memberAttendance,
@@ -298,6 +299,7 @@ function MemberProfileModal({
   onSave: (updated: SpcMember) => void
   onSaveCancellation: (updated: SpcCancellation) => void
   onDeleteCancellation: (id: string) => void
+  onDeleteMember: (id: string) => void
   onReactivate: (cancellationId: string, member: SpcMember) => void
   memberTransactions: Transaction[]
   memberAttendance: SpcClassAttendance[]
@@ -684,6 +686,16 @@ function MemberProfileModal({
                 }
                 onDeleteCancellation(selected.data.id)
                 toast.success('Record deleted')
+              } else if (selected.kind === 'member') {
+                if (!confirm('Are you sure you want to delete this member? This action cannot be undone.')) return
+                const res = await fetch(`/api/spc/members/${selected.data.id}`, { method: 'DELETE' })
+                if (!res.ok) {
+                  const body = await res.json().catch(() => ({}))
+                  toast.error('Error deleting: ' + (body.error || 'Unknown error'))
+                  return
+                }
+                onDeleteMember(selected.data.id)
+                toast.success('Member deleted')
               }
             }}
             className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -3902,6 +3914,10 @@ export default function SpcPage() {
           }}
           onDeleteCancellation={(id) => {
             setCancellations((prev) => prev.filter((c) => c.id !== id))
+            setSelectedMember(null)
+          }}
+          onDeleteMember={(id) => {
+            setMembers((prev) => prev.filter((m) => m.id !== id))
             setSelectedMember(null)
           }}
           onReactivate={(cancellationId, member) => {
