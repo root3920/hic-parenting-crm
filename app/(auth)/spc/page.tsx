@@ -288,6 +288,8 @@ function MemberProfileModal({
   memberAttendance,
   highlightNotes,
   onMemberUpdate,
+  engagementData,
+  last4Dates,
 }: {
   selected: SelectedMember
   notes: SpcMemberNote[]
@@ -305,6 +307,8 @@ function MemberProfileModal({
   memberAttendance: SpcClassAttendance[]
   highlightNotes?: boolean
   onMemberUpdate: (updated: SpcMember) => void
+  engagementData?: { classes_last_4: number; engagement_status: 'at_risk' | 'low' | 'active'; attended_dates: string[] }
+  last4Dates?: string[]
 }) {
   const supabase = useMemo(() => createClient(), [])
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
@@ -1179,6 +1183,46 @@ function MemberProfileModal({
             <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">
               Class Attendance ({memberAttendance.length} {memberAttendance.length === 1 ? 'class' : 'classes'})
             </p>
+
+            {/* Engagement summary for last 4 classes */}
+            {engagementData && last4Dates && last4Dates.length > 0 && (
+              <div className="mb-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                    Last 4 classes attended: <span className="font-bold text-zinc-800 dark:text-zinc-200">{engagementData.classes_last_4}/4</span>
+                  </span>
+                  {(() => {
+                    const badge = engagementData.engagement_status === 'at_risk'
+                      ? { emoji: '\u{1F534}', label: 'At Risk', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }
+                      : engagementData.engagement_status === 'low'
+                      ? { emoji: '\u{1F7E1}', label: 'Low', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
+                      : { emoji: '\u{1F7E2}', label: 'Active', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' }
+                    return (
+                      <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold', badge.cls)}>
+                        {badge.emoji} {badge.label}
+                      </span>
+                    )
+                  })()}
+                </div>
+                <div className="space-y-1">
+                  {last4Dates.map((date) => {
+                    const attended = engagementData.attended_dates.includes(date)
+                    return (
+                      <div key={date} className="flex items-center gap-2 text-xs">
+                        <span>{attended ? '\u2705' : '\u274C'}</span>
+                        <span className={cn(
+                          'font-medium',
+                          attended ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400 dark:text-zinc-500'
+                        )}>
+                          {formatDate(date)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {memberAttendance.length === 0 ? (
               <p className="text-xs text-zinc-400 italic">No ha asistido a ninguna clase</p>
             ) : (
@@ -1272,6 +1316,11 @@ export default function SpcPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [conversions, setConversions] = useState<{ email: string; converted_at: string | null }[]>([])
+
+  // Engagement data
+  const [engagementMap, setEngagementMap] = useState<Record<string, { classes_last_4: number; engagement_status: 'at_risk' | 'low' | 'active'; attended_dates: string[] }>>({})
+  const [last4Dates, setLast4Dates] = useState<string[]>([])
+  const [engagementFilter, setEngagementFilter] = useState<'all' | 'at_risk'>('all')
 
   // Modal state
   const { profile } = useProfile()
@@ -1577,6 +1626,16 @@ export default function SpcPage() {
       }
       setLastNoteByEmail(noteMap)
       setLoading(false)
+
+      // Fetch engagement data
+      try {
+        const engRes = await fetch('/api/spc/members/engagement')
+        if (engRes.ok) {
+          const engData = await engRes.json()
+          setEngagementMap(engData.engagement ?? {})
+          setLast4Dates(engData.last_4_dates ?? [])
+        }
+      } catch { /* engagement is non-critical */ }
     }
     fetchData()
   }, [])
@@ -1661,6 +1720,15 @@ export default function SpcPage() {
 
   const sortedTrials = [...trialMembers].sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0))
 
+  function getEngagement(email: string | null) {
+    const key = (email ?? '').toLowerCase()
+    return engagementMap[key] ?? { classes_last_4: 0, engagement_status: 'at_risk' as const, attended_dates: [] }
+  }
+
+  const atRiskCount = useMemo(() => {
+    return activeMembers.filter((m) => getEngagement(m.email).engagement_status === 'at_risk').length
+  }, [activeMembers, engagementMap]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Filtered & sorted lists ─────────────────────────────────────────────
   function matchesSearch(name: string | null, email: string | null, q: string): boolean {
     if (!q) return true
@@ -1670,6 +1738,9 @@ export default function SpcPage() {
 
   const filteredActiveMembers = useMemo(() => {
     let list = activeMembers.filter((m) => matchesSearch(m.name, m.email, activeSearch))
+    if (engagementFilter === 'at_risk') {
+      list = list.filter((m) => getEngagement(m.email).engagement_status === 'at_risk')
+    }
     switch (activeSort) {
       case 'joined_desc': list.sort((a, b) => (b.joined_at ?? '').localeCompare(a.joined_at ?? '')); break
       case 'joined_asc': list.sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? '')); break
@@ -1681,7 +1752,7 @@ export default function SpcPage() {
       case 'last_note_desc': list.sort((a, b) => (lastNoteByEmail[(b.email ?? '').toLowerCase()] ?? '').localeCompare(lastNoteByEmail[(a.email ?? '').toLowerCase()] ?? '')); break
     }
     return list
-  }, [activeMembers, activeSearch, activeSort, lastPaymentByEmail, lastNoteByEmail])
+  }, [activeMembers, activeSearch, activeSort, lastPaymentByEmail, lastNoteByEmail, engagementFilter, engagementMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredTrialMembers = useMemo(() => {
     let list = sortedTrials.filter((m) => matchesSearch(m.name, m.email, trialSearch))
@@ -2840,10 +2911,34 @@ export default function SpcPage() {
 
         {/* ACTIVE MEMBERS */}
         {activeTab === 'active' && (
+          <div className="space-y-4">
+          {/* At Risk KPI Card */}
+          {!loading && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div
+                className={cn(
+                  'rounded-xl border p-4 cursor-pointer transition-colors',
+                  engagementFilter === 'at_risk'
+                    ? 'border-red-400 bg-red-50 dark:bg-red-950/30 dark:border-red-700'
+                    : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-red-300 dark:hover:border-red-800'
+                )}
+                onClick={() => setEngagementFilter(engagementFilter === 'at_risk' ? 'all' : 'at_risk')}
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400 mb-1">At Risk</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{atRiskCount}</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">0/4 classes attended</p>
+              </div>
+            </div>
+          )}
           <Card>
             <CardHeader className="pb-2">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <CardTitle className="text-sm font-semibold">{activeMembers.length} Active Members</CardTitle>
+                <CardTitle className="text-sm font-semibold">
+                  {activeMembers.length} Active Members
+                  {engagementFilter === 'at_risk' && (
+                    <span className="ml-2 text-xs font-normal text-red-500">— showing at-risk only</span>
+                  )}
+                </CardTitle>
                 <div className="flex items-center gap-2 sm:ml-auto">
                   <div className="relative flex-1 sm:flex-initial">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
@@ -2855,6 +2950,18 @@ export default function SpcPage() {
                       className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
+                  <button
+                    onClick={() => setEngagementFilter(engagementFilter === 'at_risk' ? 'all' : 'at_risk')}
+                    className={cn(
+                      'inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors',
+                      engagementFilter === 'at_risk'
+                        ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 dark:border-red-700'
+                        : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                    )}
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    At Risk
+                  </button>
                   <select
                     value={activeSort}
                     onChange={(e) => setActiveSort(e.target.value as ActiveSort)}
@@ -2911,6 +3018,7 @@ export default function SpcPage() {
                         <TableHead className="hidden md:table-cell">Last Payment</TableHead>
                         <TableHead className="hidden md:table-cell">Next Payment</TableHead>
                         <TableHead className="hidden lg:table-cell">Score</TableHead>
+                        <TableHead className="hidden lg:table-cell">Engagement</TableHead>
                         <TableHead className="hidden lg:table-cell">Last Note</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
@@ -2970,6 +3078,24 @@ export default function SpcPage() {
                               )
                             })()}
                           </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {(() => {
+                              const eng = getEngagement(m.email)
+                              const badge = eng.engagement_status === 'at_risk'
+                                ? { emoji: '\u{1F534}', label: 'At Risk', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }
+                                : eng.engagement_status === 'low'
+                                ? { emoji: '\u{1F7E1}', label: 'Low', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
+                                : { emoji: '\u{1F7E2}', label: 'Active', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' }
+                              return (
+                                <div className="flex flex-col items-start gap-0.5">
+                                  <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold', badge.cls)}>
+                                    {badge.emoji} {badge.label}
+                                  </span>
+                                  <span className="text-[10px] text-zinc-400">{eng.classes_last_4}/4</span>
+                                </div>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
                             <LastNoteCell
                               lastNoteAt={lastNoteByEmail[(m.email ?? '').toLowerCase()]}
@@ -2984,6 +3110,7 @@ export default function SpcPage() {
               )}
             </CardContent>
           </Card>
+          </div>
         )}
 
         {/* FREE TRIALS */}
@@ -3893,6 +4020,8 @@ export default function SpcPage() {
           }
           memberAttendance={memberAttendance}
           highlightNotes={highlightNotes}
+          engagementData={selectedMember.kind === 'member' ? getEngagement(selectedMember.data.email) : undefined}
+          last4Dates={last4Dates}
           onMemberUpdate={(updated) => {
             setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m))
             setSelectedMember({ kind: 'member', data: updated })
