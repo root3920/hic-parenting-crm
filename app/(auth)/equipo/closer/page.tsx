@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+import { useProfile } from '@/hooks/useProfile'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -10,7 +11,8 @@ import { KpiGoalCard } from '@/components/shared/KpiGoalCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
 import { CloserDailyReport } from '@/types'
-import { Plus, ChevronLeft, ChevronRight, Download } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Download, Pencil, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { GOALS, GoalConfig } from '@/lib/goals'
 import { getCurrentWeekRange } from '@/lib/dateUtils'
@@ -176,10 +178,157 @@ function ReportDetail({ report, onClose }: { report: CloserDailyReport; onClose:
   )
 }
 
+// ─── Edit Modal ──────────────────────────────────────────────────────────────
+
+function EditCloserReportModal({ report, onClose, onSaved }: { report: CloserDailyReport; onClose: () => void; onSaved: (updated: CloserDailyReport) => void }) {
+  const [form, setForm] = useState({
+    date: report.date || '',
+    closer_name: report.closer_name || '',
+    showed_meetings: String(report.showed_meetings ?? ''),
+    cancelled_meetings: String(report.cancelled_meetings ?? ''),
+    no_show_meetings: String(report.no_show_meetings ?? ''),
+    rescheduled_meetings: String(report.rescheduled_meetings ?? ''),
+    total_meetings: String(report.total_meetings ?? ''),
+    offers_proposed: String(report.offers_proposed ?? ''),
+    won_deals: String(report.won_deals ?? ''),
+    cash_collected: String(report.cash_collected ?? ''),
+    recurrent_cash: String(report.recurrent_cash ?? ''),
+    feedback: report.feedback ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+  function n(v: string) { return parseInt(v) || 0 }
+  function nf(v: string) { return parseFloat(v) || 0 }
+
+  async function handleSave() {
+    if (!form.date || !form.closer_name) {
+      toast.error('Date and closer name are required')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/team/closer/reports/${report.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: form.date,
+          closer_name: form.closer_name,
+          showed_meetings: n(form.showed_meetings),
+          cancelled_meetings: n(form.cancelled_meetings),
+          no_show_meetings: n(form.no_show_meetings),
+          rescheduled_meetings: n(form.rescheduled_meetings),
+          total_meetings: n(form.total_meetings),
+          offers_proposed: n(form.offers_proposed),
+          won_deals: n(form.won_deals),
+          cash_collected: nf(form.cash_collected),
+          recurrent_cash: nf(form.recurrent_cash),
+          feedback: form.feedback || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        toast.error(err.error || 'Error updating report')
+        return
+      }
+      const updated = await res.json()
+      toast.success('Report updated successfully')
+      onSaved(updated)
+    } catch {
+      toast.error('Error updating report')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+
+  return (
+    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="text-base">Edit Report</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4 mt-2">
+        {/* Meta */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Date</label>
+            <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Closer</label>
+            <input type="text" value={form.closer_name} onChange={(e) => set('closer_name', e.target.value)} className={inputCls} />
+          </div>
+        </div>
+
+        {/* Meetings */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Meetings</p>
+          <div className="grid grid-cols-3 gap-3 mb-2">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Total Meetings</label><input type="number" min={0} value={form.total_meetings} onChange={(e) => set('total_meetings', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Showed</label><input type="number" min={0} value={form.showed_meetings} onChange={(e) => set('showed_meetings', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Cancelled</label><input type="number" min={0} value={form.cancelled_meetings} onChange={(e) => set('cancelled_meetings', e.target.value)} className={inputCls} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">No Show</label><input type="number" min={0} value={form.no_show_meetings} onChange={(e) => set('no_show_meetings', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Rescheduled</label><input type="number" min={0} value={form.rescheduled_meetings} onChange={(e) => set('rescheduled_meetings', e.target.value)} className={inputCls} /></div>
+          </div>
+        </div>
+
+        {/* Offers & Revenue */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-green-600 mb-2">Offers & Revenue</p>
+          <div className="grid grid-cols-2 gap-3 mb-2">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Offers Proposed</label><input type="number" min={0} value={form.offers_proposed} onChange={(e) => set('offers_proposed', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Won Deals</label><input type="number" min={0} value={form.won_deals} onChange={(e) => set('won_deals', e.target.value)} className={inputCls} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Cash Collected ($)</label><input type="number" min={0} step="0.01" value={form.cash_collected} onChange={(e) => set('cash_collected', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Recurrent Pipeline ($)</label><input type="number" min={0} step="0.01" value={form.recurrent_cash} onChange={(e) => set('recurrent_cash', e.target.value)} className={inputCls} /></div>
+          </div>
+        </div>
+
+        {/* Feedback */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Feedback</p>
+          <textarea
+            value={form.feedback}
+            onChange={(e) => set('feedback', e.target.value)}
+            rows={3}
+            className={inputCls}
+            placeholder="Notes or feedback..."
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-1.5 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors disabled:opacity-60"
+          >
+            {saving ? 'Saving...' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </DialogContent>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CloserDashboardPage() {
   const supabase = useMemo(() => createClient(), [])
+  const { profile } = useProfile()
+  const isAdmin = profile?.role === 'admin'
   const [reports, setReports] = useState<CloserDailyReport[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('week')
@@ -188,6 +337,9 @@ export default function CloserDashboardPage() {
   const [selectedCloser, setSelectedCloser] = useState('All')
   const [page, setPage] = useState(0)
   const [detailReport, setDetailReport] = useState<CloserDailyReport | null>(null)
+  const [editTarget, setEditTarget] = useState<CloserDailyReport | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<CloserDailyReport | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [callsData, setCallsData] = useState<CallSummary[]>([])
 
   const weekRange = useMemo(() => getCurrentWeekRange(), [])
@@ -222,6 +374,26 @@ export default function CloserDashboardPage() {
   }, [supabase, fromDate, toDate])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/team/closer/reports/${deleteTarget.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        toast.error(err.error || 'Error deleting report')
+        return
+      }
+      setReports((prev) => prev.filter((r) => r.id !== deleteTarget.id))
+      toast.success('Report deleted')
+      setDeleteTarget(null)
+    } catch {
+      toast.error('Error deleting report')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const closerNames = useMemo(() => {
     const names = Array.from(new Set(reports.map((r) => r.closer_name))).sort()
@@ -602,7 +774,7 @@ export default function CloserDashboardPage() {
                         const offerR = safeDiv(r.offers_proposed, r.showed_meetings) * 100
                         const closeR = safeDiv(r.won_deals, r.offers_proposed) * 100
                         return (
-                          <tr key={r.id} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                          <tr key={r.id} className="group border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                             <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{formatDate(r.date)}</td>
                             <td className="py-2.5 px-3 font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap">{r.closer_name}</td>
                             <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{r.total_meetings}</td>
@@ -614,12 +786,36 @@ export default function CloserDashboardPage() {
                             </td>
                             <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">{r.won_deals}</td>
                             <td className="py-2.5 px-3">
-                              <button
-                                onClick={() => setDetailReport(r)}
-                                className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                              >
-                                Ver
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setDetailReport(r)}
+                                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                >
+                                  Ver
+                                </button>
+                                {isAdmin && (
+                                  <>
+                                    <button
+                                      onClick={async () => {
+                                        const { data } = await supabase.from('closer_daily_reports').select('*').eq('id', r.id).single()
+                                        if (data) setEditTarget(data)
+                                        else toast.error('Could not load report for editing')
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                      title="Edit report"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteTarget(r)}
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                      title="Delete report"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         )
@@ -659,6 +855,50 @@ export default function CloserDashboardPage() {
 
       <Dialog open={!!detailReport} onOpenChange={(open) => { if (!open) setDetailReport(null) }}>
         {detailReport && <ReportDetail report={detailReport} onClose={() => setDetailReport(null)} />}
+      </Dialog>
+
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null) }}>
+        {editTarget && (
+          <EditCloserReportModal
+            report={editTarget}
+            onClose={() => setEditTarget(null)}
+            onSaved={(updated) => {
+              setReports((prev) => prev.map((r) => r.id === updated.id ? updated : r))
+              setEditTarget(null)
+            }}
+          />
+        )}
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Delete this report?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            Are you sure you want to delete this report? This action cannot be undone.
+            {deleteTarget && (
+              <span className="block mt-1 font-medium text-zinc-700 dark:text-zinc-300">
+                {formatDate(deleteTarget.date)} · {deleteTarget.closer_name}
+              </span>
+            )}
+          </p>
+          <div className="flex items-center justify-end gap-2 mt-4">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors disabled:opacity-60"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </DialogContent>
       </Dialog>
     </PageTransition>
   )
