@@ -3004,22 +3004,36 @@ export default function SpcPage() {
               ) : filteredActiveMembers.length === 0 ? (
                 <EmptyState title={activeSearch ? 'No matching members' : 'No active members'} description={activeSearch ? 'Try a different search term.' : 'Active subscribers will appear here.'} />
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
+                <div>
+                  <Table className="table-fixed w-full">
+                    <colgroup>
+                      <col style={{ width: 160 }} />
+                      <col className="hidden md:table-column" style={{ width: 180 }} />
+                      <col style={{ width: 80 }} />
+                      <col style={{ width: 70 }} />
+                      <col className="hidden md:table-column" style={{ width: 90 }} />
+                      <col className="hidden md:table-column" style={{ width: 90 }} />
+                      <col className="hidden md:table-column" style={{ width: 60 }} />
+                      <col className="hidden md:table-column" style={{ width: 100 }} />
+                      <col className="hidden md:table-column" style={{ width: 100 }} />
+                      <col className="hidden lg:table-column" style={{ width: 60 }} />
+                      <col className="hidden lg:table-column" style={{ width: 90 }} />
+                      <col className="hidden lg:table-column" style={{ width: 80 }} />
+                    </colgroup>
                     <TableHeader>
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="hidden md:table-cell">Email</TableHead>
-                        <TableHead>Plan</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="hidden md:table-cell">Provider</TableHead>
-                        <TableHead className="hidden md:table-cell">Joined</TableHead>
-                        <TableHead className="hidden md:table-cell">Months</TableHead>
-                        <TableHead className="hidden md:table-cell">Last Payment</TableHead>
-                        <TableHead className="hidden md:table-cell">Next Payment</TableHead>
-                        <TableHead className="hidden lg:table-cell">Score</TableHead>
-                        <TableHead className="hidden lg:table-cell">Engagement</TableHead>
-                        <TableHead className="hidden lg:table-cell">Last Note</TableHead>
+                        <TableHead className="text-xs">Name</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
+                        <TableHead className="text-xs">Plan</TableHead>
+                        <TableHead className="text-xs text-right">Amount</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Provider</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Joined</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Mo</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Last Pay</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Next Pay</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell">Score</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell">Engagement</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell">Last Note</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
@@ -3036,15 +3050,15 @@ export default function SpcPage() {
                           )}
                           onClick={() => openModal({ kind: 'member', data: m })}
                         >
-                          <TableCell className="font-medium text-sm">{m.name}</TableCell>
-                          <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
-                          <TableCell>
+                          <TableCell className="text-xs font-medium truncate">{m.name}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate">{m.email}</TableCell>
+                          <TableCell className="text-xs">
                             <StatusPill
                               label={m.plan === 'annual' ? 'Annual' : 'Monthly'}
                               variant={m.plan === 'annual' ? 'success' : 'info'}
                             />
                           </TableCell>
-                          <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
+                          <TableCell className="text-xs text-right font-semibold whitespace-nowrap">
                             {formatCurrency(m.amount)}
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
@@ -3054,7 +3068,7 @@ export default function SpcPage() {
                               const joined = new Date(m.joined_at!)
                               const now = new Date()
                               const months = (now.getFullYear() - joined.getFullYear()) * 12 + (now.getMonth() - joined.getMonth())
-                              return `${months} mo`
+                              return `${months}`
                             })() : '—'}
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">
@@ -3071,8 +3085,8 @@ export default function SpcPage() {
                             {(() => {
                               const cfg = leadScoreConfig(m.lead_score)
                               return (
-                                <span className="inline-flex items-center gap-1.5">
-                                  <span className={cn('w-2 h-2 rounded-full shrink-0', cfg.dot)} />
+                                <span className="inline-flex items-center gap-1">
+                                  <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', cfg.dot)} />
                                   <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{m.lead_score ?? 0}</span>
                                 </span>
                               )
@@ -3082,16 +3096,16 @@ export default function SpcPage() {
                             {(() => {
                               const eng = getEngagement(m.email)
                               const badge = eng.engagement_status === 'at_risk'
-                                ? { emoji: '\u{1F534}', label: 'At Risk', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }
+                                ? { label: 'At Risk', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }
                                 : eng.engagement_status === 'low'
-                                ? { emoji: '\u{1F7E1}', label: 'Low', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
-                                : { emoji: '\u{1F7E2}', label: 'Active', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' }
+                                ? { label: 'Low', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
+                                : { label: 'Active', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' }
                               return (
-                                <div className="flex flex-col items-start gap-0.5">
-                                  <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold', badge.cls)}>
-                                    {badge.emoji} {badge.label}
+                                <div className="flex flex-col items-start">
+                                  <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-tight', badge.cls)}>
+                                    {badge.label}
                                   </span>
-                                  <span className="text-[10px] text-zinc-400">{eng.classes_last_4}/4</span>
+                                  <span className="text-[11px] text-zinc-400 leading-tight">{eng.classes_last_4}/4</span>
                                 </div>
                               )
                             })()}
