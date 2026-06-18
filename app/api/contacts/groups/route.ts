@@ -20,7 +20,7 @@ const LOW_TICKET_PRODUCTS = [
 ]
 
 const MID_TICKET_PRODUCTS = [
-  { name: 'Raising Secure Children', patterns: ['raising secure children'] },
+  { name: 'Raising Secure Children', patterns: [] as string[], exact: true, exactTitle: 'Raising Secure Children', exactCost: 470 },
 ]
 
 const HIGH_TICKET_PRODUCTS = [
@@ -36,12 +36,12 @@ const PAGE_SIZE = 1000
 
 /** Fetch all rows from a table, paginating past the 1000-row Supabase limit. */
 async function fetchAllTransactions(svc: ReturnType<typeof getServiceClient>) {
-  const all: { buyer_email: string; offer_title: string }[] = []
+  const all: { buyer_email: string; offer_title: string; cost: number }[] = []
   let from = 0
   while (true) {
     const { data, error } = await svc
       .from('transactions')
-      .select('buyer_email, offer_title')
+      .select('buyer_email, offer_title, cost')
       .or('status.eq.completed,status.is.null')
       .range(from, from + PAGE_SIZE - 1)
     if (error) throw error
@@ -101,7 +101,10 @@ export async function GET() {
     }
 
     for (const product of MID_TICKET_PRODUCTS) {
-      if (matchProduct(title, product.patterns)) {
+      if (product.exact
+        ? tx.offer_title === product.exactTitle && Number(tx.cost) === product.exactCost
+        : matchProduct(title, product.patterns)
+      ) {
         if (!midTicketEmails[product.name]) midTicketEmails[product.name] = new Set()
         midTicketEmails[product.name].add(email)
         break
@@ -109,7 +112,7 @@ export async function GET() {
     }
 
     for (const product of HIGH_TICKET_PRODUCTS) {
-      if (matchProduct(title, product.patterns)) {
+      if (matchProduct(title, product.patterns) && !title.toLowerCase().includes('bundle')) {
         if (!highTicketEmails[product.name]) highTicketEmails[product.name] = new Set()
         highTicketEmails[product.name].add(email)
         break

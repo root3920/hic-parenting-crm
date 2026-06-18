@@ -141,14 +141,16 @@ export async function GET(
   }
 
   // Transaction-based groups (low-ticket, mid-ticket, high-ticket)
-  const productMap =
-    groupId === 'low-ticket' ? LOW_TICKET_PRODUCTS :
-    groupId === 'mid-ticket' ? MID_TICKET_PRODUCTS :
-    groupId === 'high-ticket' ? HIGH_TICKET_PRODUCTS : null
-
-  if (!productMap) {
+  if (!['low-ticket', 'mid-ticket', 'high-ticket'].includes(groupId)) {
     return NextResponse.json({ error: 'Unknown group' }, { status: 400 })
   }
+
+  // Mid-ticket: exact match on offer_title + cost=470 (no bundles)
+  if (groupId === 'mid-ticket') {
+    return handleMidTicket(svc, search, from, to, page)
+  }
+
+  const productMap = groupId === 'low-ticket' ? LOW_TICKET_PRODUCTS : HIGH_TICKET_PRODUCTS
 
   // Build ILIKE filter for the product or all products in the group
   const patterns: string[] = []
@@ -214,6 +216,76 @@ export async function GET(
   const all = Array.from(byEmail.values())
   const total = all.length
   const contacts = all.slice(from, to + 1)
+
+  return NextResponse.json({ contacts, total, page, pageSize: PAGE_SIZE })
+}
+
+/** Mid Ticket: exact match offer_title='Raising Secure Children' AND cost=470 */
+async function handleMidTicket(
+  svc: ReturnType<typeof getServiceClient>,
+  search: string,
+  from: number,
+  to: number,
+  page: number,
+) {
+  const all: {
+    buyer_email: string
+    buyer_name: string | null
+    buyer_phone: string | null
+    date: string
+    source: string | null
+  }[] = []
+  let offset = 0
+  while (true) {
+    let query = svc
+      .from('transactions')
+      .select('buyer_email, buyer_name, buyer_phone, date, source')
+      .or('status.eq.completed,status.is.null')
+      .eq('offer_title', 'Raising Secure Children')
+      .eq('cost', 470)
+      .order('date', { ascending: false })
+      .range(offset, offset + FETCH_PAGE - 1)
+
+    if (search) {
+      query = query.or(`buyer_email.ilike.%${search}%,buyer_name.ilike.%${search}%`)
+    }
+
+    const { data, error } = await query
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < FETCH_PAGE) break
+    offset += FETCH_PAGE
+  }
+
+  // Deduplicate by email
+  const byEmail = new Map<string, {
+    email: string
+    name: string | null
+    phone: string | null
+    source: string | null
+    date: string
+    product: string
+  }>()
+
+  for (const tx of all) {
+    if (!tx.buyer_email) continue
+    const key = tx.buyer_email.toLowerCase()
+    if (!byEmail.has(key)) {
+      byEmail.set(key, {
+        email: tx.buyer_email,
+        name: tx.buyer_name,
+        phone: tx.buyer_phone,
+        source: tx.source,
+        date: tx.date,
+        product: 'Raising Secure Children',
+      })
+    }
+  }
+
+  const deduped = Array.from(byEmail.values())
+  const total = deduped.length
+  const contacts = deduped.slice(from, to + 1)
 
   return NextResponse.json({ contacts, total, page, pageSize: PAGE_SIZE })
 }
