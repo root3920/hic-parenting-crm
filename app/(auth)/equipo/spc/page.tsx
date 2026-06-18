@@ -36,9 +36,7 @@ interface Metrics {
   pctBienvenida: number
   pctPresentacion: number
   pctReactivacion: number
-  pctConvTrial: number
   pctContactoTrial: number
-  pctRetencion: number
   pctRespuesta: number
   score: number
 }
@@ -48,9 +46,7 @@ function calcMetrics(r: SpcPerfReport): Metrics {
   const pctBienvenida   = safe(r.welcome_sent, r.new_members)
   const pctPresentacion = safe(r.new_members_introduced, r.new_members)
   const pctReactivacion = safe(r.checkins_responded, r.checkins_sent)
-  const pctConvTrial    = safe(r.trials_converted, r.trials_expiring_today)
   const pctContactoTrial = safe(r.trials_contacted, r.trials_expiring_today)
-  const pctRetencion    = safe(r.cancellations_retained, r.cancellation_requests)
   const pctRespuesta    = safe(r.questions_answered_24h, r.questions_total)
 
   // Engagement (max 40)
@@ -67,10 +63,8 @@ function calcMetrics(r: SpcPerfReport): Metrics {
 
   // Retención y conversión (max 30)
   const retentionScore =
-    pctRetencion * 0.10 +
-    pctContactoTrial * 0.05 +
-    pctConvTrial * 0.05 +
-    r.community_energy / 5 * 100 * 0.10
+    pctContactoTrial * 0.10 +
+    r.community_energy / 5 * 100 * 0.20
 
   // Operación (max 10)
   const operationScore = pctRespuesta * 0.10
@@ -79,7 +73,7 @@ function calcMetrics(r: SpcPerfReport): Metrics {
 
   return {
     pctEngagement, pctBienvenida, pctPresentacion, pctReactivacion,
-    pctConvTrial, pctContactoTrial, pctRetencion, pctRespuesta, score,
+    pctContactoTrial, pctRespuesta, score,
   }
 }
 
@@ -209,18 +203,13 @@ function DetailRow({ r, m }: { r: SpcPerfReport; m: Metrics }) {
         <Pair label="Welcomes sent" value={r.welcome_sent} />
         <Pair label="Introduced themselves" value={r.new_members_introduced} />
         <Pair label="% Welcome" value={`${m.pctBienvenida}%`} />
-        <Pair label="Check-ins sent" value={r.checkins_sent} />
         <Pair label="% Reactivation" value={`${m.pctReactivacion}%`} />
       </div>
       {/* Trials + Operations */}
       <div>
         <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-2">Retention · Operations</p>
-        <Pair label="Trials expiring" value={r.trials_expiring_today} />
-        <Pair label="Trials converted" value={r.trials_converted} />
-        <Pair label="% Trial Conv." value={`${m.pctConvTrial}%`} />
+        <Pair label="Trials contacted" value={r.trials_contacted} />
         <Pair label="Cancel. requests" value={r.cancellation_requests} />
-        <Pair label="Retained" value={r.cancellations_retained} />
-        <Pair label="% Retention" value={`${m.pctRetencion}%`} />
         <Pair label="Questions" value={r.questions_total} />
         <Pair label="Answered <24h" value={r.questions_answered_24h} />
         <Pair label="% Response" value={`${m.pctRespuesta}%`} />
@@ -264,10 +253,6 @@ export default function SpcPerfDashboard() {
   const [editTarget, setEditTarget] = useState<SpcPerfReport | null>(null)
   const [editForm, setEditForm] = useState<Record<string, string | number>>({})
   const [saving, setSaving] = useState(false)
-  const [realTrialConvRate, setRealTrialConvRate] = useState(0)
-  const [realTrialConverted, setRealTrialConverted] = useState(0)
-  const [trialPoolActive, setTrialPoolActive] = useState(0)
-  const [trialPoolCancels, setTrialPoolCancels] = useState(0)
 
   const weekRange = useMemo(() => getCurrentWeekRange(), [])
 
@@ -299,44 +284,6 @@ export default function SpcPerfDashboard() {
 
   useEffect(() => { fetchReports() }, [fetchReports])
   useEffect(() => { setPage(0) }, [preset, selectedRep])
-
-  // Fetch real trial conversion rate from spc_members + spc_cancellations (same as SPC Overview)
-  useEffect(() => {
-    async function fetchTrialConversion() {
-      const { from, to } = getRange(preset)
-      const [trialCancelsRes, activeTrialsRes, convertedRes] = await Promise.all([
-        supabase
-          .from('spc_cancellations')
-          .select('*', { count: 'exact', head: true })
-          .eq('trial_cancel', true)
-          .gte('cancelled_at', from)
-          .lte('cancelled_at', to),
-        supabase
-          .from('spc_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'trial'),
-        supabase
-          .from('spc_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('converted_from_trial', true)
-          .gte('converted_at', from)
-          .lte('converted_at', to),
-      ])
-      const trialCancels = trialCancelsRes.count ?? 0
-      const activeTrials = activeTrialsRes.count ?? 0
-      const converted = convertedRes.count ?? 0
-      const totalTrialPool = converted + trialCancels
-      const rate = totalTrialPool > 0
-        ? parseFloat(((converted / totalTrialPool) * 100).toFixed(1))
-        : 0
-      setRealTrialConvRate(rate)
-      setRealTrialConverted(converted)
-      setTrialPoolActive(activeTrials)
-      setTrialPoolCancels(trialCancels)
-    }
-    fetchTrialConversion()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, preset, customFrom, customTo])
 
   async function handleDelete(report: SpcPerfReport) {
     setReports((prev) => prev.filter((r) => r.id !== report.id))
@@ -458,8 +405,6 @@ export default function SpcPerfDashboard() {
     const pctEngSem    = allMetrics.map(({ m }) => m.pctEngagement)
     const messages     = allMetrics.map(({ r }) => r.avg_daily_messages)
     const pctReact     = allMetrics.map(({ m }) => m.pctReactivacion)
-    const pctConv      = allMetrics.map(({ m }) => m.pctConvTrial)
-    const pctRet       = allMetrics.map(({ m }) => m.pctRetencion)
     const pctEng       = allMetrics.map(({ m }) => m.pctEngagement)
     const pctResp      = allMetrics.map(({ m }) => m.pctRespuesta)
     const refs         = allMetrics.map(({ r }) => r.referrals_generated)
@@ -469,8 +414,6 @@ export default function SpcPerfDashboard() {
       avgEngSemanal:  avg(pctEngSem),
       avgMessages:    Math.round(messages.reduce((s, v) => s + v, 0) / messages.length),
       avgReact:       avg(pctReact),
-      avgConv:        avg(pctConv),
-      avgRet:         avg(pctRet),
       avgEng:         avg(pctEng),
       avgResp:        avg(pctResp),
       totalRefs:      refs.reduce((s, v) => s + v, 0),
@@ -478,7 +421,6 @@ export default function SpcPerfDashboard() {
       // New fields
       totalSupportMessages:     reports.reduce((s, r) => s + (r.support_messages ?? 0), 0),
       totalRetentionContacts:   reports.reduce((s, r) => s + (r.retention_contacts ?? 0), 0),
-      totalSuccessfullyRetained: reports.reduce((s, r) => s + (r.successfully_retained ?? 0), 0),
       totalFailedPurchaseContact: reports.reduce((s, r) => s + (r.failed_purchase_contact ?? 0), 0),
       totalCheckinActiveInactive: reports.reduce((s, r) => s + (r.checkin_active_inactive ?? 0), 0),
       totalCheckinAfterCancel:  reports.reduce((s, r) => s + (r.checkin_after_cancellation ?? 0), 0),
@@ -493,13 +435,10 @@ export default function SpcPerfDashboard() {
       score:   m.score,
       engagement: m.pctEngagement,
       reactivacion: m.pctReactivacion,
-      convTrial: m.pctConvTrial,
       supportMessages: r.support_messages ?? 0,
       retentionContacts: r.retention_contacts ?? 0,
-      successfullyRetained: r.successfully_retained ?? 0,
       checkinAfterCancel: r.checkin_after_cancellation ?? 0,
       checkinActiveInactive: r.checkin_active_inactive ?? 0,
-      retencion: m.pctRetencion,
     }))
   }, [allMetrics])
 
@@ -589,7 +528,7 @@ export default function SpcPerfDashboard() {
             <div className="mb-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Main KPIs</p>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
               <MainKpiCard
                 label="% Weekly Engagement"
                 value={kpis?.avgEngSemanal ?? 0}
@@ -612,27 +551,6 @@ export default function SpcPerfDashboard() {
                 sub="check-ins responded"
                 meta={20}
                 alert={10}
-              />
-              <div>
-                <MainKpiCard
-                  label="% Trial Conversion"
-                  value={realTrialConvRate}
-                  unit="%"
-                  sub={`${realTrialConverted} of ${realTrialConverted + trialPoolCancels} converted`}
-                  meta={60}
-                  alert={40}
-                />
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 px-1">
-                  {realTrialConverted + trialPoolCancels} trial pool ({trialPoolActive} active + {trialPoolCancels} cancelled in period)
-                </p>
-              </div>
-              <MainKpiCard
-                label="% Cancellation Retention"
-                value={kpis?.avgRet ?? 0}
-                unit="%"
-                sub="members retained"
-                meta={15}
-                alert={8}
               />
             </div>
 
@@ -679,12 +597,6 @@ export default function SpcPerfDashboard() {
                 color="text-amber-600 dark:text-amber-400"
               />
               <KpiCard
-                label="Successfully Retained"
-                value={kpis ? String(kpis.totalSuccessfullyRetained) : '—'}
-                sub={kpis && kpis.totalRetentionContacts > 0 ? `${Math.round((kpis.totalSuccessfullyRetained / kpis.totalRetentionContacts) * 100)}% retention rate` : 'no contacts yet'}
-                color={kpis && kpis.totalRetentionContacts > 0 && (kpis.totalSuccessfullyRetained / kpis.totalRetentionContacts) >= 0.5 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
-              />
-              <KpiCard
                 label="Failed Purchase Follow-up"
                 value={kpis ? String(kpis.totalFailedPurchaseContact) : '—'}
                 sub="contacts after failed payment"
@@ -726,7 +638,6 @@ export default function SpcPerfDashboard() {
                       <Tooltip contentStyle={{ fontSize: 11 }} />
                       <Legend formatter={(v) => <span className="text-xs">{v}</span>} iconSize={8} />
                       <Line type="monotone" dataKey="retentionContacts" name="Retention Contacts" stroke="#F59E0B" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="successfullyRetained" name="Retained" stroke="#16A34A" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="checkinAfterCancel" name="Post-cancel" stroke="#8B5CF6" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -789,26 +700,7 @@ export default function SpcPerfDashboard() {
                       <Legend formatter={(v) => <span className="text-xs">{v}</span>} iconSize={8} />
                       <Line type="monotone" dataKey="engagement" name="Engagement" stroke="#185FA5" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="reactivacion" name="Reactivation" stroke="#3B6D11" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="convTrial" name="Conv. Trial" stroke="#BA7517" strokeWidth={2} dot={false} />
                     </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Retención bar */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Cancellation Retention (%)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(v) => [`${v}%`, 'Retención']} contentStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="retencion" name="Retention" fill="#1D9E75" radius={[3, 3, 0, 0]} maxBarSize={36} />
-                    </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
@@ -824,7 +716,7 @@ export default function SpcPerfDashboard() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['Date', 'Rep', 'Score', 'Engagement', 'Reactivation', 'Trial Conv.', 'Retention', 'Energy', ''].map((h) => (
+                        {['Date', 'Rep', 'Score', 'Engagement', 'Reactivation', 'Energy', ''].map((h) => (
                           <th key={h} className="px-4 py-3 text-left font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
@@ -852,8 +744,6 @@ export default function SpcPerfDashboard() {
                               </td>
                               <td className="px-4 py-3"><Pct value={m.pctEngagement} /></td>
                               <td className="px-4 py-3"><Pct value={m.pctReactivacion} /></td>
-                              <td className="px-4 py-3"><Pct value={m.pctConvTrial} /></td>
-                              <td className="px-4 py-3"><Pct value={m.pctRetencion} /></td>
                               <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{r.community_energy}/5</td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-1.5">
@@ -1051,43 +941,23 @@ export default function SpcPerfDashboard() {
                     <input type="number" min={0} value={editForm.new_members_introduced} onChange={(e) => setField('new_members_introduced', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Check-ins sent</label>
-                    <input type="number" min={0} value={editForm.checkins_sent} onChange={(e) => setField('checkins_sent', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Check-ins responded</label>
-                    <input type="number" min={0} value={editForm.checkins_responded} onChange={(e) => setField('checkins_responded', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Check-ins responded</label>
+                  <input type="number" min={0} value={editForm.checkins_responded} onChange={(e) => setField('checkins_responded', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                 </div>
               </div>
 
               {/* Retention & Conversion */}
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-3">Retention & Conversion</p>
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Trials expiring</label>
-                    <input type="number" min={0} value={editForm.trials_expiring_today} onChange={(e) => setField('trials_expiring_today', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Trials converted</label>
-                    <input type="number" min={0} value={editForm.trials_converted} onChange={(e) => setField('trials_converted', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                  </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Trials contacted</label>
                     <input type="number" min={0} value={editForm.trials_contacted} onChange={(e) => setField('trials_contacted', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Cancellation requests</label>
                     <input type="number" min={0} value={editForm.cancellation_requests} onChange={(e) => setField('cancellation_requests', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Members retained</label>
-                    <input type="number" min={0} value={editForm.cancellations_retained} onChange={(e) => setField('cancellations_retained', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                   </div>
                 </div>
               </div>

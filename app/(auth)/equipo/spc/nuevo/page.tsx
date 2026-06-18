@@ -30,20 +30,15 @@ interface FormState {
   new_members: string
   welcome_sent: string
   new_members_introduced: string
-  checkins_sent: string
   checkins_responded: string
   // new in engagement
   support_messages: string
   // new in activation
   checkin_active_inactive: string
   // retención
-  trials_expiring_today: string
-  trials_converted: string
   trials_contacted: string
   cancellation_requests: string
-  cancellations_retained: string
   retention_contacts: string
-  successfully_retained: string
   checkin_after_cancellation: string
   failed_purchase_contact: string
   trials_expiring_soon_contacted: string
@@ -70,15 +65,10 @@ const initial: FormState = {
   new_members_introduced: '',
   support_messages: '',
   checkin_active_inactive: '',
-  checkins_sent: '',
   checkins_responded: '',
-  trials_expiring_today: '',
-  trials_converted: '',
   trials_contacted: '',
   cancellation_requests: '',
-  cancellations_retained: '',
   retention_contacts: '',
-  successfully_retained: '',
   checkin_after_cancellation: '',
   failed_purchase_contact: '',
   trials_expiring_soon_contacted: '',
@@ -242,18 +232,18 @@ export default function NuevoSpcPerfPage() {
       new_members:             n(form.new_members),
       welcome_sent:            n(form.welcome_sent),
       new_members_introduced:  n(form.new_members_introduced),
-      checkins_sent:           n(form.checkins_sent),
+      checkins_sent:           0,
       checkins_responded:      n(form.checkins_responded),
-      trials_expiring_today:   n(form.trials_expiring_today),
-      trials_converted:        n(form.trials_converted),
+      trials_expiring_today:   0,
+      trials_converted:        0,
       trials_contacted:        n(form.trials_contacted),
       cancellation_requests:   n(form.cancellation_requests),
-      cancellations_retained:  n(form.cancellations_retained),
+      cancellations_retained:  0,
       support_messages:        n(form.support_messages),
       retention_contacts:      n(form.retention_contacts),
       checkin_active_inactive:  n(form.checkin_active_inactive),
       checkin_after_cancellation: n(form.checkin_after_cancellation),
-      successfully_retained:   n(form.successfully_retained),
+      successfully_retained:   0,
       failed_purchase_contact: n(form.failed_purchase_contact),
       trials_expiring_soon_contacted: n(form.trials_expiring_soon_contacted),
       questions_total:         n(form.questions_total),
@@ -376,11 +366,7 @@ export default function NuevoSpcPerfPage() {
                 <NumberInput value={form.new_members_introduced} onChange={(v) => set('new_members_introduced', v)} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <FieldLabel>Check-ins to inactive members +7 days</FieldLabel>
-                <NumberInput value={form.checkins_sent} onChange={(v) => set('checkins_sent', v)} />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <FieldLabel>Check-ins that generated a response</FieldLabel>
                 <NumberInput value={form.checkins_responded} onChange={(v) => set('checkins_responded', v)} />
@@ -399,41 +385,20 @@ export default function NuevoSpcPerfPage() {
               weight="Weight: 30%"
               color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
             />
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div>
-                <FieldLabel>Trials expiring today</FieldLabel>
-                <NumberInput value={form.trials_expiring_today} onChange={(v) => set('trials_expiring_today', v)} />
-              </div>
-              <div>
-                <FieldLabel>Trials converted to active</FieldLabel>
-                <NumberInput value={form.trials_converted} onChange={(v) => set('trials_converted', v)} />
-              </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <FieldLabel>Trials contacted on expiration day</FieldLabel>
                 <NumberInput value={form.trials_contacted} onChange={(v) => set('trials_contacted', v)} />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <FieldLabel>Cancellation requests today</FieldLabel>
                 <NumberInput value={form.cancellation_requests} onChange={(v) => set('cancellation_requests', v)} />
               </div>
-              <div>
-                <FieldLabel>Members retained (avoided cancelling)</FieldLabel>
-                <NumberInput value={form.cancellations_retained} onChange={(v) => set('cancellations_retained', v)} />
-              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <FieldLabel>Retention contacts (trial ending or want to cancel)</FieldLabel>
-                <NumberInput value={form.retention_contacts} onChange={(v) => set('retention_contacts', v)} />
-                <p className="text-[10px] text-zinc-400 mt-1">How many members did you contact proactively?</p>
-              </div>
-              <div>
-                <FieldLabel>Successfully retained</FieldLabel>
-                <NumberInput value={form.successfully_retained} onChange={(v) => set('successfully_retained', v)} />
-                <p className="text-[10px] text-zinc-400 mt-1">Members who confirmed they want to stay</p>
-              </div>
+            <div className="mb-3">
+              <FieldLabel>Retention contacts (trial ending or want to cancel)</FieldLabel>
+              <NumberInput value={form.retention_contacts} onChange={(v) => set('retention_contacts', v)} />
+              <p className="text-[10px] text-zinc-400 mt-1">How many members did you contact proactively?</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
