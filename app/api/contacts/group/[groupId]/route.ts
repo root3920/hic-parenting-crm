@@ -27,6 +27,45 @@ const HIGH_TICKET_PRODUCTS: Record<string, string[]> = {
 }
 
 const PAGE_SIZE = 50
+const FETCH_PAGE = 1000
+
+/** Fetch all matching transactions, paginating past Supabase 1000-row limit. */
+async function fetchAllMatching(
+  svc: ReturnType<typeof getServiceClient>,
+  orClauses: string,
+  search: string,
+) {
+  const all: {
+    buyer_email: string
+    buyer_name: string | null
+    buyer_phone: string | null
+    offer_title: string
+    date: string
+    source: string | null
+  }[] = []
+  let from = 0
+  while (true) {
+    let query = svc
+      .from('transactions')
+      .select('buyer_email, buyer_name, buyer_phone, offer_title, date, source')
+      .or('status.eq.completed,status.is.null')
+      .or(orClauses)
+      .order('date', { ascending: false })
+      .range(from, from + FETCH_PAGE - 1)
+
+    if (search) {
+      query = query.or(`buyer_email.ilike.%${search}%,buyer_name.ilike.%${search}%`)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < FETCH_PAGE) break
+    from += FETCH_PAGE
+  }
+  return all
+}
 
 export async function GET(
   req: NextRequest,
@@ -121,25 +160,18 @@ export async function GET(
     }
   }
 
-  // Fetch matching transactions
   const orClauses = patterns.map((p) => `offer_title.ilike.%${p}%`).join(',')
-  let query = svc
-    .from('transactions')
-    .select('buyer_email, buyer_name, buyer_phone, offer_title, date', { count: 'exact' })
-    .or('status.eq.completed,status.is.null')
-    .or(orClauses)
-    .order('date', { ascending: false })
 
-  if (search) {
-    query = query.or(`buyer_email.ilike.%${search}%,buyer_name.ilike.%${search}%`)
+  // Fetch ALL matching transactions (no date filter, paginated past 1000-row limit)
+  let allTx: Awaited<ReturnType<typeof fetchAllMatching>>
+  try {
+    allTx = await fetchAllMatching(svc, orClauses, search)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 
-  // Deduplicate by email — fetch all matching then paginate in memory
-  // (transactions can have multiple rows per person)
-  const { data: allTx, error } = await query.range(0, 4999)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Deduplicate by email, keep latest transaction per person
+  // Deduplicate by email, keep latest transaction per person (already ordered by date desc)
   const byEmail = new Map<string, {
     email: string
     name: string | null
@@ -149,7 +181,7 @@ export async function GET(
     product: string
   }>()
 
-  for (const tx of allTx ?? []) {
+  for (const tx of allTx) {
     if (!tx.buyer_email) continue
     const key = tx.buyer_email.toLowerCase()
 
@@ -172,7 +204,7 @@ export async function GET(
         email: tx.buyer_email,
         name: tx.buyer_name,
         phone: tx.buyer_phone,
-        source: null,
+        source: tx.source,
         date: tx.date,
         product: matchedProduct,
       })

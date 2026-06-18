@@ -32,6 +32,27 @@ function matchProduct(offerTitle: string, patterns: string[]): boolean {
   return patterns.some((p) => lower.includes(p))
 }
 
+const PAGE_SIZE = 1000
+
+/** Fetch all rows from a table, paginating past the 1000-row Supabase limit. */
+async function fetchAllTransactions(svc: ReturnType<typeof getServiceClient>) {
+  const all: { buyer_email: string; offer_title: string }[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await svc
+      .from('transactions')
+      .select('buyer_email, offer_title')
+      .or('status.eq.completed,status.is.null')
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return all
+}
+
 export async function GET() {
   const userSupabase = await createServerSupabaseClient()
   const { data: { user } } = await userSupabase.auth.getUser()
@@ -58,46 +79,71 @@ export async function GET() {
     .select('id', { count: 'exact', head: true })
     .eq('status', 'active')
 
-  // 3. Transactions — classify into Low/Mid/High ticket
-  const { data: transactions } = await svc
-    .from('transactions')
-    .select('offer_title')
-    .or('status.eq.completed,status.is.null')
+  // 3. Transactions — fetch ALL, classify, and deduplicate by email per product
+  const transactions = await fetchAllTransactions(svc)
 
-  const lowTicketGroups: Record<string, number> = {}
-  const midTicketGroups: Record<string, number> = {}
-  const highTicketGroups: Record<string, number> = {}
-  let lowTotal = 0
-  let midTotal = 0
-  let highTotal = 0
+  // Deduplicate: count unique emails per product
+  const lowTicketEmails: Record<string, Set<string>> = {}
+  const midTicketEmails: Record<string, Set<string>> = {}
+  const highTicketEmails: Record<string, Set<string>> = {}
 
-  for (const tx of transactions ?? []) {
+  for (const tx of transactions) {
     const title = tx.offer_title || ''
+    const email = (tx.buyer_email || '').toLowerCase()
+    if (!email) continue
 
     for (const product of LOW_TICKET_PRODUCTS) {
       if (matchProduct(title, product.patterns)) {
-        lowTicketGroups[product.name] = (lowTicketGroups[product.name] || 0) + 1
-        lowTotal++
+        if (!lowTicketEmails[product.name]) lowTicketEmails[product.name] = new Set()
+        lowTicketEmails[product.name].add(email)
         break
       }
     }
 
     for (const product of MID_TICKET_PRODUCTS) {
       if (matchProduct(title, product.patterns)) {
-        midTicketGroups[product.name] = (midTicketGroups[product.name] || 0) + 1
-        midTotal++
+        if (!midTicketEmails[product.name]) midTicketEmails[product.name] = new Set()
+        midTicketEmails[product.name].add(email)
         break
       }
     }
 
     for (const product of HIGH_TICKET_PRODUCTS) {
       if (matchProduct(title, product.patterns)) {
-        highTicketGroups[product.name] = (highTicketGroups[product.name] || 0) + 1
-        highTotal++
+        if (!highTicketEmails[product.name]) highTicketEmails[product.name] = new Set()
+        highTicketEmails[product.name].add(email)
         break
       }
     }
   }
+
+  // Build subgroup counts from unique emails
+  const lowTicketGroups: Record<string, number> = {}
+  let lowTotal = 0
+  const allLowEmails = new Set<string>()
+  for (const [name, emails] of Object.entries(lowTicketEmails)) {
+    lowTicketGroups[name] = emails.size
+    for (const e of Array.from(emails)) allLowEmails.add(e)
+  }
+  lowTotal = allLowEmails.size
+
+  const midTicketGroups: Record<string, number> = {}
+  let midTotal = 0
+  const allMidEmails = new Set<string>()
+  for (const [name, emails] of Object.entries(midTicketEmails)) {
+    midTicketGroups[name] = emails.size
+    for (const e of Array.from(emails)) allMidEmails.add(e)
+  }
+  midTotal = allMidEmails.size
+
+  const highTicketGroups: Record<string, number> = {}
+  let highTotal = 0
+  const allHighEmails = new Set<string>()
+  for (const [name, emails] of Object.entries(highTicketEmails)) {
+    highTicketGroups[name] = emails.size
+    for (const e of Array.from(emails)) allHighEmails.add(e)
+  }
+  highTotal = allHighEmails.size
 
   return NextResponse.json({
     groups: [
