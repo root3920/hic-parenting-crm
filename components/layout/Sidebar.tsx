@@ -145,16 +145,12 @@ export function Sidebar() {
     return (
       <div className="flex flex-col h-full">
         {/* Logo area */}
-        <div className={cn('flex items-center h-14 border-b border-white/10 shrink-0', isExpanded ? 'px-4 gap-3' : 'justify-center px-2')}>
+        <div className={cn('flex items-center h-14 border-b border-white/10 shrink-0', isExpanded ? 'px-4' : 'justify-center px-2')}>
           <img
-            src="/logo.png"
+            src="/hic-logo.svg"
             alt="HIC"
-            className={cn('object-contain transition-all duration-200', isExpanded ? 'h-8 w-auto' : 'h-7 w-7')}
-            style={!isExpanded ? { objectPosition: 'left', clipPath: 'inset(0 60% 0 0)', width: '28px', height: '28px' } : undefined}
+            className={cn('object-contain transition-all duration-200', isExpanded ? 'h-10 w-auto' : 'h-8 w-8')}
           />
-          {isExpanded && (
-            <span className="text-sm font-bold text-white tracking-tight truncate">HIC Dashboard</span>
-          )}
         </div>
 
         {/* Quick actions */}
