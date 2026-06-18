@@ -60,17 +60,28 @@ export async function GET() {
 
   const svc = getServiceClient()
 
-  // 1. Freebies — group by product
-  const { data: freebies } = await svc
+  // 1. Freebies — real total via count, then group by product (paginated)
+  const { count: freebieTotal } = await svc
     .from('freebie_leads')
-    .select('product')
+    .select('id', { count: 'exact', head: true })
 
+  // Fetch all freebie products for grouping (paginated past 1000-row limit)
   const freebieGroups: Record<string, number> = {}
-  let freebieTotal = 0
-  for (const f of freebies ?? []) {
-    const product = f.product || 'Unknown'
-    freebieGroups[product] = (freebieGroups[product] || 0) + 1
-    freebieTotal++
+  {
+    let offset = 0
+    while (true) {
+      const { data } = await svc
+        .from('freebie_leads')
+        .select('product')
+        .range(offset, offset + PAGE_SIZE - 1)
+      if (!data || data.length === 0) break
+      for (const f of data) {
+        const product = f.product || 'Unknown'
+        freebieGroups[product] = (freebieGroups[product] || 0) + 1
+      }
+      if (data.length < PAGE_SIZE) break
+      offset += PAGE_SIZE
+    }
   }
 
   // 2. SPC Members (active)
@@ -154,7 +165,7 @@ export async function GET() {
         id: 'freebies',
         name: 'Freebies',
         color: '#6B7280',
-        total: freebieTotal,
+        total: freebieTotal ?? 0,
         subgroups: Object.entries(freebieGroups).map(([name, count]) => ({ name, count })),
       },
       {
