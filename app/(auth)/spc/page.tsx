@@ -19,7 +19,7 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, Calendar, Clock, Download, ExternalLink, Mail, MessageSquare, Pencil, Phone, Plus, Search, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, Calendar, CheckCircle2, Circle, Clock, Download, ExternalLink, Mail, MessageSquare, Pencil, Phone, Plus, Search, Trash2, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -307,7 +307,7 @@ function MemberProfileModal({
   memberAttendance: SpcClassAttendance[]
   highlightNotes?: boolean
   onMemberUpdate: (updated: SpcMember) => void
-  engagementData?: { classes_last_4: number; engagement_status: 'at_risk' | 'low' | 'active'; attended_dates: string[] }
+  engagementData?: { classes_last_4: number; engagement_status: 'at_risk' | 'low' | 'active'; attended_dates: string[]; checklist_completed?: number; checklist_total?: number }
   last4Dates?: string[]
 }) {
   const supabase = useMemo(() => createClient(), [])
@@ -838,6 +838,11 @@ function MemberProfileModal({
                 )}
               </div>
 
+              {/* ── Retention Checklist (members only) ── */}
+              {selected.kind === 'member' && (
+                <RetentionChecklist email={selected.data.email} member={selected.data} />
+              )}
+
               {/* ── Transactions ── */}
               {(selected.kind === 'member' || selected.kind === 'cancellation') && (
                 <div className="mt-4">
@@ -1251,6 +1256,152 @@ function MemberProfileModal({
   )
 }
 
+// ── Retention Checklist ───────────────────────────────────────────────────────
+interface ChecklistData {
+  kajabi_access: boolean
+  whatsapp_joined: boolean
+  checkin_2weeks: boolean
+  checkin_7days_before_trial_end: boolean
+  stayed_active: boolean
+  checkin_3months: boolean
+  checkin_6months: boolean
+  checkin_12months: boolean
+}
+
+const CHECKLIST_ITEMS: { key: keyof ChecklistData; label: string; auto?: boolean }[] = [
+  { key: 'kajabi_access', label: 'Ingresó a Kajabi' },
+  { key: 'whatsapp_joined', label: 'Se unió al WhatsApp', auto: true },
+  { key: 'checkin_2weeks', label: '1er Check-in (2 semanas en el free trial)' },
+  { key: 'checkin_7days_before_trial_end', label: '2do Check-in (7 días antes del fin del free trial)' },
+  { key: 'stayed_active', label: 'Se quedó como miembro activo', auto: true },
+  { key: 'checkin_3months', label: 'Check-in 3 meses en el SPC' },
+  { key: 'checkin_6months', label: 'Check-in 6 meses en el SPC' },
+  { key: 'checkin_12months', label: 'Check-in 12 meses en el SPC' },
+]
+
+function RetentionChecklist({ email, member }: { email: string; member: SpcMember }) {
+  const [checklist, setChecklist] = useState<ChecklistData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!email) return
+    setLoading(true)
+    fetch(`/api/spc/checklist?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.checklist) setChecklist(d.checklist) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [email])
+
+  async function toggle(key: keyof ChecklistData) {
+    if (!checklist) return
+    // Don't allow unchecking auto fields when they're auto-true
+    const item = CHECKLIST_ITEMS.find((i) => i.key === key)
+    if (item?.auto) {
+      const isAutoTrue =
+        (key === 'whatsapp_joined' && member.whatsapp_active) ||
+        (key === 'stayed_active' && member.status === 'active')
+      if (isAutoTrue) return
+    }
+
+    const newVal = !checklist[key]
+    // Optimistic update
+    setChecklist((prev) => prev ? { ...prev, [key]: newVal } : prev)
+
+    const res = await fetch(`/api/spc/checklist?email=${encodeURIComponent(email)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: newVal }),
+    })
+    if (!res.ok) {
+      // Revert on failure
+      setChecklist((prev) => prev ? { ...prev, [key]: !newVal } : prev)
+      toast.error('Failed to update checklist')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="mt-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">Retention Checklist</p>
+        <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 text-center">
+          <p className="text-xs text-zinc-400 animate-pulse">Loading…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!checklist) return null
+
+  const completed = CHECKLIST_ITEMS.filter((i) => checklist[i.key]).length
+  const total = CHECKLIST_ITEMS.length
+  const pct = Math.round((completed / total) * 100)
+  const barColor = completed <= 3 ? 'bg-red-500' : completed <= 6 ? 'bg-amber-500' : 'bg-green-500'
+  const countColor = completed <= 3 ? 'text-red-600 dark:text-red-400' : completed <= 6 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'
+
+  return (
+    <div className="mt-4">
+      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">Retention Checklist</p>
+      <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-3">
+        {/* Progress bar */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className={cn('text-xs font-bold', countColor)}>{completed}/{total} completed</span>
+            <span className="text-[10px] text-zinc-400">{pct}%</span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+            <div className={cn('h-full rounded-full transition-all duration-500', barColor)} style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+
+        {/* Items */}
+        <div className="space-y-1">
+          {CHECKLIST_ITEMS.map((item) => {
+            const checked = checklist[item.key]
+            const isAutoTrue = item.auto && (
+              (item.key === 'whatsapp_joined' && member.whatsapp_active) ||
+              (item.key === 'stayed_active' && member.status === 'active')
+            )
+            return (
+              <button
+                key={item.key}
+                onClick={() => toggle(item.key)}
+                disabled={!!isAutoTrue}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors',
+                  checked
+                    ? 'bg-green-50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20'
+                    : 'hover:bg-zinc-100 dark:hover:bg-zinc-700/50',
+                  isAutoTrue && 'cursor-default'
+                )}
+              >
+                {checked ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+                ) : (
+                  <Circle className="h-4 w-4 shrink-0 text-zinc-300 dark:text-zinc-600" />
+                )}
+                <span className={cn(
+                  'text-xs flex-1',
+                  checked
+                    ? 'line-through text-green-700 dark:text-green-400'
+                    : 'text-zinc-700 dark:text-zinc-300'
+                )}>
+                  {item.label}
+                </span>
+                {isAutoTrue && (
+                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    auto
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function WhatsAppToggle({ member, onUpdate }: { member: SpcMember; onUpdate: (updated: SpcMember) => void }) {
   const supabase = useMemo(() => createClient(), [])
   const [toggling, setToggling] = useState(false)
@@ -1318,7 +1469,7 @@ export default function SpcPage() {
   const [conversions, setConversions] = useState<{ email: string; converted_at: string | null }[]>([])
 
   // Engagement data
-  const [engagementMap, setEngagementMap] = useState<Record<string, { classes_last_4: number; engagement_status: 'at_risk' | 'low' | 'active'; attended_dates: string[] }>>({})
+  const [engagementMap, setEngagementMap] = useState<Record<string, { classes_last_4: number; engagement_status: 'at_risk' | 'low' | 'active'; attended_dates: string[]; checklist_completed?: number; checklist_total?: number }>>({})
   const [last4Dates, setLast4Dates] = useState<string[]>([])
   const [engagementFilter, setEngagementFilter] = useState<'all' | 'at_risk'>('all')
 
@@ -1722,7 +1873,7 @@ export default function SpcPage() {
 
   function getEngagement(email: string | null) {
     const key = (email ?? '').toLowerCase()
-    return engagementMap[key] ?? { classes_last_4: 0, engagement_status: 'at_risk' as const, attended_dates: [] }
+    return engagementMap[key] ?? { classes_last_4: 0, engagement_status: 'at_risk' as const, attended_dates: [], checklist_completed: 0, checklist_total: 8 }
   }
 
   const atRiskCount = useMemo(() => {
@@ -3106,6 +3257,7 @@ export default function SpcPage() {
                                     {badge.label}
                                   </span>
                                   <span className="text-[11px] text-zinc-400 leading-tight">{eng.classes_last_4}/4</span>
+                                  <span className="text-[11px] text-zinc-400 leading-tight">{eng.checklist_completed ?? 0}/8 ✓</span>
                                 </div>
                               )
                             })()}

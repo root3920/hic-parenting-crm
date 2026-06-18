@@ -51,18 +51,57 @@ export async function GET() {
     }
   }
 
-  // Build engagement map
+  // Fetch all checklists for checklist_score
+  const { data: checklistRows } = await svc
+    .from('spc_member_checklist')
+    .select('member_email, kajabi_access, whatsapp_joined, checkin_2weeks, checkin_7days_before_trial_end, stayed_active, checkin_3months, checkin_6months, checkin_12months')
+
+  const checklistByEmail: Record<string, { completed: number; total: number }> = {}
+  const CHECKLIST_KEYS = ['kajabi_access', 'whatsapp_joined', 'checkin_2weeks', 'checkin_7days_before_trial_end', 'stayed_active', 'checkin_3months', 'checkin_6months', 'checkin_12months'] as const
+  for (const row of checklistRows ?? []) {
+    const email = row.member_email.toLowerCase()
+    const completed = CHECKLIST_KEYS.filter((k) => row[k] === true).length
+    checklistByEmail[email] = { completed, total: 8 }
+  }
+
+  // Build engagement map with checklist-aware status
   const engagement: Record<string, {
     classes_last_4: number
     engagement_status: 'at_risk' | 'low' | 'active'
     attended_dates: string[]
+    checklist_completed: number
+    checklist_total: number
   }> = {}
 
-  for (const [email, { count, dates }] of Object.entries(countByEmail)) {
+  // Collect all emails (from attendance + checklists)
+  const allEmails = new Set([
+    ...Object.keys(countByEmail),
+    ...Object.keys(checklistByEmail),
+  ])
+
+  for (const email of Array.from(allEmails)) {
+    const classData = countByEmail[email]
+    const count = classData?.count ?? 0
+    const dates = classData?.dates ?? new Set<string>()
+    const cl = checklistByEmail[email] ?? { completed: 0, total: 8 }
+    const checklistCompletion = cl.completed / cl.total
+
+    // Updated engagement status using checklist
+    let status: 'at_risk' | 'low' | 'active'
+    if (checklistCompletion < 0.5 && count <= 1) {
+      status = 'at_risk'
+    } else if (checklistCompletion >= 0.5 && count >= 2) {
+      status = 'active'
+    } else {
+      status = 'low'
+    }
+
     engagement[email] = {
       classes_last_4: count,
-      engagement_status: count === 0 ? 'at_risk' : count <= 2 ? 'low' : 'active',
+      engagement_status: status,
       attended_dates: Array.from(dates).sort().reverse(),
+      checklist_completed: cl.completed,
+      checklist_total: cl.total,
     }
   }
 
