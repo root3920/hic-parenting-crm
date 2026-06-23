@@ -14,7 +14,7 @@ export const GOALS = {
       alert: 4.0,
       unit: '%',
       label: 'Pitch Rate',
-      description: 'Proposed calls + DQ with SPC offer / Total convos',
+      description: '(Proposed calls + DQ with SPC offer) / (Total convos - Active convos)',
     } as GoalConfig,
     bookingRate: {
       target: 30.0,
