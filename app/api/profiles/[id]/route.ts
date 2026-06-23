@@ -14,7 +14,7 @@ export async function PATCH(
   const body = await req.json()
   const { role } = body
 
-  const validRoles = ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht']
+  const validRoles = ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht', 'coach']
   if (!role || !validRoles.includes(role)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
   }

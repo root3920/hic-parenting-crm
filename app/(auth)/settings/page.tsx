@@ -38,7 +38,7 @@ type PasswordForm = z.infer<typeof passwordSchema>
 
 // ─── Team management types ────────────────────────────────────────────────────
 
-type Role = 'admin' | 'closer' | 'setter' | 'csm_spc' | 'csm_ht'
+type Role = 'admin' | 'closer' | 'setter' | 'csm_spc' | 'csm_ht' | 'coach'
 
 interface TeamProfile {
   id: string
@@ -63,6 +63,7 @@ const ROLE_LABELS: Record<Role, string> = {
   setter:  'Setter',
   csm_spc: 'Client Success SPC',
   csm_ht:  'Client Success HT',
+  coach:   'Coach',
 }
 const ROLE_COLORS: Record<Role, string> = {
   admin:   'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
@@ -70,6 +71,7 @@ const ROLE_COLORS: Record<Role, string> = {
   setter:  'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   csm_spc: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
   csm_ht:  'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  coach:   'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
 }
 const emptyInviteForm: InviteForm = { email: '', full_name: '', role: 'closer', closer_name: '', setter_name: '' }
 
@@ -722,6 +724,7 @@ export default function SettingsPage() {
                   <option value="setter">Setter</option>
                   <option value="csm_spc">Client Success SPC</option>
                   <option value="csm_ht">Client Success HT</option>
+                  <option value="coach">Coach</option>
                 </select>
               </div>
 
