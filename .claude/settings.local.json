@@ -59,7 +59,8 @@
       "Bash(find /Users/federicoalarconu/hic-dashboard -path */node_modules -prune -o -type f \\\\\\(-name *.sql -o -name schema* \\\\\\) -print)",
       "Bash(git log:*)",
       "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *spc*members* -o -name *members*spc* \\\\\\) \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
-      "Bash(find /Users/federicoalarconu/hic-dashboard/app -type d -name \"\\(auth\\)\")"
+      "Bash(find /Users/federicoalarconu/hic-dashboard/app -type d -name \"\\(auth\\)\")",
+      "Bash(for f:*)"
     ]
   }
 }

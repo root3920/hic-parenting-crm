@@ -40,6 +40,11 @@ interface FormState {
   learning_3: string
   performance_score: number
   improvement_notes: string
+  client_retention_rate: string
+  completion_rate: string
+  engagement_score: string
+  upsell_renewal_rate: string
+  avg_resolution_time_hours: string
 }
 
 const EMPTY: FormState = {
@@ -64,6 +69,11 @@ const EMPTY: FormState = {
   learning_3: '',
   performance_score: 5,
   improvement_notes: '',
+  client_retention_rate: '',
+  completion_rate: '',
+  engagement_score: '',
+  upsell_renewal_rate: '',
+  avg_resolution_time_hours: '',
 }
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
@@ -116,7 +126,6 @@ export default function HtCsmNewReportPage() {
   const [form, setForm] = useState<FormState>(EMPTY)
   const [saving, setSaving] = useState(false)
   const [repOptions, setRepOptions] = useState<string[]>([])
-  const [totalGraduates, setTotalGraduates] = useState<number | null>(null)
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -139,14 +148,6 @@ export default function HtCsmNewReportPage() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    supabase
-      .from('pwu_students')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'graduated')
-      .then(({ count }) => setTotalGraduates(count ?? 0))
-  }, [supabase])
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.rep_name) { toast.error('Select a rep name'); return }
@@ -155,9 +156,9 @@ export default function HtCsmNewReportPage() {
       const { error } = await supabase.from('ht_csm_reports').insert({
         date: form.date,
         rep_name: form.rep_name,
-        total_active_graduates: totalGraduates ?? 0,
-        graduates_contacted:    parseInt(form.graduates_contacted) || 0,
-        graduates_responded:    parseInt(form.graduates_responded) || 0,
+        total_active_graduates: 0,
+        graduates_contacted:    0,
+        graduates_responded:    0,
         real_conversations:     parseInt(form.real_conversations) || 0,
         ascension_invitations:  parseInt(form.ascension_invitations) || 0,
         calls_scheduled:        parseInt(form.calls_scheduled) || 0,
@@ -175,6 +176,11 @@ export default function HtCsmNewReportPage() {
         learning_3:             form.learning_3 || null,
         performance_score:      form.performance_score,
         improvement_notes:      form.improvement_notes || null,
+        client_retention_rate:  parseFloat(form.client_retention_rate) || 0,
+        completion_rate:        parseFloat(form.completion_rate) || 0,
+        engagement_score:       parseFloat(form.engagement_score) || 0,
+        upsell_renewal_rate:    parseFloat(form.upsell_renewal_rate) || 0,
+        avg_resolution_time_hours: parseFloat(form.avg_resolution_time_hours) || 0,
       })
       if (error) { toast.error(`Failed to save: ${error.message}`); return }
       toast.success('Report saved successfully')
@@ -202,7 +208,7 @@ export default function HtCsmNewReportPage() {
         </div>
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Daily Report — Client Success HT</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Graduate ascension activity log</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Daily client success activity log</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-0">
@@ -234,24 +240,6 @@ export default function HtCsmNewReportPage() {
                 />
               </div>
             </div>
-            <div>
-              <FieldLabel>Total active graduates (auto)</FieldLabel>
-              <div className={readonlyCls}>
-                {totalGraduates === null ? 'Loading…' : totalGraduates}
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* ── Outreach ── */}
-          <SectionCard>
-            <SectionHeader
-              label="Outreach"
-              color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-            />
-            <div>
-              <FieldLabel>Graduates contacted today</FieldLabel>
-              <NumberInput value={form.graduates_contacted} onChange={(v) => set('graduates_contacted', v)} />
-            </div>
           </SectionCard>
 
           {/* ── Response Rate ── */}
@@ -262,11 +250,7 @@ export default function HtCsmNewReportPage() {
             />
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <FieldLabel>Graduates who responded</FieldLabel>
-                <NumberInput value={form.graduates_responded} onChange={(v) => set('graduates_responded', v)} />
-              </div>
-              <div>
-                <FieldLabel>Entered real conversation</FieldLabel>
+                <FieldLabel>Real conversations</FieldLabel>
                 <NumberInput value={form.real_conversations} onChange={(v) => set('real_conversations', v)} />
               </div>
             </div>
@@ -409,6 +393,41 @@ export default function HtCsmNewReportPage() {
               <div>
                 <FieldLabel>Key learning 3</FieldLabel>
                 <input type="text" value={form.learning_3} onChange={(e) => set('learning_3', e.target.value)} placeholder="What will you do differently?" className={inputCls} />
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ── Success Metrics ── */}
+          <SectionCard>
+            <SectionHeader
+              label="Success Metrics"
+              color="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <FieldLabel>Client Retention Rate (%)</FieldLabel>
+                <p className="text-[10px] text-zinc-400 mb-1">% of clients who stayed active this week</p>
+                <NumberInput value={form.client_retention_rate} onChange={(v) => set('client_retention_rate', v)} />
+              </div>
+              <div>
+                <FieldLabel>Completion Rate of Program Components (%)</FieldLabel>
+                <p className="text-[10px] text-zinc-400 mb-1">% of assigned program components completed by clients</p>
+                <NumberInput value={form.completion_rate} onChange={(v) => set('completion_rate', v)} />
+              </div>
+              <div>
+                <FieldLabel>Engagement Score (%)</FieldLabel>
+                <p className="text-[10px] text-zinc-400 mb-1">Based on attendance + participation this week</p>
+                <NumberInput value={form.engagement_score} onChange={(v) => set('engagement_score', v)} />
+              </div>
+              <div>
+                <FieldLabel>% Upsells or Renewals Closed</FieldLabel>
+                <p className="text-[10px] text-zinc-400 mb-1">% of upsell or renewal opportunities that closed</p>
+                <NumberInput value={form.upsell_renewal_rate} onChange={(v) => set('upsell_renewal_rate', v)} />
+              </div>
+              <div>
+                <FieldLabel>Avg Resolution Time (hours)</FieldLabel>
+                <p className="text-[10px] text-zinc-400 mb-1">Average time to resolve a client concern this week</p>
+                <NumberInput value={form.avg_resolution_time_hours} onChange={(v) => set('avg_resolution_time_hours', v)} />
               </div>
             </div>
           </SectionCard>

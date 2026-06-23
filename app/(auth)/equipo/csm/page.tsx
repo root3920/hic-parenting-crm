@@ -49,6 +49,12 @@ interface HtReport {
   performance_score: number
   improvement_notes: string | null
   created_at: string
+  // Success metrics
+  client_retention_rate: number
+  completion_rate: number
+  engagement_score: number
+  upsell_renewal_rate: number
+  avg_resolution_time_hours: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -258,8 +264,6 @@ function ReportDetail({
         {/* Left column */}
         <div>
           <p className={subLabel}>Funnel Metrics</p>
-          <Row label="Graduates contacted"    value={report.graduates_contacted} />
-          <Row label="Graduates responded"    value={report.graduates_responded} />
           <Row label="Real conversations"     value={report.real_conversations} />
           <Row label="Ascension invitations"  value={report.ascension_invitations} />
           <Row label="Calls scheduled"        value={report.calls_scheduled} />
@@ -280,6 +284,13 @@ function ReportDetail({
 
         {/* Right column */}
         <div>
+          <p className={subLabel}>Success Metrics</p>
+          <Row label="Client Retention Rate" value={report.client_retention_rate ? `${report.client_retention_rate}%` : null} />
+          <Row label="Completion Rate" value={report.completion_rate ? `${report.completion_rate}%` : null} />
+          <Row label="Engagement Score" value={report.engagement_score ? `${report.engagement_score}%` : null} />
+          <Row label="Upsell / Renewal Rate" value={report.upsell_renewal_rate ? `${report.upsell_renewal_rate}%` : null} />
+          <Row label="Avg Resolution Time" value={report.avg_resolution_time_hours ? `${report.avg_resolution_time_hours} hrs` : null} />
+
           <p className={subLabel}>Key Learnings</p>
           <Row label="Learning 1" value={report.learning_1} />
           <Row label="Learning 2" value={report.learning_2} />
@@ -318,6 +329,11 @@ interface EditForm {
   learning_3: string
   performance_score: number
   improvement_notes: string
+  client_retention_rate: string
+  completion_rate: string
+  engagement_score: string
+  upsell_renewal_rate: string
+  avg_resolution_time_hours: string
 }
 
 function reportToEditForm(r: HtReport): EditForm {
@@ -343,6 +359,11 @@ function reportToEditForm(r: HtReport): EditForm {
     learning_3:             r.learning_3 ?? '',
     performance_score:      r.performance_score,
     improvement_notes:      r.improvement_notes ?? '',
+    client_retention_rate:  String(r.client_retention_rate ?? 0),
+    completion_rate:        String(r.completion_rate ?? 0),
+    engagement_score:       String(r.engagement_score ?? 0),
+    upsell_renewal_rate:    String(r.upsell_renewal_rate ?? 0),
+    avg_resolution_time_hours: String(r.avg_resolution_time_hours ?? 0),
   }
 }
 
@@ -395,6 +416,11 @@ function EditModal({
           learning_3:             form.learning_3 || null,
           performance_score:      form.performance_score,
           improvement_notes:      form.improvement_notes || null,
+          client_retention_rate:  parseFloat(form.client_retention_rate) || 0,
+          completion_rate:        parseFloat(form.completion_rate) || 0,
+          engagement_score:       parseFloat(form.engagement_score) || 0,
+          upsell_renewal_rate:    parseFloat(form.upsell_renewal_rate) || 0,
+          avg_resolution_time_hours: parseFloat(form.avg_resolution_time_hours) || 0,
         })
         .eq('id', report.id)
         .select()
@@ -456,8 +482,6 @@ function EditModal({
           {/* Funnel */}
           <p className={sectionCls}>Funnel Metrics</p>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelCls}>Graduates contacted</label><NumInput field="graduates_contacted" /></div>
-            <div><label className={labelCls}>Graduates responded</label><NumInput field="graduates_responded" /></div>
             <div><label className={labelCls}>Real conversations</label><NumInput field="real_conversations" /></div>
             <div><label className={labelCls}>Ascension invitations</label><NumInput field="ascension_invitations" /></div>
             <div><label className={labelCls}>Calls scheduled</label><NumInput field="calls_scheduled" /></div>
@@ -497,6 +521,16 @@ function EditModal({
             <div><label className={labelCls}>Learning 1</label><input type="text" value={form.learning_1} onChange={(e) => set('learning_1', e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Learning 2</label><input type="text" value={form.learning_2} onChange={(e) => set('learning_2', e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Learning 3</label><input type="text" value={form.learning_3} onChange={(e) => set('learning_3', e.target.value)} className={inputCls} /></div>
+          </div>
+
+          {/* Success Metrics */}
+          <p className={sectionCls}>Success Metrics</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>Client Retention Rate (%)</label><NumInput field="client_retention_rate" /></div>
+            <div><label className={labelCls}>Completion Rate (%)</label><NumInput field="completion_rate" /></div>
+            <div><label className={labelCls}>Engagement Score (%)</label><NumInput field="engagement_score" /></div>
+            <div><label className={labelCls}>Upsell / Renewal Rate (%)</label><NumInput field="upsell_renewal_rate" /></div>
+            <div><label className={labelCls}>Avg Resolution Time (hours)</label><NumInput field="avg_resolution_time_hours" /></div>
           </div>
 
           {/* Self-assessment */}
@@ -564,7 +598,6 @@ export default function HtCsmDashboardPage() {
   const [editingReport, setEditingReport] = useState<HtReport | null>(null)
   const weekRange = useMemo(() => getCurrentWeekRange(), [])
   const [page, setPage] = useState(0)
-  const [totalGraduates, setTotalGraduates] = useState(0)
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from('ht_csm_reports').delete().eq('id', id)
@@ -586,16 +619,9 @@ export default function HtCsmDashboardPage() {
       q = q.gte('date', range.from).lte('date', range.to)
     }
 
-    // Fetch reports and total graduates count in parallel
-    const gradCountQ = supabase
-      .from('pwu_students')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'graduated')
-
-    const [reportsRes, gradRes] = await Promise.all([q, gradCountQ])
+    const reportsRes = await q
 
     setReports(reportsRes.data ?? [])
-    setTotalGraduates(gradRes.count ?? 0)
 
     setPage(0)
     setLoading(false)
@@ -617,6 +643,13 @@ export default function HtCsmDashboardPage() {
     const sumCalls       = reports.reduce((s, r) => s + r.total_calls_week, 0)
     const avgScore       = avg(reports.map((r) => r.performance_score))
 
+    // Success metrics averages (only count reports that have non-zero values)
+    const retentionVals = reports.map((r) => r.client_retention_rate ?? 0).filter((v) => v > 0)
+    const completionVals = reports.map((r) => r.completion_rate ?? 0).filter((v) => v > 0)
+    const engagementVals = reports.map((r) => r.engagement_score ?? 0).filter((v) => v > 0)
+    const upsellVals = reports.map((r) => r.upsell_renewal_rate ?? 0).filter((v) => v > 0)
+    const resolutionVals = reports.map((r) => r.avg_resolution_time_hours ?? 0).filter((v) => v > 0)
+
     return {
       outreachRate:  pct(totContacted, totGraduates),
       responseRate:  pct(totConversations, totContacted),
@@ -626,7 +659,11 @@ export default function HtCsmDashboardPage() {
       sumCalls,
       avgScore,
       totalClosed: totClosed,
-      totContacted,
+      avgRetention:   retentionVals.length > 0 ? retentionVals.reduce((s, v) => s + v, 0) / retentionVals.length : null,
+      avgCompletion:  completionVals.length > 0 ? completionVals.reduce((s, v) => s + v, 0) / completionVals.length : null,
+      avgEngagement:  engagementVals.length > 0 ? engagementVals.reduce((s, v) => s + v, 0) / engagementVals.length : null,
+      avgUpsell:      upsellVals.length > 0 ? upsellVals.reduce((s, v) => s + v, 0) / upsellVals.length : null,
+      avgResolution:  resolutionVals.length > 0 ? resolutionVals.reduce((s, v) => s + v, 0) / resolutionVals.length : null,
     }
   }, [reports])
 
@@ -753,13 +790,6 @@ export default function HtCsmDashboardPage() {
             {/* ── KPI Cards ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <KpiCard
-                label="Outreach Rate"
-                value={fmtPct(kpis.outreachRate)}
-                goal="Goal: ≥ 50%"
-                barPct={isNaN(kpis.outreachRate) ? 0 : (kpis.outreachRate / 50) * 100}
-                status={rateStatus(kpis.outreachRate, 50, 40)}
-              />
-              <KpiCard
                 label="Response Rate"
                 value={fmtPct(kpis.responseRate)}
                 goal="Goal: ≥ 35%"
@@ -808,13 +838,47 @@ export default function HtCsmDashboardPage() {
                 barPct={Math.min(100, kpis.totalClosed * 20)}
                 status={kpis.totalClosed > 0 ? 'good' : 'warn'}
               />
+            </div>
+
+            {/* ── Success Metrics ── */}
+            <div className="mb-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Success Metrics</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
               <KpiCard
-                label="Graduates Contacted"
-                value={`${kpis.totContacted} of ${totalGraduates}`}
-                sub={`${fmtPct(pct(kpis.totContacted, totalGraduates))} reached`}
-                goal="Goal: contact all"
-                barPct={totalGraduates > 0 ? (kpis.totContacted / totalGraduates) * 100 : 0}
-                status={rateStatus(pct(kpis.totContacted, totalGraduates), 50, 30)}
+                label="Client Retention Rate"
+                value={kpis.avgRetention !== null ? `${kpis.avgRetention.toFixed(1)}%` : '—'}
+                sub="avg for period"
+                barPct={kpis.avgRetention ?? 0}
+                status={rateStatus(kpis.avgRetention ?? 0, 80, 60)}
+              />
+              <KpiCard
+                label="Completion Rate"
+                value={kpis.avgCompletion !== null ? `${kpis.avgCompletion.toFixed(1)}%` : '—'}
+                sub="avg for period"
+                barPct={kpis.avgCompletion ?? 0}
+                status={rateStatus(kpis.avgCompletion ?? 0, 70, 50)}
+              />
+              <KpiCard
+                label="Engagement Score"
+                value={kpis.avgEngagement !== null ? `${kpis.avgEngagement.toFixed(1)}%` : '—'}
+                sub="avg for period"
+                barPct={kpis.avgEngagement ?? 0}
+                status={rateStatus(kpis.avgEngagement ?? 0, 70, 50)}
+              />
+              <KpiCard
+                label="Upsell / Renewal Rate"
+                value={kpis.avgUpsell !== null ? `${kpis.avgUpsell.toFixed(1)}%` : '—'}
+                sub="avg for period"
+                barPct={kpis.avgUpsell ?? 0}
+                status={rateStatus(kpis.avgUpsell ?? 0, 30, 15)}
+              />
+              <KpiCard
+                label="Avg Resolution Time"
+                value={kpis.avgResolution !== null ? `${kpis.avgResolution.toFixed(1)} hrs` : '—'}
+                sub="avg for period"
+                barPct={kpis.avgResolution !== null ? Math.min(100, (1 - kpis.avgResolution / 48) * 100) : 0}
+                status={kpis.avgResolution !== null ? (kpis.avgResolution <= 12 ? 'good' : kpis.avgResolution <= 24 ? 'warn' : 'alert') : 'alert'}
               />
             </div>
 
@@ -836,7 +900,6 @@ export default function HtCsmDashboardPage() {
                         contentStyle={{ fontSize: 11 }}
                       />
                       <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
-                      <Line type="monotone" dataKey="outreach" stroke="#185FA5" strokeWidth={2} dot={false} name="Outreach" />
                       <Line type="monotone" dataKey="response" stroke="#1D9E75" strokeWidth={2} dot={false} name="Response" />
                       <Line type="monotone" dataKey="pitch"    stroke="#8B5CF6" strokeWidth={2} dot={false} name="Pitch" />
                       <Line type="monotone" dataKey="show"     stroke="#F59E0B" strokeWidth={2} dot={false} name="Show" />
@@ -922,7 +985,7 @@ export default function HtCsmDashboardPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['', 'Date', 'Rep', 'Outreach%', 'Response%', 'Pitch%', 'Show%', 'Close%', 'Calls', 'Score'].map((h, i) => (
+                        {['', 'Date', 'Rep', 'Response%', 'Pitch%', 'Show%', 'Close%', 'Calls', 'Score'].map((h, i) => (
                           <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
@@ -931,7 +994,6 @@ export default function HtCsmDashboardPage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                       {pageReports.map((r) => {
-                        const outreach = pct(r.graduates_contacted, r.total_active_graduates)
                         const response = pct(r.real_conversations, r.graduates_contacted)
                         const pitch    = pct(r.ascension_invitations, r.real_conversations)
                         const show     = pct(r.calls_showed, r.calls_scheduled)
@@ -967,7 +1029,6 @@ export default function HtCsmDashboardPage() {
                               </td>
                               <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">{formatDate(r.date)}</td>
                               <td className="px-4 py-3 text-sm font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap">{r.rep_name}</td>
-                              <Cell v={outreach} st={rateStatus(outreach, 50, 40)} />
                               <Cell v={response} st={rateStatus(response, 35, 25)} />
                               <Cell v={pitch}    st={rateStatus(pitch, 45, 30)} />
                               <Cell v={show}     st={rateStatus(show, 65, 50)} />
@@ -995,7 +1056,7 @@ export default function HtCsmDashboardPage() {
                                   exit={{ opacity: 0 }}
                                   transition={{ duration: 0.15 }}
                                 >
-                                  <td colSpan={10} className="p-0">
+                                  <td colSpan={9} className="p-0">
                                     <ReportDetail
                                       report={r}
                                       onEdit={() => setEditingReport(r)}
