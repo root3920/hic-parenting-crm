@@ -11,10 +11,7 @@ import { formatDate } from '@/lib/utils'
 import { Plus, ChevronDown, ChevronRight, Download, Pencil, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
-} from 'recharts'
+// recharts removed — no charts in current dashboard
 import { motion, AnimatePresence } from 'framer-motion'
 import { getCurrentWeekRange } from '@/lib/dateUtils'
 
@@ -93,19 +90,6 @@ function rateStatus(v: number, goal: number, alert: number): 'good' | 'warn' | '
   return 'alert'
 }
 
-function callsStatus(v: number): 'good' | 'warn' | 'alert' {
-  if (isNaN(v)) return 'alert'
-  if (v >= 4 && v <= 6) return 'good'
-  if (v >= 3) return 'warn'
-  return 'alert'
-}
-
-function closeRateStatus(v: number): 'good' | 'warn' | 'alert' {
-  if (isNaN(v)) return 'alert'
-  if (v >= 30 && v <= 40) return 'good'
-  if (v >= 25) return 'warn'
-  return 'alert'
-}
 
 const STATUS_DOT: Record<'good' | 'warn' | 'alert', string> = {
   good:  'bg-green-500',
@@ -189,7 +173,6 @@ function collectObjections(reports: HtReport[]): [string, number][] {
 
 // ── Row detail expand ─────────────────────────────────────────────────────────
 
-const LOST_REASONS = ['Lack of interest', 'Price', 'Timing', 'Not qualified', 'Other']
 
 function ReportDetail({
   report,
@@ -263,23 +246,13 @@ function ReportDetail({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
         {/* Left column */}
         <div>
-          <p className={subLabel}>Funnel Metrics</p>
+          <p className={subLabel}>Activity</p>
           <Row label="Real conversations"     value={report.real_conversations} />
-          <Row label="Ascension invitations"  value={report.ascension_invitations} />
-          <Row label="Calls scheduled"        value={report.calls_scheduled} />
-          <Row label="Calls showed"           value={report.calls_showed} />
-          <Row label="Enrollments closed"     value={report.enrollments_closed} />
-          <Row label="Calls today"             value={report.total_calls_week} />
-
-          <p className={subLabel}>Lost Opportunities</p>
-          <Row label="Leads lost"      value={report.leads_lost} />
-          <Row label="Primary reason"  value={report.lost_reason} />
 
           <p className={subLabel}>Objections</p>
           <Row label="Objection 1"       value={report.objection_1} />
           <Row label="Objection 2"       value={report.objection_2} />
           <Row label="Objection 3"       value={report.objection_3} />
-          <Row label="Graduate patterns" value={report.graduate_patterns} />
         </div>
 
         {/* Right column */}
@@ -310,20 +283,10 @@ function ReportDetail({
 interface EditForm {
   date: string
   rep_name: string
-  graduates_contacted: string
-  graduates_responded: string
   real_conversations: string
-  ascension_invitations: string
-  calls_scheduled: string
-  calls_showed: string
-  enrollments_closed: string
-  total_calls_week: string
   objection_1: string
   objection_2: string
   objection_3: string
-  graduate_patterns: string
-  leads_lost: string
-  lost_reason: string
   learning_1: string
   learning_2: string
   learning_3: string
@@ -340,20 +303,10 @@ function reportToEditForm(r: HtReport): EditForm {
   return {
     date:                   r.date,
     rep_name:               r.rep_name,
-    graduates_contacted:    String(r.graduates_contacted),
-    graduates_responded:    String(r.graduates_responded),
     real_conversations:     String(r.real_conversations),
-    ascension_invitations:  String(r.ascension_invitations),
-    calls_scheduled:        String(r.calls_scheduled),
-    calls_showed:           String(r.calls_showed),
-    enrollments_closed:     String(r.enrollments_closed),
-    total_calls_week:       String(r.total_calls_week),
     objection_1:            r.objection_1 ?? '',
     objection_2:            r.objection_2 ?? '',
     objection_3:            r.objection_3 ?? '',
-    graduate_patterns:      r.graduate_patterns ?? '',
-    leads_lost:             String(r.leads_lost),
-    lost_reason:            r.lost_reason ?? '',
     learning_1:             r.learning_1 ?? '',
     learning_2:             r.learning_2 ?? '',
     learning_3:             r.learning_3 ?? '',
@@ -397,20 +350,10 @@ function EditModal({
         .update({
           date:                   form.date,
           rep_name:               form.rep_name,
-          graduates_contacted:    parseInt(form.graduates_contacted) || 0,
-          graduates_responded:    parseInt(form.graduates_responded) || 0,
           real_conversations:     parseInt(form.real_conversations) || 0,
-          ascension_invitations:  parseInt(form.ascension_invitations) || 0,
-          calls_scheduled:        parseInt(form.calls_scheduled) || 0,
-          calls_showed:           parseInt(form.calls_showed) || 0,
-          enrollments_closed:     parseInt(form.enrollments_closed) || 0,
-          total_calls_week:       parseInt(form.total_calls_week) || 0,
           objection_1:            form.objection_1 || null,
           objection_2:            form.objection_2 || null,
           objection_3:            form.objection_3 || null,
-          graduate_patterns:      form.graduate_patterns || null,
-          leads_lost:             parseInt(form.leads_lost) || 0,
-          lost_reason:            form.lost_reason || null,
           learning_1:             form.learning_1 || null,
           learning_2:             form.learning_2 || null,
           learning_3:             form.learning_3 || null,
@@ -479,15 +422,10 @@ function EditModal({
             </div>
           </div>
 
-          {/* Funnel */}
-          <p className={sectionCls}>Funnel Metrics</p>
+          {/* Activity */}
+          <p className={sectionCls}>Activity</p>
           <div className="grid grid-cols-2 gap-3">
             <div><label className={labelCls}>Real conversations</label><NumInput field="real_conversations" /></div>
-            <div><label className={labelCls}>Ascension invitations</label><NumInput field="ascension_invitations" /></div>
-            <div><label className={labelCls}>Calls scheduled</label><NumInput field="calls_scheduled" /></div>
-            <div><label className={labelCls}>Calls showed</label><NumInput field="calls_showed" /></div>
-            <div><label className={labelCls}>Enrollments closed</label><NumInput field="enrollments_closed" /></div>
-            <div><label className={labelCls}>Calls today</label><NumInput field="total_calls_week" /></div>
           </div>
 
           {/* Quality */}
@@ -496,23 +434,6 @@ function EditModal({
             <div><label className={labelCls}>Objection 1</label><input type="text" value={form.objection_1} onChange={(e) => set('objection_1', e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Objection 2</label><input type="text" value={form.objection_2} onChange={(e) => set('objection_2', e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Objection 3</label><input type="text" value={form.objection_3} onChange={(e) => set('objection_3', e.target.value)} className={inputCls} /></div>
-          </div>
-          <div>
-            <label className={labelCls}>Graduate patterns</label>
-            <textarea value={form.graduate_patterns} onChange={(e) => set('graduate_patterns', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} />
-          </div>
-
-          {/* Lost */}
-          <p className={sectionCls}>Lost Opportunities</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelCls}>Leads lost</label><NumInput field="leads_lost" /></div>
-            <div>
-              <label className={labelCls}>Primary reason</label>
-              <select value={form.lost_reason} onChange={(e) => set('lost_reason', e.target.value)} className={inputCls}>
-                <option value="">Select…</option>
-                {LOST_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
           </div>
 
           {/* Learnings */}
@@ -634,13 +555,7 @@ export default function HtCsmDashboardPage() {
     if (reports.length === 0) return null
 
     const totContacted   = reports.reduce((s, r) => s + r.graduates_contacted, 0)
-    const totGraduates   = reports.reduce((s, r) => s + r.total_active_graduates, 0)
     const totConversations = reports.reduce((s, r) => s + r.real_conversations, 0)
-    const totInvitations = reports.reduce((s, r) => s + r.ascension_invitations, 0)
-    const totScheduled   = reports.reduce((s, r) => s + r.calls_scheduled, 0)
-    const totShowed      = reports.reduce((s, r) => s + r.calls_showed, 0)
-    const totClosed      = reports.reduce((s, r) => s + r.enrollments_closed, 0)
-    const sumCalls       = reports.reduce((s, r) => s + r.total_calls_week, 0)
     const avgScore       = avg(reports.map((r) => r.performance_score))
 
     // Success metrics averages (only count reports that have non-zero values)
@@ -651,63 +566,14 @@ export default function HtCsmDashboardPage() {
     const resolutionVals = reports.map((r) => r.avg_resolution_time_hours ?? 0).filter((v) => v > 0)
 
     return {
-      outreachRate:  pct(totContacted, totGraduates),
       responseRate:  pct(totConversations, totContacted),
-      pitchRate:     pct(totInvitations, totConversations),
-      showRate:      pct(totShowed, totScheduled),
-      closeRate:     pct(totClosed, totShowed),
-      sumCalls,
       avgScore,
-      totalClosed: totClosed,
       avgRetention:   retentionVals.length > 0 ? retentionVals.reduce((s, v) => s + v, 0) / retentionVals.length : null,
       avgCompletion:  completionVals.length > 0 ? completionVals.reduce((s, v) => s + v, 0) / completionVals.length : null,
       avgEngagement:  engagementVals.length > 0 ? engagementVals.reduce((s, v) => s + v, 0) / engagementVals.length : null,
       avgUpsell:      upsellVals.length > 0 ? upsellVals.reduce((s, v) => s + v, 0) / upsellVals.length : null,
       avgResolution:  resolutionVals.length > 0 ? resolutionVals.reduce((s, v) => s + v, 0) / resolutionVals.length : null,
     }
-  }, [reports])
-
-  // ── Chart data (ascending) ──
-  const chartData = useMemo(() => {
-    const byDate: Record<string, {
-      date: string
-      outreach: number; response: number; pitch: number; show: number; close: number
-      calls: number
-      contacted: number; graduates: number
-      conversations: number; invitations: number
-      scheduled: number; showed: number; closed: number
-    }> = {}
-
-    for (const r of [...reports].reverse()) {
-      if (!byDate[r.date]) {
-        byDate[r.date] = {
-          date: formatDate(r.date),
-          outreach: 0, response: 0, pitch: 0, show: 0, close: 0,
-          calls: 0,
-          contacted: 0, graduates: 0, conversations: 0, invitations: 0,
-          scheduled: 0, showed: 0, closed: 0,
-        }
-      }
-      const d = byDate[r.date]
-      d.contacted    += r.graduates_contacted
-      d.graduates    += r.total_active_graduates
-      d.conversations += r.real_conversations
-      d.invitations  += r.ascension_invitations
-      d.scheduled    += r.calls_scheduled
-      d.showed       += r.calls_showed
-      d.closed       += r.enrollments_closed
-      d.calls        += r.total_calls_week
-    }
-
-    // Compute derived rates per day
-    return Object.values(byDate).map((d) => ({
-      ...d,
-      outreach: Math.round(pct(d.contacted, d.graduates)) || 0,
-      response: Math.round(pct(d.conversations, d.contacted)) || 0,
-      pitch:    Math.round(pct(d.invitations, d.conversations)) || 0,
-      show:     Math.round(pct(d.showed, d.scheduled)) || 0,
-      close:    Math.round(pct(d.closed, d.showed)) || 0,
-    }))
   }, [reports])
 
   // ── Objections ──
@@ -788,7 +654,7 @@ export default function HtCsmDashboardPage() {
         ) : kpis && (
           <>
             {/* ── KPI Cards ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-3 mb-6">
               <KpiCard
                 label="Response Rate"
                 value={fmtPct(kpis.responseRate)}
@@ -797,46 +663,11 @@ export default function HtCsmDashboardPage() {
                 status={rateStatus(kpis.responseRate, 35, 25)}
               />
               <KpiCard
-                label="Pitch Rate"
-                value={fmtPct(kpis.pitchRate)}
-                goal="Goal: ≥ 45%"
-                barPct={isNaN(kpis.pitchRate) ? 0 : (kpis.pitchRate / 45) * 100}
-                status={rateStatus(kpis.pitchRate, 45, 30)}
-              />
-              <KpiCard
-                label="Show Rate"
-                value={fmtPct(kpis.showRate)}
-                goal="Goal: ≥ 65%"
-                barPct={isNaN(kpis.showRate) ? 0 : (kpis.showRate / 65) * 100}
-                status={rateStatus(kpis.showRate, 65, 50)}
-              />
-              <KpiCard
-                label="Close Rate"
-                value={fmtPct(kpis.closeRate)}
-                goal="Goal: 30–40%"
-                barPct={isNaN(kpis.closeRate) ? 0 : (kpis.closeRate / 40) * 100}
-                status={closeRateStatus(kpis.closeRate)}
-              />
-              <KpiCard
-                label="Total Calls"
-                value={String(kpis.sumCalls)}
-                sub="sum for period"
-                barPct={Math.min(100, (kpis.sumCalls / (reports.length * 6)) * 100)}
-                status={kpis.sumCalls > 0 ? 'good' : 'alert'}
-              />
-              <KpiCard
                 label="Avg Score"
                 value={isNaN(kpis.avgScore) ? '—' : `${kpis.avgScore.toFixed(1)} / 10`}
                 sub="self-assessment"
                 barPct={isNaN(kpis.avgScore) ? 0 : (kpis.avgScore / 10) * 100}
                 status={rateStatus(kpis.avgScore * 10, 70, 50)}
-              />
-              <KpiCard
-                label="Total Enrollments"
-                value={String(kpis.totalClosed)}
-                sub="closed in period"
-                barPct={Math.min(100, kpis.totalClosed * 20)}
-                status={kpis.totalClosed > 0 ? 'good' : 'warn'}
               />
             </div>
 
@@ -882,71 +713,6 @@ export default function HtCsmDashboardPage() {
               />
             </div>
 
-            {/* ── Charts ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {/* Funnel rates trend */}
-              <Card className="md:col-span-2">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Conversion Funnel — Rate Trends</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} unit="%" />
-                      <Tooltip
-                        formatter={(v) => [`${Number(v ?? 0).toFixed(1)}%`]}
-                        contentStyle={{ fontSize: 11 }}
-                      />
-                      <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
-                      <Line type="monotone" dataKey="response" stroke="#1D9E75" strokeWidth={2} dot={false} name="Response" />
-                      <Line type="monotone" dataKey="pitch"    stroke="#8B5CF6" strokeWidth={2} dot={false} name="Pitch" />
-                      <Line type="monotone" dataKey="show"     stroke="#F59E0B" strokeWidth={2} dot={false} name="Show" />
-                      <Line type="monotone" dataKey="close"    stroke="#EF4444" strokeWidth={2} dot={false} name="Close" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Daily call volume */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Daily Call Volume</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="calls" name="Calls" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={36} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Close Rate vs Show Rate */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Close Rate vs Show Rate</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} unit="%" />
-                      <Tooltip formatter={(v) => [`${Number(v ?? 0).toFixed(1)}%`]} contentStyle={{ fontSize: 11 }} />
-                      <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
-                      <Bar dataKey="show"  name="Show"  fill="#F59E0B" radius={[3, 3, 0, 0]} maxBarSize={24} />
-                      <Bar dataKey="close" name="Close" fill="#1D9E75" radius={[3, 3, 0, 0]} maxBarSize={24} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
 
             {/* ── Objections ── */}
             {objections.length > 0 && (
@@ -985,7 +751,7 @@ export default function HtCsmDashboardPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                        {['', 'Date', 'Rep', 'Response%', 'Pitch%', 'Show%', 'Close%', 'Calls', 'Score'].map((h, i) => (
+                        {['', 'Date', 'Rep', 'Response%', 'Retention%', 'Completion%', 'Engagement%', 'Upsell%', 'Res. Time', 'Score'].map((h, i) => (
                           <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
@@ -995,9 +761,6 @@ export default function HtCsmDashboardPage() {
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                       {pageReports.map((r) => {
                         const response = pct(r.real_conversations, r.graduates_contacted)
-                        const pitch    = pct(r.ascension_invitations, r.real_conversations)
-                        const show     = pct(r.calls_showed, r.calls_scheduled)
-                        const close    = pct(r.enrollments_closed, r.calls_showed)
                         const isOpen   = expandedId === r.id
 
                         function Cell({ v, st }: { v: number; st: 'good' | 'warn' | 'alert' }) {
@@ -1006,6 +769,14 @@ export default function HtCsmDashboardPage() {
                               <span className={cn('inline-flex px-1.5 py-0.5 rounded text-xs font-semibold', CELL_BG[st])}>
                                 {fmtPct(v)}
                               </span>
+                            </td>
+                          )
+                        }
+
+                        function ValCell({ v, unit }: { v: number; unit?: string }) {
+                          return (
+                            <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400">
+                              {v > 0 ? `${v}${unit ?? ''}` : '—'}
                             </td>
                           )
                         }
@@ -1030,10 +801,13 @@ export default function HtCsmDashboardPage() {
                               <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">{formatDate(r.date)}</td>
                               <td className="px-4 py-3 text-sm font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap">{r.rep_name}</td>
                               <Cell v={response} st={rateStatus(response, 35, 25)} />
-                              <Cell v={pitch}    st={rateStatus(pitch, 45, 30)} />
-                              <Cell v={show}     st={rateStatus(show, 65, 50)} />
-                              <Cell v={close}    st={rateStatus(close, 30, 25)} />
-                              <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400">{r.total_calls_week}</td>
+                              <ValCell v={r.client_retention_rate ?? 0} unit="%" />
+                              <ValCell v={r.completion_rate ?? 0} unit="%" />
+                              <ValCell v={r.engagement_score ?? 0} unit="%" />
+                              <ValCell v={r.upsell_renewal_rate ?? 0} unit="%" />
+                              <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400">
+                                {(r.avg_resolution_time_hours ?? 0) > 0 ? `${r.avg_resolution_time_hours}h` : '—'}
+                              </td>
                               <td className="px-4 py-3">
                                 <span className={cn(
                                   'inline-flex px-1.5 py-0.5 rounded text-xs font-bold',
@@ -1056,7 +830,7 @@ export default function HtCsmDashboardPage() {
                                   exit={{ opacity: 0 }}
                                   transition={{ duration: 0.15 }}
                                 >
-                                  <td colSpan={9} className="p-0">
+                                  <td colSpan={10} className="p-0">
                                     <ReportDetail
                                       report={r}
                                       onEdit={() => setEditingReport(r)}

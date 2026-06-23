@@ -12,8 +12,6 @@ import { useProfile } from '@/hooks/useProfile'
 
 export const dynamic = 'force-dynamic'
 
-const LOST_REASONS = ['Lack of interest', 'Price', 'Timing', 'Not qualified', 'Other']
-
 function today() {
   return new Date().toISOString().split('T')[0]
 }
@@ -21,20 +19,10 @@ function today() {
 interface FormState {
   rep_name: string
   date: string
-  graduates_contacted: string
-  graduates_responded: string
   real_conversations: string
-  ascension_invitations: string
-  calls_scheduled: string
-  calls_showed: string
-  enrollments_closed: string
-  total_calls_week: string
   objection_1: string
   objection_2: string
   objection_3: string
-  graduate_patterns: string
-  leads_lost: string
-  lost_reason: string
   learning_1: string
   learning_2: string
   learning_3: string
@@ -50,20 +38,10 @@ interface FormState {
 const EMPTY: FormState = {
   rep_name: '',
   date: today(),
-  graduates_contacted: '',
-  graduates_responded: '',
   real_conversations: '',
-  ascension_invitations: '',
-  calls_scheduled: '',
-  calls_showed: '',
-  enrollments_closed: '',
-  total_calls_week: '',
   objection_1: '',
   objection_2: '',
   objection_3: '',
-  graduate_patterns: '',
-  leads_lost: '',
-  lost_reason: '',
   learning_1: '',
   learning_2: '',
   learning_3: '',
@@ -79,7 +57,6 @@ const EMPTY: FormState = {
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 
 const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
-const readonlyCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 font-medium'
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">{children}</label>
@@ -156,21 +133,10 @@ export default function HtCsmNewReportPage() {
       const { error } = await supabase.from('ht_csm_reports').insert({
         date: form.date,
         rep_name: form.rep_name,
-        total_active_graduates: 0,
-        graduates_contacted:    0,
-        graduates_responded:    0,
         real_conversations:     parseInt(form.real_conversations) || 0,
-        ascension_invitations:  parseInt(form.ascension_invitations) || 0,
-        calls_scheduled:        parseInt(form.calls_scheduled) || 0,
-        calls_showed:           parseInt(form.calls_showed) || 0,
-        enrollments_closed:     parseInt(form.enrollments_closed) || 0,
-        total_calls_week:       parseInt(form.total_calls_week) || 0,
         objection_1:            form.objection_1 || null,
         objection_2:            form.objection_2 || null,
         objection_3:            form.objection_3 || null,
-        graduate_patterns:      form.graduate_patterns || null,
-        leads_lost:             parseInt(form.leads_lost) || 0,
-        lost_reason:            form.lost_reason || null,
         learning_1:             form.learning_1 || null,
         learning_2:             form.learning_2 || null,
         learning_3:             form.learning_3 || null,
@@ -256,79 +222,13 @@ export default function HtCsmNewReportPage() {
             </div>
           </SectionCard>
 
-          {/* ── Pitch Rate ── */}
-          <SectionCard>
-            <SectionHeader
-              label="Pitch Rate"
-              color="bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>Real conversations held</FieldLabel>
-                <div className={readonlyCls}>{form.real_conversations || '0'}</div>
-              </div>
-              <div>
-                <FieldLabel>Ascension call invitations sent</FieldLabel>
-                <NumberInput value={form.ascension_invitations} onChange={(v) => set('ascension_invitations', v)} />
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* ── Show Rate ── */}
-          <SectionCard>
-            <SectionHeader
-              label="Show Rate"
-              color="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>Calls scheduled</FieldLabel>
-                <NumberInput value={form.calls_scheduled} onChange={(v) => set('calls_scheduled', v)} />
-              </div>
-              <div>
-                <FieldLabel>Calls completed / showed</FieldLabel>
-                <NumberInput value={form.calls_showed} onChange={(v) => set('calls_showed', v)} />
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* ── Close Rate ── */}
-          <SectionCard>
-            <SectionHeader
-              label="Close Rate"
-              color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>Calls completed</FieldLabel>
-                <div className={readonlyCls}>{form.calls_showed || '0'}</div>
-              </div>
-              <div>
-                <FieldLabel>Enrollments closed</FieldLabel>
-                <NumberInput value={form.enrollments_closed} onChange={(v) => set('enrollments_closed', v)} />
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* ── Calls / Week ── */}
-          <SectionCard>
-            <SectionHeader
-              label="Calls Today"
-              color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-            />
-            <div>
-              <FieldLabel>Calls today</FieldLabel>
-              <NumberInput value={form.total_calls_week} onChange={(v) => set('total_calls_week', v)} />
-            </div>
-          </SectionCard>
-
           {/* ── Conversation Quality ── */}
           <SectionCard>
             <SectionHeader
               label="Conversation Quality"
               color="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
             />
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <FieldLabel>Main objection 1</FieldLabel>
                 <input type="text" value={form.objection_1} onChange={(e) => set('objection_1', e.target.value)} placeholder="e.g. Price" className={inputCls} />
@@ -340,37 +240,6 @@ export default function HtCsmNewReportPage() {
               <div>
                 <FieldLabel>Main objection 3</FieldLabel>
                 <input type="text" value={form.objection_3} onChange={(e) => set('objection_3', e.target.value)} placeholder="e.g. Not a priority" className={inputCls} />
-              </div>
-            </div>
-            <div>
-              <FieldLabel>Patterns detected in graduates</FieldLabel>
-              <textarea
-                value={form.graduate_patterns}
-                onChange={(e) => set('graduate_patterns', e.target.value)}
-                placeholder="Describe recurring behaviors or patterns…"
-                rows={3}
-                className={cn(inputCls, 'resize-none')}
-              />
-            </div>
-          </SectionCard>
-
-          {/* ── Lost Opportunities ── */}
-          <SectionCard>
-            <SectionHeader
-              label="Lost Opportunities"
-              color="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>Leads who did not advance</FieldLabel>
-                <NumberInput value={form.leads_lost} onChange={(v) => set('leads_lost', v)} />
-              </div>
-              <div>
-                <FieldLabel>Primary reason</FieldLabel>
-                <select value={form.lost_reason} onChange={(e) => set('lost_reason', e.target.value)} className={inputCls}>
-                  <option value="">Select reason…</option>
-                  {LOST_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
               </div>
             </div>
           </SectionCard>
