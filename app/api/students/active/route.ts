@@ -47,7 +47,9 @@ export async function GET(request: NextRequest) {
     .eq('status', 'active')
     .order('first_name', { ascending: true })
 
-  if (type) query = query.eq('type', type)
+  if (type) {
+    query = query.or(`type.ilike.%${type}%,type.ilike.%individual%`)
+  }
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

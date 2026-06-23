@@ -764,15 +764,15 @@ function ClientCombobox({ value, onChange }: { value: string; onChange: (v: stri
       </div>
 
       <AnimatePresence>
-        {open && filtered.length > 0 && (
+        {open && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.15 }}
-            className="absolute z-50 top-full mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg"
+            className="absolute z-50 top-full mt-1 w-full max-h-[200px] overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg"
           >
-            {filtered.map(s => {
+            {filtered.length > 0 ? filtered.map(s => {
               const fullName = `${s.first_name} ${s.last_name || ''}`.trim()
               return (
                 <button
@@ -785,7 +785,11 @@ function ClientCombobox({ value, onChange }: { value: string; onChange: (v: stri
                   {s.email && <p className="text-xs text-zinc-400 dark:text-zinc-500">{s.email}</p>}
                 </button>
               )
-            })}
+            }) : search ? (
+              <div className="px-3 py-3 text-sm text-zinc-400 dark:text-zinc-500">
+                No results — custom name will be used
+              </div>
+            ) : null}
           </motion.div>
         )}
       </AnimatePresence>
