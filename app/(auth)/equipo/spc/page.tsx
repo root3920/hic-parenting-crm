@@ -301,13 +301,26 @@ export default function SpcPerfDashboard() {
         .gte('converted_at', from)
         .lte('converted_at', to)
 
-      // Trial cancels in period
-      const { count: trialCancelsCount } = await supabase
+      // Fetch all cancellations in period (cancelled_at is DATE, use date strings)
+      const { data: periodCancels } = await supabase
         .from('spc_cancellations')
-        .select('*', { count: 'exact', head: true })
-        .eq('trial_cancel', true)
+        .select('paid_cancel, trial_cancel, cancel_type')
         .gte('cancelled_at', from)
         .lte('cancelled_at', to)
+
+      const cancels = periodCancels ?? []
+
+      // Use same logic as SPC Overview: isPaidCancel / isTrialCancel
+      const trialCancelsInPeriod = cancels.filter((c) => {
+        if (c.trial_cancel === true) return true
+        if (c.paid_cancel === true) return false
+        return c.cancel_type === 'trial_cancel'
+      })
+      const paidCancelsInPeriod = cancels.filter((c) => {
+        if (c.paid_cancel === true) return true
+        if (c.trial_cancel === true) return false
+        return c.cancel_type === 'paid_cancel'
+      })
 
       // Active trials (current)
       const { count: activeTrialsCount } = await supabase
@@ -316,21 +329,12 @@ export default function SpcPerfDashboard() {
         .eq('status', 'trial')
 
       const converted = convertedCount ?? 0
-      const trialDenom = (activeTrialsCount ?? 0) + (trialCancelsCount ?? 0)
+      const trialDenom = (activeTrialsCount ?? 0) + trialCancelsInPeriod.length
       setTrialConversionRate({
         rate: trialDenom > 0 ? parseFloat(((converted / trialDenom) * 100).toFixed(1)) : 0,
         converted,
         total: trialDenom,
       })
-
-      // Churn: paid cancels in period
-      const { count: paidCancelsCount } = await supabase
-        .from('spc_cancellations')
-        .select('*', { count: 'exact', head: true })
-        .eq('trial_cancel', false)
-        .eq('paid_cancel', true)
-        .gte('cancelled_at', from)
-        .lte('cancelled_at', to)
 
       // Active members
       const { count: activeMembersCount } = await supabase
@@ -338,7 +342,7 @@ export default function SpcPerfDashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active')
 
-      const paidCancels = paidCancelsCount ?? 0
+      const paidCancels = paidCancelsInPeriod.length
       const activeMembers = activeMembersCount ?? 0
       const churnDenom = activeMembers + paidCancels
       setChurnRate({

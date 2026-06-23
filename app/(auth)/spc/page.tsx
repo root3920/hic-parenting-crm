@@ -2007,11 +2007,13 @@ export default function SpcPage() {
   // Non-trial cancellations = paid + pending (CSV imports without type info)
   const nonTrialCancels = cancellations.filter((c) => !isTrialCancel(c))
   // Only count cancellations with a known cancelled_at date for churn
+  // Use string comparison on YYYY-MM to avoid timezone issues with DATE fields
   const thisMonthCancels = nonTrialCancels.filter((c) => {
     if (!c.cancelled_at) return false
-    const d = new Date(c.cancelled_at)
+    const cancelMonth = c.cancelled_at.slice(0, 7)
     const now2 = new Date()
-    return d.getFullYear() === now2.getFullYear() && d.getMonth() === now2.getMonth()
+    const currentMonth = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`
+    return cancelMonth === currentMonth
   })
   const unknownDateCancels = cancellations.filter((c) => !c.cancelled_at).length
 
