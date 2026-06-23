@@ -319,7 +319,7 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
 function ReportDetail({ report, onClose }: { report: Row; onClose: () => void }) {
   void onClose
   const convRate = safeDiv(report.qualified_calls, report.total_convos) * 100
-  const pitchRate = safeDiv(report.call_proposed, report.total_convos) * 100
+  const pitchRate = safeDiv(report.call_proposed + (report.dq_spc_offered ?? 0), report.total_convos) * 100
 
   function Row({ label, value }: { label: string; value: string | number | null | undefined }) {
     if (value === null || value === undefined || value === '') return null
@@ -491,7 +491,7 @@ export default function SetterDashboardPage() {
     const totalProposed = sumField(filtered, 'call_proposed')
     const totalBooked   = sumField(filtered, 'qualified_calls')
     return {
-      pitchRate:   safeDiv(totalProposed, totalConvos)  * 100,
+      pitchRate:   safeDiv(totalProposed + sumField(filtered, 'dq_spc_offered'), totalConvos)  * 100,
       bookingRate: safeDiv(totalBooked,   totalProposed) * 100,
       convGeneral: safeDiv(totalBooked,   totalConvos)  * 100,
     }
