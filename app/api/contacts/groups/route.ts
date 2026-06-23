@@ -20,7 +20,7 @@ const LOW_TICKET_PRODUCTS = [
 ]
 
 const MID_TICKET_PRODUCTS = [
-  { name: 'Raising Secure Children', patterns: [] as string[], exact: true, exactTitle: 'Raising Secure Children', exactCost: 470 },
+  { name: 'Raising Secure Children', patterns: [] as string[], exact: true, exactTitles: ['Raising Secure Children', 'Bundle: Secure Parent Collective + Raising Secure Children (Yearly)'], exactCost: 470 },
 ]
 
 const HIGH_TICKET_PRODUCTS = [
@@ -113,7 +113,7 @@ export async function GET() {
 
     for (const product of MID_TICKET_PRODUCTS) {
       if (product.exact
-        ? tx.offer_title === product.exactTitle && Number(tx.cost) === product.exactCost
+        ? product.exactTitles.includes(tx.offer_title ?? '') && Number(tx.cost) === product.exactCost
         : matchProduct(title, product.patterns)
       ) {
         if (!midTicketEmails[product.name]) midTicketEmails[product.name] = new Set()

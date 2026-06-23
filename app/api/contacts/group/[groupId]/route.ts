@@ -220,7 +220,7 @@ export async function GET(
   return NextResponse.json({ contacts, total, page, pageSize: PAGE_SIZE })
 }
 
-/** Mid Ticket: exact match offer_title='Raising Secure Children' AND cost=470 */
+/** Mid Ticket: offer_title in ('Raising Secure Children', 'Bundle: Secure Parent Collective + Raising Secure Children (Yearly)') AND cost=470 */
 async function handleMidTicket(
   svc: ReturnType<typeof getServiceClient>,
   search: string,
@@ -234,15 +234,16 @@ async function handleMidTicket(
     buyer_phone: string | null
     date: string
     source: string | null
+    offer_title: string | null
   }[] = []
   let offset = 0
   while (true) {
     let query = svc
       .from('transactions')
-      .select('buyer_email, buyer_name, buyer_phone, date, source')
+      .select('buyer_email, buyer_name, buyer_phone, date, source, offer_title')
       .or('status.eq.completed,status.is.null')
-      .eq('offer_title', 'Raising Secure Children')
       .eq('cost', 470)
+      .in('offer_title', ['Raising Secure Children', 'Bundle: Secure Parent Collective + Raising Secure Children (Yearly)'])
       .order('date', { ascending: false })
       .range(offset, offset + FETCH_PAGE - 1)
 
@@ -258,7 +259,7 @@ async function handleMidTicket(
     offset += FETCH_PAGE
   }
 
-  // Deduplicate by email
+  // Deduplicate by email (keep most recent)
   const byEmail = new Map<string, {
     email: string
     name: string | null
@@ -278,7 +279,7 @@ async function handleMidTicket(
         phone: tx.buyer_phone,
         source: tx.source,
         date: tx.date,
-        product: 'Raising Secure Children',
+        product: tx.offer_title ?? 'Raising Secure Children',
       })
     }
   }
