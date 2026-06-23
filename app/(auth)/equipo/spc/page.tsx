@@ -254,6 +254,9 @@ export default function SpcPerfDashboard() {
   const [editForm, setEditForm] = useState<Record<string, string | number>>({})
   const [saving, setSaving] = useState(false)
 
+  const [trialConversionRate, setTrialConversionRate] = useState<{ rate: number; converted: number; total: number } | null>(null)
+  const [churnRate, setChurnRate] = useState<{ rate: number; paidCancels: number; active: number } | null>(null)
+
   const weekRange = useMemo(() => getCurrentWeekRange(), [])
 
   function getRange(p: Preset): { from: string; to: string } {
@@ -284,6 +287,69 @@ export default function SpcPerfDashboard() {
 
   useEffect(() => { fetchReports() }, [fetchReports])
   useEffect(() => { setPage(0) }, [preset, selectedRep])
+
+  // Fetch trial conversion & churn rates based on date range
+  useEffect(() => {
+    async function fetchMemberKpis() {
+      const { from, to } = getRange(preset)
+
+      // Trial conversions in period
+      const { count: convertedCount } = await supabase
+        .from('spc_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('converted_from_trial', true)
+        .gte('converted_at', from)
+        .lte('converted_at', to)
+
+      // Trial cancels in period
+      const { count: trialCancelsCount } = await supabase
+        .from('spc_cancellations')
+        .select('*', { count: 'exact', head: true })
+        .eq('trial_cancel', true)
+        .gte('cancelled_at', from)
+        .lte('cancelled_at', to)
+
+      // Active trials (current)
+      const { count: activeTrialsCount } = await supabase
+        .from('spc_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'trial')
+
+      const converted = convertedCount ?? 0
+      const trialDenom = (activeTrialsCount ?? 0) + (trialCancelsCount ?? 0)
+      setTrialConversionRate({
+        rate: trialDenom > 0 ? parseFloat(((converted / trialDenom) * 100).toFixed(1)) : 0,
+        converted,
+        total: trialDenom,
+      })
+
+      // Churn: paid cancels in period
+      const { count: paidCancelsCount } = await supabase
+        .from('spc_cancellations')
+        .select('*', { count: 'exact', head: true })
+        .eq('trial_cancel', false)
+        .eq('paid_cancel', true)
+        .gte('cancelled_at', from)
+        .lte('cancelled_at', to)
+
+      // Active members
+      const { count: activeMembersCount } = await supabase
+        .from('spc_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active')
+
+      const paidCancels = paidCancelsCount ?? 0
+      const activeMembers = activeMembersCount ?? 0
+      const churnDenom = activeMembers + paidCancels
+      setChurnRate({
+        rate: churnDenom > 0 ? parseFloat(((paidCancels / churnDenom) * 100).toFixed(1)) : 0,
+        paidCancels,
+        active: activeMembers,
+      })
+    }
+    fetchMemberKpis()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, preset, customFrom, customTo])
 
   async function handleDelete(report: SpcPerfReport) {
     setReports((prev) => prev.filter((r) => r.id !== report.id))
@@ -528,7 +594,7 @@ export default function SpcPerfDashboard() {
             <div className="mb-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2 px-0.5">Main KPIs</p>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
               <MainKpiCard
                 label="% Weekly Engagement"
                 value={kpis?.avgEngSemanal ?? 0}
@@ -551,6 +617,18 @@ export default function SpcPerfDashboard() {
                 sub="check-ins responded"
                 meta={20}
                 alert={10}
+              />
+              <KpiCard
+                label="Trial Conversion"
+                value={trialConversionRate ? `${trialConversionRate.rate}%` : '—'}
+                sub={trialConversionRate ? `${trialConversionRate.converted} converted / ${trialConversionRate.total} total` : undefined}
+                color={trialConversionRate && trialConversionRate.rate >= 50 ? 'text-green-600 dark:text-green-400' : trialConversionRate && trialConversionRate.rate >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}
+              />
+              <KpiCard
+                label="Churn Rate"
+                value={churnRate ? `${churnRate.rate}%` : '—'}
+                sub={churnRate ? `${churnRate.paidCancels} cancels / ${churnRate.active + churnRate.paidCancels} base` : undefined}
+                color={churnRate && churnRate.rate <= 5 ? 'text-green-600 dark:text-green-400' : churnRate && churnRate.rate <= 10 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}
               />
             </div>
 
