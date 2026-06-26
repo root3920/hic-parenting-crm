@@ -19,7 +19,7 @@ import {
   TableHeader,
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, Calendar, CheckCircle2, Circle, Clock, Download, ExternalLink, Mail, MessageSquare, Pencil, Phone, Plus, Search, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, Calendar, CheckCircle2, Circle, Clock, Download, ExternalLink, Link2, Mail, MessageSquare, Pencil, Phone, Plus, Search, Trash2, Unlink, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -339,6 +339,96 @@ function MemberProfileModal({
     offer_title: '', amount: '', currency: 'USD', cancelled_at: '', provider: '',
   })
 
+  // Link Transaction state
+  const [linkSearch, setLinkSearch] = useState('')
+  const [linkResults, setLinkResults] = useState<{ id: string; transaction_id: string; offer_title: string; cost: number; date: string; buyer_email: string; status?: string }[]>([])
+  const [linkSearching, setLinkSearching] = useState(false)
+  const [linkedTxIds, setLinkedTxIds] = useState<Set<string>>(new Set())
+  const [manuallyLinkedTxs, setManuallyLinkedTxs] = useState<{ transaction_id: string; offer_title: string; cost: number; date: string; buyer_email: string; status?: string }[]>([])
+  const [linkingId, setLinkingId] = useState<string | null>(null)
+
+  // Fetch manually linked transactions when member changes
+  useEffect(() => {
+    if (selected.kind !== 'member' || !selected.data.email) return
+    const email = selected.data.email.toLowerCase()
+    async function fetchLinked() {
+      try {
+        const res = await fetch(`/api/spc/members/link-transaction?email=${encodeURIComponent(email)}`)
+        if (!res.ok) return
+        const links: { transaction_id: string }[] = await res.json()
+        const linkedIds = new Set(links.map((l) => l.transaction_id))
+        setLinkedTxIds(linkedIds)
+        // Fetch full transaction details for linked ones
+        if (linkedIds.size > 0) {
+          const { data: txs } = await supabase
+            .from('transactions')
+            .select('id, transaction_id, offer_title, cost, date, buyer_email, status')
+            .in('transaction_id', Array.from(linkedIds))
+          setManuallyLinkedTxs(txs ?? [])
+        } else {
+          setManuallyLinkedTxs([])
+        }
+      } catch { /* ignore */ }
+    }
+    fetchLinked()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected.kind === 'member' ? selected.data.id : null])
+
+  // Debounced search for link transaction
+  useEffect(() => {
+    if (linkSearch.length < 2) { setLinkResults([]); return }
+    const timer = setTimeout(async () => {
+      setLinkSearching(true)
+      try {
+        const res = await fetch(`/api/spc/members/search-transactions?q=${encodeURIComponent(linkSearch)}`)
+        if (res.ok) setLinkResults(await res.json())
+      } catch { /* ignore */ }
+      setLinkSearching(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [linkSearch])
+
+  async function handleLinkTransaction(tx: { transaction_id: string; offer_title: string; cost: number; date: string; buyer_email: string; status?: string }) {
+    if (selected.kind !== 'member' || !selected.data.email) return
+    setLinkingId(tx.transaction_id)
+    try {
+      const res = await fetch('/api/spc/members/link-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_email: selected.data.email, transaction_id: tx.transaction_id }),
+      })
+      if (res.ok) {
+        setLinkedTxIds((prev) => { const n = new Set(prev); n.add(tx.transaction_id); return n })
+        setManuallyLinkedTxs((prev) => [...prev, tx])
+        setLinkSearch('')
+        setLinkResults([])
+        toast.success('Transaction linked')
+      } else {
+        const err = await res.json()
+        toast.error(err.error ?? 'Failed to link')
+      }
+    } catch { toast.error('Failed to link transaction') }
+    setLinkingId(null)
+  }
+
+  async function handleUnlinkTransaction(transactionId: string) {
+    if (selected.kind !== 'member' || !selected.data.email) return
+    setLinkingId(transactionId)
+    try {
+      const res = await fetch('/api/spc/members/link-transaction', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_email: selected.data.email, transaction_id: transactionId }),
+      })
+      if (res.ok) {
+        setLinkedTxIds((prev) => { const n = new Set(prev); n.delete(transactionId); return n })
+        setManuallyLinkedTxs((prev) => prev.filter((t) => t.transaction_id !== transactionId))
+        toast.success('Transaction unlinked')
+      }
+    } catch { toast.error('Failed to unlink') }
+    setLinkingId(null)
+  }
+
   function setField<K extends keyof MemberEditForm>(key: K, value: MemberEditForm[K]) {
     setEditForm((prev) => ({ ...prev, [key]: value }))
   }
@@ -398,7 +488,10 @@ function MemberProfileModal({
           provider: editForm.provider,
           joined_at: editForm.joined_at || null,
           status: editForm.status,
-          trial_end_date: editForm.trial_end_date || null,
+      }
+      // Only update trial_end_date if the user explicitly changed it; never overwrite with null
+      if (editForm.trial_end_date && editForm.trial_end_date !== (selected.data.trial_end_date ?? '')) {
+        updatePayload.trial_end_date = editForm.trial_end_date
       }
       // next_payment_date is NOT NULL in DB — only include if non-empty
       if (editForm.next_payment_date) {
@@ -911,6 +1004,100 @@ function MemberProfileModal({
                         )
                       })()}
                     </>
+                  )}
+                  {/* ── Manually Linked Transactions ── */}
+                  {manuallyLinkedTxs.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {manuallyLinkedTxs
+                        .filter((mtx) => !memberTransactions.some((t) => t.transaction_id === mtx.transaction_id))
+                        .map((mtx) => {
+                          const st = mtx.status ?? 'completed'
+                          const stCls =
+                            st === 'refunded' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                            st === 'failed'   ? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' :
+                            'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                          return (
+                            <div key={mtx.transaction_id} className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3">
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-tight flex-1 min-w-0 truncate">
+                                  {mtx.offer_title}
+                                </span>
+                                <span className="text-xs font-semibold text-green-700 dark:text-green-400 whitespace-nowrap">
+                                  ${Number(mtx.cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className={cn('inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold', stCls)}>
+                                    {st.charAt(0).toUpperCase() + st.slice(1)}
+                                  </span>
+                                  <span className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                    Manually linked
+                                  </span>
+                                  <span className="text-xs text-zinc-400 flex items-center gap-0.5">
+                                    <Calendar className="h-3 w-3" />{formatDate(mtx.date)}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => handleUnlinkTransaction(mtx.transaction_id)}
+                                  disabled={linkingId === mtx.transaction_id}
+                                  className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400 flex items-center gap-0.5 disabled:opacity-50"
+                                >
+                                  <Unlink className="h-3 w-3" /> Unlink
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )}
+
+                  {/* ── Link Transaction ── */}
+                  {selected.kind === 'member' && !isEditing && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-2 flex items-center gap-1">
+                        <Link2 className="h-3 w-3" /> Link Transaction
+                      </p>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                        <input
+                          type="text"
+                          placeholder="Search by email or transaction ID..."
+                          value={linkSearch}
+                          onChange={(e) => setLinkSearch(e.target.value)}
+                          className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                        />
+                      </div>
+                      {linkSearching && <p className="text-[10px] text-zinc-400 mt-1">Searching...</p>}
+                      {linkResults.length > 0 && (
+                        <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
+                          {linkResults.map((tx) => {
+                            const alreadyLinked = linkedTxIds.has(tx.transaction_id) || memberTransactions.some((mt) => mt.transaction_id === tx.transaction_id)
+                            return (
+                              <div key={tx.id} className="flex items-center justify-between gap-2 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate">{tx.offer_title}</p>
+                                  <p className="text-[10px] text-zinc-400">
+                                    ${Number(tx.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })} &middot; {formatDate(tx.date)} &middot; {tx.buyer_email}
+                                  </p>
+                                </div>
+                                {alreadyLinked ? (
+                                  <span className="text-[10px] text-zinc-400 whitespace-nowrap">Already linked</span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleLinkTransaction(tx)}
+                                    disabled={linkingId === tx.transaction_id}
+                                    className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-0.5 whitespace-nowrap disabled:opacity-50"
+                                  >
+                                    <Link2 className="h-3 w-3" /> Link
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
