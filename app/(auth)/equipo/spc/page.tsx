@@ -293,7 +293,14 @@ export default function SpcPerfDashboard() {
     async function fetchMemberKpis() {
       const { from, to } = getRange(preset)
 
-      // Trial conversions in period
+      // Trials expiring in period (denominator)
+      const { count: trialsExpiringCount } = await supabase
+        .from('spc_members')
+        .select('*', { count: 'exact', head: true })
+        .gte('trial_end_date', from)
+        .lte('trial_end_date', to)
+
+      // Trial conversions in period (numerator)
       const { count: convertedCount } = await supabase
         .from('spc_members')
         .select('*', { count: 'exact', head: true })
@@ -301,7 +308,7 @@ export default function SpcPerfDashboard() {
         .gte('converted_at', from)
         .lte('converted_at', to)
 
-      // Fetch all cancellations in period (cancelled_at is DATE, use date strings)
+      // Fetch paid cancellations in period for churn rate
       const { data: periodCancels } = await supabase
         .from('spc_cancellations')
         .select('paid_cancel, trial_cancel, cancel_type')
@@ -310,30 +317,18 @@ export default function SpcPerfDashboard() {
 
       const cancels = periodCancels ?? []
 
-      // Use same logic as SPC Overview: isPaidCancel / isTrialCancel
-      const trialCancelsInPeriod = cancels.filter((c) => {
-        if (c.trial_cancel === true) return true
-        if (c.paid_cancel === true) return false
-        return c.cancel_type === 'trial_cancel'
-      })
       const paidCancelsInPeriod = cancels.filter((c) => {
         if (c.paid_cancel === true) return true
         if (c.trial_cancel === true) return false
         return c.cancel_type === 'paid_cancel'
       })
 
-      // Active trials (current)
-      const { count: activeTrialsCount } = await supabase
-        .from('spc_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'trial')
-
       const converted = convertedCount ?? 0
-      const trialDenom = (activeTrialsCount ?? 0) + trialCancelsInPeriod.length
+      const trialsExpiring = trialsExpiringCount ?? 0
       setTrialConversionRate({
-        rate: trialDenom > 0 ? parseFloat(((converted / trialDenom) * 100).toFixed(1)) : 0,
+        rate: trialsExpiring > 0 ? parseFloat(((converted / trialsExpiring) * 100).toFixed(1)) : 0,
         converted,
-        total: trialDenom,
+        total: trialsExpiring,
       })
 
       // Active members
@@ -625,7 +620,7 @@ export default function SpcPerfDashboard() {
               <KpiCard
                 label="Trial Conversion"
                 value={trialConversionRate ? `${trialConversionRate.rate}%` : '—'}
-                sub={trialConversionRate ? `${trialConversionRate.converted} converted / ${trialConversionRate.total} total` : undefined}
+                sub={trialConversionRate ? `${trialConversionRate.converted} converted / ${trialConversionRate.total} expiring in period` : undefined}
                 color={trialConversionRate && trialConversionRate.rate >= 50 ? 'text-green-600 dark:text-green-400' : trialConversionRate && trialConversionRate.rate >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}
               />
               <KpiCard
