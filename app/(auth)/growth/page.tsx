@@ -536,7 +536,7 @@ function NewReportTab({ onSaved }: { onSaved: () => void }) {
             }
           </FormField>
           <FormField label="Coach name" required>
-            <input value={coachName} onChange={e => setCoachName(e.target.value)} required className={inputClass} placeholder="Your name" />
+            <CoachCombobox value={coachName} onChange={setCoachName} />
           </FormField>
           <FormField label="Session number">
             <input value={sessionNumber} onChange={e => setSessionNumber(e.target.value)} className={inputClass} placeholder="e.g. 4" />
@@ -790,6 +790,90 @@ function ClientCombobox({ value, onChange }: { value: string; onChange: (v: stri
                 No results — custom name will be used
               </div>
             ) : null}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ─── Coach Combobox ────────────────────────────────────────── */
+
+function CoachCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [coaches, setCoaches] = useState<{ full_name: string }[]>([])
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState(value)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch('/api/growth/coaches')
+      .then(r => r.ok ? r.json() : [])
+      .then(setCoaches)
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { setSearch(value) }, [value])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filtered = useMemo(() => {
+    if (!search) return coaches
+    const q = search.toLowerCase()
+    return coaches.filter(c => c.full_name.toLowerCase().includes(q))
+  }, [coaches, search])
+
+  function handleSelect(name: string) {
+    onChange(name)
+    setSearch(name)
+    setOpen(false)
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value
+    setSearch(v)
+    onChange(v)
+    if (!open) setOpen(true)
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <input
+        value={search}
+        onChange={handleInputChange}
+        onFocus={() => setOpen(true)}
+        required
+        className={inputClass}
+        placeholder="Select or type coach name..."
+        autoComplete="off"
+      />
+
+      <AnimatePresence>
+        {open && filtered.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-50 top-full mt-1 w-full max-h-[200px] overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg"
+          >
+            {filtered.map(c => (
+              <button
+                key={c.full_name}
+                type="button"
+                onClick={() => handleSelect(c.full_name)}
+                className="w-full text-left px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+              >
+                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{c.full_name}</p>
+              </button>
+            ))}
           </motion.div>
         )}
       </AnimatePresence>
