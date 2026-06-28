@@ -71,6 +71,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/api/spc/backfill-csv' ||
     pathname === '/api/growth/reports/public' ||
     pathname === '/api/growth/coaches' ||
+    pathname === '/api/growth/students' ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
   ) {
     return NextResponse.next()

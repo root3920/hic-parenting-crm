@@ -214,7 +214,7 @@ function ClientCombobox({ value, onChange }: { value: string; onChange: (v: stri
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch('/api/students/active?type=1:1')
+    fetch('/api/growth/students')
       .then(r => r.ok ? r.json() : [])
       .then(setStudents)
       .catch(() => {})
@@ -313,7 +313,7 @@ function CohortSelect({ value, onChange }: { value: string; onChange: (v: string
   const [cohorts, setCohorts] = useState<string[]>([])
 
   useEffect(() => {
-    fetch('/api/students/active?view=cohorts')
+    fetch('/api/growth/students?view=cohorts')
       .then(r => r.ok ? r.json() : [])
       .then(setCohorts)
       .catch(() => {})

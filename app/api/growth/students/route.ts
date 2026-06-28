@@ -1,0 +1,47 @@
+import { createClient } from '@supabase/supabase-js'
+import { NextResponse, type NextRequest } from 'next/server'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+)
+
+export async function GET(request: NextRequest) {
+  const search = request.nextUrl.searchParams.get('search') ?? ''
+  const view = request.nextUrl.searchParams.get('view')
+
+  // Return distinct active cohorts
+  if (view === 'cohorts') {
+    const { data, error } = await supabaseAdmin
+      .from('pwu_students')
+      .select('cohort')
+      .eq('status', 'active')
+      .not('cohort', 'is', null)
+      .order('cohort', { ascending: true })
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    const unique = Array.from(new Set((data || []).map(r => r.cohort as string)))
+    return NextResponse.json(unique)
+  }
+
+  // Return active students filtered by search
+  let query = supabaseAdmin
+    .from('pwu_students')
+    .select('id, first_name, last_name, email')
+    .eq('status', 'active')
+    .order('first_name', { ascending: true })
+    .limit(20)
+
+  if (search) {
+    query = query.or(
+      `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
+    )
+  }
+
+  const { data, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json(data ?? [])
+}
