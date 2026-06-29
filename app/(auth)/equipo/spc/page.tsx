@@ -490,6 +490,8 @@ export default function SpcPerfDashboard() {
       totalCheckinActiveInactive: reports.reduce((s, r) => s + (r.checkin_active_inactive ?? 0), 0),
       totalCheckinAfterCancel:  reports.reduce((s, r) => s + (r.checkin_after_cancellation ?? 0), 0),
       totalTrialsExpiringSoonContacted: reports.reduce((s, r) => s + ((r as any).trials_expiring_soon_contacted ?? 0), 0),
+      totalWelcomeSent: reports.reduce((s, r) => s + (r.welcome_sent ?? 0), 0),
+      totalNewMembers:  reports.reduce((s, r) => s + (r.new_members ?? 0), 0),
     }
   }, [allMetrics])
 
@@ -609,14 +611,20 @@ export default function SpcPerfDashboard() {
                 meta={20}
                 alert={10}
               />
-              <MainKpiCard
-                label="% Inactive Reactivation"
-                value={kpis?.avgReact ?? 0}
-                unit="%"
-                sub="check-ins responded"
-                meta={20}
-                alert={10}
-              />
+              {(() => {
+                const welcomed = kpis?.totalWelcomeSent ?? 0
+                const newMem = kpis?.totalNewMembers ?? 0
+                const rate = newMem > 0 ? Math.round((welcomed / newMem) * 100) : 0
+                const color = rate >= 80 ? 'text-green-600 dark:text-green-400' : rate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
+                return (
+                  <KpiCard
+                    label="Welcome Rate"
+                    value={`${rate}%`}
+                    sub={`${welcomed} welcomed / ${newMem} new members`}
+                    color={color}
+                  />
+                )
+              })()}
               <KpiCard
                 label="Trial Conversion"
                 value={trialConversionRate ? `${trialConversionRate.rate}%` : '—'}
