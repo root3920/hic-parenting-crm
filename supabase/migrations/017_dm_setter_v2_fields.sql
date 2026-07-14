@@ -1,0 +1,17 @@
+ALTER TABLE job_applications
+ADD COLUMN IF NOT EXISTS whatsapp_number TEXT,
+ADD COLUMN IF NOT EXISTS city_country_timezone TEXT,
+ADD COLUMN IF NOT EXISTS english_level_v2 TEXT,
+ADD COLUMN IF NOT EXISTS experience_years TEXT,
+ADD COLUMN IF NOT EXISTS communication_channels TEXT[],
+ADD COLUMN IF NOT EXISTS crm_tools TEXT[],
+ADD COLUMN IF NOT EXISTS measurable_results TEXT,
+ADD COLUMN IF NOT EXISTS hours_schedule TEXT,
+ADD COLUMN IF NOT EXISTS working_elsewhere TEXT,
+ADD COLUMN IF NOT EXISTS has_equipment TEXT,
+ADD COLUMN IF NOT EXISTS start_compensation TEXT,
+ADD COLUMN IF NOT EXISTS dm_exercise_1 TEXT,
+ADD COLUMN IF NOT EXISTS dm_exercise_2 TEXT,
+ADD COLUMN IF NOT EXISTS dm_exercise_3 TEXT,
+ADD COLUMN IF NOT EXISTS prioritization TEXT,
+ADD COLUMN IF NOT EXISTS feedback_story TEXT;

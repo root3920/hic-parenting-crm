@@ -59,9 +59,31 @@ export async function POST(request: Request) {
     re_engagement_steps,
     culture_fit_why,
     excites_most,
+    // DM Setter v2 fields
+    whatsapp_number,
+    city_country_timezone,
+    english_level_v2,
+    experience_years,
+    communication_channels,
+    measurable_results,
+    hours_schedule,
+    working_elsewhere,
+    has_equipment,
+    start_compensation,
+    dm_exercise_1,
+    dm_exercise_2,
+    dm_exercise_3,
+    prioritization,
+    feedback_story,
   } = body
 
-  if (!full_name || !email || !country_timezone || !phone || !video_url || !confirmed_job_description || !confirmed_remote) {
+  // Validate required fields per position
+  const isDmSetterV2 = position === 'dm_setter' && whatsapp_number
+  if (isDmSetterV2) {
+    if (!full_name || !email || !whatsapp_number || !video_url) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+  } else if (!full_name || !email || !country_timezone || !phone || !video_url || !confirmed_job_description || !confirmed_remote) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -69,25 +91,48 @@ export async function POST(request: Request) {
     position: position === 'closer' ? 'closer' : position === 'csm' ? 'csm' : 'dm_setter',
     full_name,
     email,
-    country_timezone,
-    phone,
-    how_heard,
-    english_level,
-    has_experience,
-    past_experience,
-    crm_tools,
-    hours_per_day,
-    availability,
-    available_immediately,
-    why_hic,
-    great_setter,
-    communication_style,
-    biggest_strength,
-    five_year_vision,
-    confirmed_job_description,
-    confirmed_remote,
-    additional_comments,
     video_url,
+  }
+
+  // DM Setter v2 fields
+  if (isDmSetterV2) {
+    insertData.whatsapp_number = whatsapp_number
+    insertData.city_country_timezone = city_country_timezone
+    insertData.english_level_v2 = english_level_v2
+    insertData.experience_years = experience_years
+    insertData.past_experience = past_experience
+    insertData.communication_channels = communication_channels
+    insertData.crm_tools = crm_tools
+    insertData.measurable_results = measurable_results
+    insertData.hours_schedule = hours_schedule
+    insertData.working_elsewhere = working_elsewhere
+    insertData.has_equipment = has_equipment
+    insertData.start_compensation = start_compensation
+    insertData.dm_exercise_1 = dm_exercise_1
+    insertData.dm_exercise_2 = dm_exercise_2
+    insertData.dm_exercise_3 = dm_exercise_3
+    insertData.prioritization = prioritization
+    insertData.feedback_story = feedback_story
+  } else {
+    // Legacy shared fields for closer/csm/old dm_setter
+    insertData.country_timezone = country_timezone
+    insertData.phone = phone
+    insertData.how_heard = how_heard
+    insertData.english_level = english_level
+    insertData.has_experience = has_experience
+    insertData.past_experience = past_experience
+    insertData.crm_tools = crm_tools
+    insertData.hours_per_day = hours_per_day
+    insertData.availability = availability
+    insertData.available_immediately = available_immediately
+    insertData.why_hic = why_hic
+    insertData.great_setter = great_setter
+    insertData.communication_style = communication_style
+    insertData.biggest_strength = biggest_strength
+    insertData.five_year_vision = five_year_vision
+    insertData.confirmed_job_description = confirmed_job_description
+    insertData.confirmed_remote = confirmed_remote
+    insertData.additional_comments = additional_comments
   }
 
   // Add closer-specific fields only for closer applications

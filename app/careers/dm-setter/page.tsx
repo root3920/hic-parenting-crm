@@ -4,16 +4,23 @@ import { useState } from 'react'
 
 export const dynamic = 'force-dynamic'
 
-const HOW_HEARD_OPTIONS = ['Instagram', 'Facebook', 'LinkedIn', 'Referred by someone', 'Other']
-const ENGLISH_OPTIONS = ['Basic', 'Intermediate', 'Advanced', 'Native/Fluent']
-const EXPERIENCE_OPTIONS = ['Yes', 'No', 'Something similar']
-const HOURS_OPTIONS = ['2-4 hours', '4-6 hours', '6-8 hours', 'Full time 8+']
-const AVAILABLE_OPTIONS = ['Yes', 'No', 'In 1-2 weeks', 'In 1 month']
+const ENGLISH_OPTIONS = ['Basic', 'Intermediate', 'Upper-intermediate', 'Advanced', 'Native or bilingual']
+const EXPERIENCE_OPTIONS = ['No direct experience', 'Less than 6 months', '6–12 months', '1–2 years', 'More than 2 years']
+const CHANNEL_OPTIONS = ['Instagram DMs', 'Facebook Messenger', 'WhatsApp', 'SMS', 'Email', 'Phone calls', 'CRM conversations', 'Other']
+const CRM_OPTIONS = ['GoHighLevel', 'HubSpot', 'Salesforce', 'Kajabi', 'ManyChat', 'Slack', 'ClickUp', 'Google Sheets', 'Other', 'I have not used a CRM']
+const WORKING_OPTIONS = ['No', 'Yes, part-time', 'Yes, full-time', 'Occasionally or freelance']
+const EQUIPMENT_OPTIONS = ['Yes, I have all three', 'I am missing one of these requirements', 'No']
 
 export default function DMSetterApplicationPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  const [channels, setChannels] = useState<string[]>([])
+  const [crmTools, setCrmTools] = useState<string[]>([])
+
+  function toggleItem(arr: string[], setArr: (v: string[]) => void, item: string) {
+    setArr(arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item])
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -22,26 +29,26 @@ export default function DMSetterApplicationPage() {
 
     const fd = new FormData(e.currentTarget)
     const data = {
+      position: 'dm_setter',
       full_name: fd.get('full_name'),
       email: fd.get('email'),
-      country_timezone: fd.get('country_timezone'),
-      phone: fd.get('phone'),
-      how_heard: fd.get('how_heard'),
-      english_level: fd.get('english_level'),
-      has_experience: fd.get('has_experience'),
+      whatsapp_number: fd.get('whatsapp_number'),
+      city_country_timezone: fd.get('city_country_timezone'),
+      english_level_v2: fd.get('english_level_v2'),
+      experience_years: fd.get('experience_years'),
       past_experience: fd.get('past_experience'),
-      crm_tools: fd.get('crm_tools'),
-      hours_per_day: fd.get('hours_per_day'),
-      availability: fd.get('availability'),
-      available_immediately: fd.get('available_immediately'),
-      why_hic: fd.get('why_hic'),
-      great_setter: fd.get('great_setter'),
-      communication_style: fd.get('communication_style'),
-      biggest_strength: fd.get('biggest_strength'),
-      five_year_vision: fd.get('five_year_vision'),
-      confirmed_job_description: fd.get('confirmed_job_description') === 'on',
-      confirmed_remote: fd.get('confirmed_remote') === 'on',
-      additional_comments: fd.get('additional_comments'),
+      communication_channels: channels,
+      crm_tools: crmTools,
+      measurable_results: fd.get('measurable_results'),
+      hours_schedule: fd.get('hours_schedule'),
+      working_elsewhere: fd.get('working_elsewhere'),
+      has_equipment: fd.get('has_equipment'),
+      start_compensation: fd.get('start_compensation'),
+      dm_exercise_1: fd.get('dm_exercise_1'),
+      dm_exercise_2: fd.get('dm_exercise_2'),
+      dm_exercise_3: fd.get('dm_exercise_3'),
+      prioritization: fd.get('prioritization'),
+      feedback_story: fd.get('feedback_story'),
       video_url: fd.get('video_url'),
     }
 
@@ -68,12 +75,12 @@ export default function DMSetterApplicationPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-[#FAFAF8] flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-lg">
           <img src="/logo.png" alt="HIC Parenting" className="h-10 mx-auto mb-8" />
-          <div className="text-5xl mb-4">🎉</div>
-          <h1 className="text-2xl font-bold text-[#1C2B3A] mb-3">Thank you for applying!</h1>
-          <p className="text-[#718096] text-base">
-            We&apos;ll review your application and get back to you soon.
+          <div className="text-5xl mb-4">&#10003;</div>
+          <h1 className="text-2xl font-bold text-[#1C2B3A] mb-3">Application submitted</h1>
+          <p className="text-[#718096] text-base leading-relaxed">
+            Thank you for applying to HIC Parenting. Our team will review your experience, availability, written responses, and video. Candidates selected for the next stage will receive an invitation to complete an additional assessment. Please monitor your email and WhatsApp.
           </p>
         </div>
       </div>
@@ -87,123 +94,142 @@ export default function DMSetterApplicationPage() {
         <div className="text-center mb-10">
           <img src="/logo.png" alt="HIC Parenting" className="h-10 mx-auto mb-6" />
           <h1 className="text-2xl md:text-3xl font-bold text-[#1C2B3A] mb-2">
-            DM Setter Application
+            DM Setter Application &ndash; HIC Parenting
           </h1>
-          <p className="text-[#718096] text-sm">
-            Join the HIC Parenting team. Fill out the form below to apply.
+          <p className="text-[#718096] text-sm leading-relaxed max-w-xl mx-auto">
+            Thank you for your interest in joining HIC Parenting. We are looking for a proactive, organized, warm, and results-driven DM Setter who can create genuine conversations, follow up consistently, qualify prospects, and guide the right people toward booking a call. Estimated completion time: 10&ndash;15 minutes.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Personal Info */}
+          {/* Section: Personal Information */}
           <Section title="Personal Information">
-            <Field label="Full Name" required>
+            <Field label="Full name" required>
               <input name="full_name" type="text" required className={inputClass} placeholder="Your full name" />
             </Field>
-            <Field label="Email Address" required>
+            <Field label="Email address" required>
               <input name="email" type="email" required className={inputClass} placeholder="you@email.com" />
             </Field>
-            <Field label="Country & Time Zone" required>
-              <input name="country_timezone" type="text" required className={inputClass} placeholder="e.g. Colombia, GMT-5" />
+            <Field label="WhatsApp number including country code" required>
+              <input name="whatsapp_number" type="text" required className={inputClass} placeholder="+1 234 567 8900" />
             </Field>
-            <Field label="Phone / WhatsApp Number" required>
-              <input name="phone" type="text" required className={inputClass} placeholder="+1 234 567 8900" />
+            <Field label="City, country, and time zone" required>
+              <input name="city_country_timezone" type="text" required className={inputClass} placeholder="e.g. Bogota, Colombia, GMT-5" />
             </Field>
-            <Field label="How did you hear about this opportunity?">
-              <select name="how_heard" className={inputClass} defaultValue="">
-                <option value="" disabled>Select an option</option>
-                {HOW_HEARD_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </Field>
-          </Section>
-
-          {/* Experience */}
-          <Section title="Experience & Skills">
-            <Field label="What's your English level?">
-              <select name="english_level" className={inputClass} defaultValue="">
+            <Field label="How would you describe your English level?" required>
+              <select name="english_level_v2" required className={inputClass} defaultValue="">
                 <option value="" disabled>Select your level</option>
                 {ENGLISH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </Field>
-            <Field label="Have you worked as a DM Setter or in appointment setting before?">
-              <select name="has_experience" className={inputClass} defaultValue="">
+          </Section>
+
+          {/* Section: Experience */}
+          <Section title="Experience">
+            <Field label="How much experience do you have in appointment setting, sales, lead generation, or customer service?" required>
+              <select name="experience_years" required className={inputClass} defaultValue="">
                 <option value="" disabled>Select an option</option>
                 {EXPERIENCE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </Field>
-            <Field label="Briefly describe your past experience related to online communication or sales.">
-              <textarea name="past_experience" rows={3} className={inputClass} placeholder="Your relevant experience..." />
+            <Field label="Please briefly describe your most relevant professional experience." required>
+              <textarea name="past_experience" rows={3} required className={inputClass} placeholder="Your relevant experience..." />
             </Field>
-            <Field label="What CRM or tools have you used before?">
-              <input name="crm_tools" type="text" className={inputClass} placeholder="e.g. HubSpot, Close, GoHighLevel..." />
+            <Field label="Which communication channels have you used professionally?">
+              <div className="flex flex-wrap gap-2 mt-1">
+                {CHANNEL_OPTIONS.map(ch => (
+                  <button
+                    key={ch}
+                    type="button"
+                    onClick={() => toggleItem(channels, setChannels, ch)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      channels.includes(ch)
+                        ? 'bg-[#185FA5] text-white border-[#185FA5]'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
+                    }`}
+                  >
+                    {ch}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Which tools or CRMs have you used?">
+              <div className="flex flex-wrap gap-2 mt-1">
+                {CRM_OPTIONS.map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => toggleItem(crmTools, setCrmTools, t)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      crmTools.includes(t)
+                        ? 'bg-[#185FA5] text-white border-[#185FA5]'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Please share your most recent measurable results. Include numbers whenever possible.">
+              <p className="text-xs text-[#718096] mb-1">Examples: conversations managed, appointments booked, booking rate, show rate, response rate, or sales influenced.</p>
+              <textarea name="measurable_results" rows={3} className={inputClass} placeholder="Your measurable results..." />
             </Field>
           </Section>
 
-          {/* Availability */}
-          <Section title="Availability">
-            <Field label="How many hours per day can you dedicate to this role?">
-              <select name="hours_per_day" className={inputClass} defaultValue="">
-                <option value="" disabled>Select hours</option>
-                {HOURS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
+          {/* Section: Availability and Requirements */}
+          <Section title="Availability and Requirements">
+            <Field label="How many hours per day are you available to work, and what is your available schedule?" required>
+              <p className="text-xs text-[#718096] mb-1">Please include your local time zone.</p>
+              <textarea name="hours_schedule" rows={3} required className={inputClass} placeholder="e.g. 6 hours/day, 9am-3pm EST" />
             </Field>
-            <Field label="What's your typical availability in your local time?">
-              <input name="availability" type="text" className={inputClass} placeholder="e.g. 9am - 5pm" />
-            </Field>
-            <Field label="Are you available to start immediately?">
-              <select name="available_immediately" className={inputClass} defaultValue="">
+            <Field label="Are you currently working with another company or client?" required>
+              <select name="working_elsewhere" required className={inputClass} defaultValue="">
                 <option value="" disabled>Select an option</option>
-                {AVAILABLE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                {WORKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </Field>
-          </Section>
-
-          {/* About You */}
-          <Section title="About You">
-            <Field label="Why do you want to work with HIC Parenting?">
-              <textarea name="why_hic" rows={3} className={inputClass} placeholder="Tell us why..." />
+            <Field label="Do you have your own computer, stable internet, and a quiet workspace?" required>
+              <select name="has_equipment" required className={inputClass} defaultValue="">
+                <option value="" disabled>Select an option</option>
+                {EQUIPMENT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
             </Field>
-            <Field label="In your opinion, what makes a great DM Setter?">
-              <textarea name="great_setter" rows={3} className={inputClass} placeholder="Your thoughts..." />
-            </Field>
-            <Field label="How would you describe your communication style in DMs?">
-              <textarea name="communication_style" rows={3} className={inputClass} placeholder="Describe your style..." />
-            </Field>
-            <Field label="What's your biggest strength when speaking to potential clients?">
-              <textarea name="biggest_strength" rows={3} className={inputClass} placeholder="Your biggest strength..." />
-            </Field>
-            <Field label="How do you see yourself in 2 years?">
-              <textarea name="five_year_vision" rows={3} className={inputClass} placeholder="Your vision..." />
+            <Field label="When would you be available to start, and what is your expected monthly compensation in USD?" required>
+              <textarea name="start_compensation" rows={2} required className={inputClass} placeholder="Start date and expected compensation..." />
             </Field>
           </Section>
 
-          {/* Video */}
-          <Section title="Video Introduction">
-            <Field label="Paste a link to your 1-minute video introduction (Loom, YouTube, Google Drive, etc.)" required>
+          {/* Section: Practical DM Exercise */}
+          <Section title="Practical DM Exercise">
+            <p className="text-sm text-[#718096]">Please write the exact message you would send.</p>
+            <Field label={'A mother replies to an Instagram story and says: \u201CI\'m interested, but I\'m not sure this would work for my family.\u201D How would you continue the conversation?'} required>
+              <textarea name="dm_exercise_1" rows={4} required className={inputClass} placeholder="Your message..." />
+            </Field>
+            <Field label="A prospect had a positive conversation with you and received the booking link 48 hours ago, but she has not scheduled a call. Write the follow-up message you would send." required>
+              <textarea name="dm_exercise_2" rows={4} required className={inputClass} placeholder="Your follow-up message..." />
+            </Field>
+            <Field label={'\u201CI really need help, but I don\u2019t have time for a call right now.\u201D How would you respond?'} required>
+              <textarea name="dm_exercise_3" rows={4} required className={inputClass} placeholder="Your response..." />
+            </Field>
+          </Section>
+
+          {/* Section: Organization and Performance */}
+          <Section title="Organization and Performance">
+            <Field label={'You begin your shift and see these conversations:\nA. A prospect requested the booking link 10 minutes ago.\nB. A prospect has a call tomorrow but has not confirmed.\nC. A prospect has not responded in five days.\nD. A new prospect just replied, \u201CI\'m ready to learn more.\u201D\nE. A prospect clearly said she is no longer interested.\nIn what order would you handle them, and why?'} required>
+              <textarea name="prioritization" rows={5} required className={inputClass} placeholder="Your prioritization and reasoning..." />
+            </Field>
+            <Field label="Tell us about a time you received feedback about your communication or performance. What did you change afterward?" required>
+              <textarea name="feedback_story" rows={4} required className={inputClass} placeholder="Your experience..." />
+            </Field>
+          </Section>
+
+          {/* Section: Video */}
+          <Section title="Video">
+            <Field label={'Share a link to a video of no more than 90 seconds answering:\n1. Who are you?\n2. What relevant experience do you have?\n3. What measurable result are you most proud of?\n4. Why would you be a good fit for HIC Parenting?\nYou may use Loom, Google Drive, or YouTube Unlisted. Please confirm that the link is accessible.'} required>
               <input name="video_url" type="url" required className={inputClass} placeholder="https://..." />
             </Field>
           </Section>
-
-          {/* Confirmations */}
-          <Section title="Confirmations">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input name="confirmed_job_description" type="checkbox" required className="mt-1 h-4 w-4 rounded border-[#E8E4DC] text-[#F59E0B] focus:ring-[#F59E0B]" />
-              <span className="text-sm text-[#1C2B3A]">
-                I confirm that I&apos;ve read and understood the job description <span className="text-red-500">*</span>
-              </span>
-            </label>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input name="confirmed_remote" type="checkbox" required className="mt-1 h-4 w-4 rounded border-[#E8E4DC] text-[#F59E0B] focus:ring-[#F59E0B]" />
-              <span className="text-sm text-[#1C2B3A]">
-                I understand that this is a remote position with performance-based compensation <span className="text-red-500">*</span>
-              </span>
-            </label>
-          </Section>
-
-          {/* Additional */}
-          <Field label="Any additional comments or questions?">
-            <textarea name="additional_comments" rows={3} className={inputClass} placeholder="Anything else you'd like us to know..." />
-          </Field>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
@@ -239,7 +265,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-[#1C2B3A]">
+      <label className="block text-sm font-medium text-[#1C2B3A] whitespace-pre-line">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
