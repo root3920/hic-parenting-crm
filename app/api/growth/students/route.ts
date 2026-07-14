@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -19,25 +20,27 @@ export async function GET(request: Request) {
       .not('cohort', 'is', null)
       .order('cohort', { ascending: true })
 
-    if (error) return Response.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error('Supabase error:', error)
+      return NextResponse.json([], { status: 200 })
+    }
 
     const unique = Array.from(new Set((data || []).map(r => r.cohort as string)))
-    return Response.json(unique)
+    return NextResponse.json(unique)
   }
 
-  let query = supabase
+  const { data, error } = await supabase
     .from('pwu_students')
     .select('id, first_name, last_name, email, type')
     .eq('status', 'active')
+    .or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
     .order('first_name', { ascending: true })
     .limit(20)
 
-  if (search.length > 0) {
-    query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
+  if (error) {
+    console.error('Supabase error:', error)
+    return NextResponse.json([], { status: 200 })
   }
 
-  const { data, error } = await query
-
-  if (error) return Response.json({ error: error.message }, { status: 500 })
-  return Response.json(data ?? [])
+  return NextResponse.json(data ?? [])
 }

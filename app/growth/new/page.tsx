@@ -208,17 +208,26 @@ interface ActiveStudent {
 }
 
 function ClientCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [students, setStudents] = useState<ActiveStudent[]>([])
+  const [studentOptions, setStudentOptions] = useState<ActiveStudent[]>([])
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState(value)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    fetch('/api/growth/students')
-      .then(r => r.ok ? r.json() : [])
-      .then(setStudents)
-      .catch(() => {})
-  }, [])
+  const searchStudents = async (query: string) => {
+    if (query.length < 1) {
+      setStudentOptions([])
+      return
+    }
+    try {
+      const res = await fetch(`/api/growth/students?search=${encodeURIComponent(query)}`)
+      const data = await res.json()
+      console.log('Students response:', data)
+      setStudentOptions(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error('Student search error:', err)
+      setStudentOptions([])
+    }
+  }
 
   useEffect(() => { setSearch(value) }, [value])
 
@@ -232,16 +241,6 @@ function ClientCombobox({ value, onChange }: { value: string; onChange: (v: stri
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const filtered = useMemo(() => {
-    if (!search) return students
-    const q = search.toLowerCase()
-    return students.filter(s => {
-      const full = `${s.first_name} ${s.last_name || ''}`.toLowerCase()
-      const email = (s.email || '').toLowerCase()
-      return full.includes(q) || email.includes(q)
-    })
-  }, [students, search])
-
   function handleSelect(s: ActiveStudent) {
     const fullName = `${s.first_name} ${s.last_name || ''}`.trim()
     onChange(fullName)
@@ -254,6 +253,7 @@ function ClientCombobox({ value, onChange }: { value: string; onChange: (v: stri
     setSearch(v)
     onChange(v)
     if (!open) setOpen(true)
+    searchStudents(v)
   }
 
   return (
@@ -282,7 +282,7 @@ function ClientCombobox({ value, onChange }: { value: string; onChange: (v: stri
             transition={{ duration: 0.15 }}
             className="absolute z-50 top-full mt-1 w-full max-h-[200px] overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg"
           >
-            {filtered.length > 0 ? filtered.map(s => {
+            {studentOptions.length > 0 ? studentOptions.map(s => {
               const fullName = `${s.first_name} ${s.last_name || ''}`.trim()
               return (
                 <button
