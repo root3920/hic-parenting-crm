@@ -48,6 +48,7 @@ interface FormState {
   // Downsell SPC
   dq_detected: string
   dq_spc_offered: string
+  spc_buyers: string
   // Autoevaluación
   performance_score: number
   highs: string[]
@@ -62,7 +63,7 @@ const initialState: FormState = {
   total_convos: '', active_conversations: '', followups: '', inbound: '', outbound: '', no_reply: '', new_leads: '',
   calls_proposed: '', calls_booked: '', calls_no_reply: '', calls_followup: '',
   qual_apps: '', disqual_apps: '', waiting: '', requalified: 'N/A', disqual_reasons: [],
-  dq_detected: '', dq_spc_offered: '',
+  dq_detected: '', dq_spc_offered: '', spc_buyers: '',
   performance_score: 7, highs: [], lows: [], notas: '',
 }
 
@@ -200,6 +201,7 @@ export default function NuevoReporteSetterPage() {
       disqual_reasons: form.disqual_reasons.length ? form.disqual_reasons : null,
       dq_detected: n(form.dq_detected),
       dq_spc_offered: n(form.dq_spc_offered),
+      spc_buyers: n(form.spc_buyers),
       performance_score: form.performance_score,
       highs: form.highs.length ? form.highs : null,
       lows: form.lows.length ? form.lows : null,
@@ -350,12 +352,17 @@ export default function NuevoReporteSetterPage() {
               label="Downsell SPC"
               sub="DQ → SPC tracking"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div><FieldLabel>Descualificados detectados</FieldLabel><NumberInput value={form.dq_detected} onChange={(v) => set('dq_detected', v)} /></div>
               <div>
                 <FieldLabel>DQ a los que les ofreciste SPC</FieldLabel>
                 <NumberInput value={form.dq_spc_offered} onChange={(v) => set('dq_spc_offered', v)} />
                 <p className="text-[10px] text-zinc-400 mt-1">De los descualificados de hoy, ¿a cuántos les ofreciste el SPC?</p>
+              </div>
+              <div>
+                <FieldLabel>Compradores SPC por Setting</FieldLabel>
+                <NumberInput value={form.spc_buyers} onChange={(v) => set('spc_buyers', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">¿Cuántos contactos compraron el SPC gracias a tu gestión hoy?</p>
               </div>
             </div>
           </SectionCard>

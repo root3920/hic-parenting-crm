@@ -119,6 +119,7 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
     disqual_reasons: Array.isArray(report.disqual_reasons) ? report.disqual_reasons : [],
     dq_detected: String(report.dq_detected ?? ''),
     dq_spc_offered: String(report.dq_spc_offered ?? ''),
+    spc_buyers: String(report.spc_buyers ?? ''),
     performance_score: report.performance_score ?? 7,
     highs: Array.isArray(report.highs) ? report.highs : (typeof report.highs === 'string' && report.highs ? report.highs.split(', ') : []),
     lows: Array.isArray(report.lows) ? report.lows : (typeof report.lows === 'string' && report.lows ? report.lows.split(', ') : []),
@@ -177,6 +178,7 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
           disqual_reasons: form.disqual_reasons.length ? form.disqual_reasons : null,
           dq_detected: n(form.dq_detected),
           dq_spc_offered: n(form.dq_spc_offered),
+          spc_buyers: n(form.spc_buyers),
           performance_score: form.performance_score,
           highs: form.highs.length ? form.highs : null,
           lows: form.lows.length ? form.lows : null,
@@ -273,9 +275,10 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
         {/* Downsell SPC */}
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-orange-600 mb-2">Downsell SPC</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">DQ Detected</label><input type="number" min={0} value={form.dq_detected} onChange={(e) => set('dq_detected', e.target.value)} className={inputCls} /></div>
             <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">DQ con oferta SPC</label><input type="number" min={0} value={form.dq_spc_offered} onChange={(e) => set('dq_spc_offered', e.target.value)} className={inputCls} /></div>
+            <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Compradores SPC</label><input type="number" min={0} value={form.spc_buyers} onChange={(e) => set('spc_buyers', e.target.value)} className={inputCls} /></div>
           </div>
         </div>
 
@@ -451,6 +454,7 @@ export default function SetterDashboardPage() {
           active_conversations: r.active_conversations ?? 0,
           dq_detected:       r.dq_detected ?? 0,
           dq_spc_offered:    r.dq_spc_offered ?? 0,
+          spc_buyers:        r.spc_buyers ?? 0,
           source:            'Formulario' as const,
         })),
       ].sort((a, b) => b.date.localeCompare(a.date))
@@ -509,6 +513,7 @@ export default function SetterDashboardPage() {
     const totalActiveConversations = sumField(filtered, 'active_conversations')
     const totalDqDetected = sumField(filtered, 'dq_detected')
     const totalDqSpcOffered = sumField(filtered, 'dq_spc_offered')
+    const totalSpcBuyers = sumField(filtered, 'spc_buyers')
     return {
       totalConvos,
       totalFollowups,
@@ -519,6 +524,7 @@ export default function SetterDashboardPage() {
       totalActiveConversations,
       totalDqDetected,
       totalDqSpcOffered,
+      totalSpcBuyers,
     }
   }, [filtered])
 
@@ -715,6 +721,7 @@ export default function SetterDashboardPage() {
                 value={volume.totalDqSpcOffered}
                 sub={`${fmtPct(safeDiv(volume.totalDqSpcOffered, volume.totalDqDetected) * 100)} de DQ`}
               />
+              <VolumeCard label="Compradores SPC" value={volume.totalSpcBuyers} />
             </div>
 
             {/* ── Section 3: Charts ── */}
@@ -892,6 +899,7 @@ export default function SetterDashboardPage() {
                       active_conversations: updated.active_conversations ?? 0,
                       dq_detected: updated.dq_detected ?? 0,
                       dq_spc_offered: updated.dq_spc_offered ?? 0,
+                      spc_buyers: updated.spc_buyers ?? 0,
                     }
                   : r
               ))

@@ -79,7 +79,7 @@ export async function PATCH(
     'inbound', 'outbound', 'no_reply', 'new_leads',
     'calls_proposed', 'calls_booked', 'calls_no_reply', 'calls_followup',
     'qual_apps', 'disqual_apps', 'waiting', 'requalified', 'disqual_reasons',
-    'dq_detected', 'dq_spc_offered',
+    'dq_detected', 'dq_spc_offered', 'spc_buyers',
     'performance_score', 'highs', 'lows', 'notas',
   ]
 
