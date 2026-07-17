@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 function getServiceClient() {
   return createClient(
@@ -40,4 +40,33 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json(data ?? [])
+}
+
+// POST /api/client-success/pipeline — create a single pipeline record
+export async function POST(req: NextRequest) {
+  const auth = await verifyAuth()
+  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { student_id } = await req.json()
+  if (!student_id) return NextResponse.json({ error: 'student_id required' }, { status: 400 })
+
+  const db = getServiceClient()
+
+  const { data, error } = await db
+    .from('onboarding_pipeline')
+    .upsert({
+      student_id,
+      current_step: 1,
+      step1_status: 'pending',
+      step2_status: 'pending',
+      step3_status: 'pending',
+      step4_status: 'pending',
+      step5_status: 'pending',
+      step6_status: 'pending',
+    }, { onConflict: 'student_id' })
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  return NextResponse.json(data)
 }

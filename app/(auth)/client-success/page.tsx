@@ -12,8 +12,11 @@ import { usePreviewRole } from '@/contexts/PreviewRoleContext'
 import {
   RefreshCw, Filter, Users, CheckCircle2, Clock, AlertCircle, Circle,
   ChevronDown, ChevronRight, X, Mail, Phone, Calendar, GripVertical,
-  MessageSquare, Pencil, ChevronUp,
+  MessageSquare, Pencil, ChevronUp, CreditCard, DollarSign, Video, Plus,
+  GraduationCap, PauseCircle, Trash2, ExternalLink,
 } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import type { StudentNote, Transaction, StudentPaymentPlan, CoachingSession } from '@/types'
 import { cn } from '@/lib/utils'
 import {
   DndContext,
@@ -290,9 +293,14 @@ function AccordionColumn({
   )
 }
 
-// ─── Detail Modal ───────────────────────────────────────────────────────────
+// ─── Full Student Modal ─────────────────────────────────────────────────────
 
-function PipelineDetailModal({
+function fmtDate(d: string | null) {
+  if (!d) return '—'
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function FullStudentModal({
   record,
   onClose,
   onUpdate,
@@ -301,16 +309,47 @@ function PipelineDetailModal({
   onClose: () => void
   onUpdate: (updated: PipelineRecord) => void
 }) {
+  const supabase = useMemo(() => createClient(), [])
   const [localRecord, setLocalRecord] = useState(record)
   const [saving, setSaving] = useState(false)
   const [coaches, setCoaches] = useState<{ full_name: string }[]>([])
+  const [notes, setNotes] = useState<StudentNote[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [sessions, setSessions] = useState<CoachingSession[]>([])
+  const [newNote, setNewNote] = useState('')
+  const [addingNote, setAddingNote] = useState(false)
 
+  const student = record.student
+  if (!student) return null
+
+  // Fetch all related data
   useEffect(() => {
-    fetch('/api/growth/coaches')
-      .then((r) => r.json())
-      .then((d) => setCoaches(d))
+    fetch('/api/growth/coaches').then((r) => r.json()).then(setCoaches).catch(() => {})
+
+    // Notes
+    supabase
+      .from('student_notes')
+      .select('*')
+      .eq('student_id', student.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setNotes(data ?? []))
+
+    // Transactions
+    if (student.email) {
+      supabase
+        .from('transactions')
+        .select('*')
+        .ilike('buyer_email', student.email)
+        .order('date', { ascending: false })
+        .then(({ data }) => setTransactions(data ?? []))
+    }
+
+    // Sessions
+    fetch(`/api/students/sessions?student_id=${student.id}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setSessions)
       .catch(() => {})
-  }, [])
+  }, [student.id, student.email, supabase])
 
   const patchField = useCallback(async (updates: Record<string, unknown>) => {
     setSaving(true)
@@ -330,48 +369,74 @@ function PipelineDetailModal({
   }, [localRecord, onUpdate])
 
   const handleStepStatusChange = useCallback(async (stepNum: number, newStatus: string) => {
-    const updates: Record<string, unknown> = {
-      [`step${stepNum}_status`]: newStatus,
-    }
-
-    // Auto-advance current_step when marked completed
+    const updates: Record<string, unknown> = { [`step${stepNum}_status`]: newStatus }
     if (newStatus === 'completed' && stepNum <= 5) {
-      const nextStep = stepNum + 1
-      const nextStepStatus = (localRecord as unknown as Record<string, unknown>)[`step${nextStep}_status`] as string
-      if (nextStepStatus === 'pending') {
-        updates.current_step = nextStep
-      }
+      const nextStepStatus = (localRecord as unknown as Record<string, unknown>)[`step${stepNum + 1}_status`] as string
+      if (nextStepStatus === 'pending') updates.current_step = stepNum + 1
     }
-
     await patchField(updates)
   }, [localRecord, patchField])
 
-  const handleStepDateChange = useCallback(async (stepNum: number, date: string) => {
-    await patchField({ [`step${stepNum}_date`]: date || null })
-  }, [patchField])
+  const handleAddNote = useCallback(async () => {
+    if (!newNote.trim()) return
+    setAddingNote(true)
+    const { data } = await supabase
+      .from('student_notes')
+      .insert({ student_id: student.id, note: newNote.trim(), created_by: 'pipeline' })
+      .select()
+      .single()
+    if (data) setNotes((prev) => [data, ...prev])
+    setNewNote('')
+    setAddingNote(false)
+  }, [newNote, student.id, supabase])
 
-  if (!record.student) return null
+  const completedTx = transactions.filter((t) => t.status === 'completed')
+  const totalPaid = completedTx.reduce((sum, t) => sum + (Number(t.cost) || 0), 0)
+
+  const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
+  const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
+  const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700 w-full max-w-2xl">
+      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-700 w-full max-w-4xl">
+        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-zinc-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-bold text-blue-600 dark:text-blue-300">
-              {getInitials(record.student)}
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-lg font-bold text-blue-600 dark:text-blue-300 shrink-0">
+              {getInitials(student)}
             </div>
             <div>
-              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{fullName(record.student)}</h2>
-              <div className="flex items-center gap-2 mt-0.5">
-                {record.student.email && (
-                  <span className="flex items-center gap-1 text-[11px] text-zinc-400">
-                    <Mail className="h-3 w-3" />{record.student.email}
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{fullName(student)}</h2>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                {student.email && (
+                  <span className="flex items-center gap-1 text-xs text-zinc-400">
+                    <Mail className="h-3 w-3" />{student.email}
                   </span>
                 )}
-                {record.student.phone && (
-                  <span className="flex items-center gap-1 text-[11px] text-zinc-400">
-                    <Phone className="h-3 w-3" />{record.student.phone}
+                {student.phone && (
+                  <span className="flex items-center gap-1 text-xs text-zinc-400">
+                    <Phone className="h-3 w-3" />{student.phone}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className={cn(
+                  'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold',
+                  student.status === 'active' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                  student.status === 'graduated' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                  student.status === 'paused' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                  'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                )}>
+                  {student.status === 'graduated' ? 'Graduated 🎓' : student.status.charAt(0).toUpperCase() + student.status.slice(1)}
+                </span>
+                <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                  {student.type === 'individual' ? 'Individual 1:1' : 'Group'}
+                </span>
+                {student.cohort && (
+                  <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                    {student.type === 'individual' ? '1:1' : `Cohort ${student.cohort}`}
                   </span>
                 )}
               </div>
@@ -382,13 +447,11 @@ function PipelineDetailModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
-          {/* Onboarding Pipeline Timeline */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">
-              Onboarding Pipeline
-            </p>
-            <div className="space-y-0">
+        <div className="p-5">
+          {/* Onboarding Pipeline */}
+          <div className="mb-6">
+            <p className={sectionLabel}>Onboarding Pipeline</p>
+            <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-1">
               {STEPS.map((step) => {
                 const status = (localRecord as unknown as Record<string, unknown>)[`step${step.num}_status`] as string ?? 'pending'
                 const date = (localRecord as unknown as Record<string, unknown>)[`step${step.num}_date`] as string | null
@@ -398,47 +461,32 @@ function PipelineDetailModal({
                   <div
                     key={step.num}
                     className={cn(
-                      'flex items-center gap-3 py-2.5 px-3 rounded-lg border-l-[3px] mb-1',
+                      'flex items-center gap-3 py-2 px-2.5 rounded-lg border-l-[3px]',
                       status === 'completed' && 'border-l-[#b9d496] bg-green-50/50 dark:bg-green-900/10',
                       status === 'waiting' && 'border-l-[#ffbd59] bg-amber-50/50 dark:bg-amber-900/10',
                       status === 'pending' && 'border-l-zinc-200 dark:border-l-zinc-700',
-                      isCurrent && status === 'pending' && 'bg-zinc-50 dark:bg-zinc-800/50',
+                      isCurrent && status === 'pending' && 'bg-white dark:bg-zinc-800',
                     )}
                   >
-                    {/* Icon */}
                     <div className="shrink-0">
-                      {status === 'completed' && (
-                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      )}
-                      {status === 'waiting' && (
-                        <Clock className="h-4 w-4 text-amber-500 dark:text-amber-400" />
-                      )}
-                      {status === 'pending' && (
-                        <Circle className="h-4 w-4 text-zinc-300 dark:text-zinc-600" />
-                      )}
+                      {status === 'completed' && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />}
+                      {status === 'waiting' && <Clock className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />}
+                      {status === 'pending' && <Circle className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-600" />}
                     </div>
-
-                    {/* Step info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        Step {step.num}: {step.name}
-                      </p>
-                    </div>
-
-                    {/* Date picker */}
+                    <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex-1 min-w-0">
+                      {step.num}. {step.name}
+                    </span>
                     <input
                       type="date"
                       value={date ?? ''}
-                      onChange={(e) => handleStepDateChange(step.num, e.target.value)}
-                      className="text-[11px] border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 w-[110px] focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                      onChange={(e) => patchField({ [`step${step.num}_date`]: e.target.value || null })}
+                      className="text-[11px] border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 w-[105px] focus:outline-none focus:ring-1 focus:ring-blue-500/30"
                     />
-
-                    {/* Status dropdown */}
                     <select
                       value={status}
                       onChange={(e) => handleStepStatusChange(step.num, e.target.value)}
                       className={cn(
-                        'text-[11px] font-medium rounded px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500/30 cursor-pointer',
+                        'text-[11px] font-medium rounded px-1.5 py-0.5 border-0 focus:outline-none cursor-pointer',
                         status === 'completed' && 'bg-[#b9d496]/30 text-green-700 dark:text-green-400',
                         status === 'waiting' && 'bg-[#ffbd59]/30 text-amber-700 dark:text-amber-400',
                         status === 'pending' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400',
@@ -452,47 +500,165 @@ function PipelineDetailModal({
                 )
               })}
             </div>
-          </div>
-
-          {/* Coach, Enrollment Date, Notes */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Coach</label>
-              <select
-                value={localRecord.coach ?? ''}
-                onChange={(e) => patchField({ coach: e.target.value || null })}
-                className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              >
-                <option value="">No coach assigned</option>
-                {coaches.map((c) => (
-                  <option key={c.full_name} value={c.full_name}>{c.full_name}</option>
-                ))}
-              </select>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-0.5">Coach</label>
+                <select
+                  value={localRecord.coach ?? ''}
+                  onChange={(e) => patchField({ coach: e.target.value || null })}
+                  className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                >
+                  <option value="">—</option>
+                  {coaches.map((c) => (
+                    <option key={c.full_name} value={c.full_name}>{c.full_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-0.5">Enrollment Date</label>
+                <input
+                  type="date"
+                  value={localRecord.enrollment_date ?? ''}
+                  onChange={(e) => patchField({ enrollment_date: e.target.value || null })}
+                  className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Enrollment Date</label>
-              <input
-                type="date"
-                value={localRecord.enrollment_date ?? ''}
-                onChange={(e) => patchField({ enrollment_date: e.target.value || null })}
-                className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            <div className="mt-2">
+              <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-0.5">Pipeline Notes</label>
+              <textarea
+                value={localRecord.notes ?? ''}
+                onChange={(e) => setLocalRecord((prev) => ({ ...prev, notes: e.target.value }))}
+                onBlur={() => patchField({ notes: localRecord.notes })}
+                rows={2}
+                className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30 resize-none"
               />
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Notes</label>
-            <textarea
-              value={localRecord.notes ?? ''}
-              onChange={(e) => setLocalRecord((prev) => ({ ...prev, notes: e.target.value }))}
-              onBlur={() => patchField({ notes: localRecord.notes })}
-              rows={3}
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
-            />
+            {saving && <p className="text-[10px] text-blue-500 animate-pulse mt-1">Saving...</p>}
           </div>
 
-          {saving && (
-            <p className="text-[11px] text-blue-500 animate-pulse">Saving...</p>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* LEFT */}
+            <div className="space-y-6">
+              {/* Key Dates */}
+              <div>
+                <p className={sectionLabel}>Key Dates</p>
+                <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className={rowLabel}>Total Paid</span>
+                    <span className={cn(rowValue, totalPaid > 0 ? 'text-green-600 dark:text-green-400' : '')}>
+                      {totalPaid > 0 ? `$${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={rowLabel}>Payments</span>
+                    <span className={rowValue}>{completedTx.length > 0 ? `${completedTx.length} payment${completedTx.length !== 1 ? 's' : ''}` : '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={rowLabel}>Cohort Assigned</span>
+                    <span className={rowValue}>{fmtDate(student.cohort_assigned_at)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transactions */}
+              {transactions.length > 0 && (
+                <div>
+                  <p className={sectionLabel}>Transactions</p>
+                  <div className="space-y-1.5">
+                    {transactions.slice(0, 5).map((t) => (
+                      <div key={t.id} className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate">{t.offer_title}</p>
+                          <p className="text-[11px] text-zinc-400">{fmtDate(t.date)}</p>
+                        </div>
+                        <div className="text-right ml-2">
+                          <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">${Number(t.cost).toFixed(2)}</p>
+                          <span className={cn(
+                            'inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold capitalize',
+                            t.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                            t.status === 'refunded' ? 'bg-red-100 text-red-700' : 'bg-zinc-100 text-zinc-500'
+                          )}>
+                            {t.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Coaching Sessions */}
+              {sessions.length > 0 && (
+                <div>
+                  <p className={cn(sectionLabel, 'flex items-center gap-1.5')}>
+                    <Video className="h-3.5 w-3.5" /> Coaching Sessions
+                  </p>
+                  <div className="space-y-1.5">
+                    {sessions.slice(0, 5).map((s) => (
+                      <div key={s.id} className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2">
+                        <div>
+                          <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                            {new Date(s.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {' · '}
+                            {new Date(s.session_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                          </p>
+                          <p className="text-[11px] text-zinc-400">{s.duration_minutes} min · {s.session_type}</p>
+                        </div>
+                        <span className={cn(
+                          'inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold',
+                          s.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                          s.status === 'scheduled' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                          'bg-zinc-100 text-zinc-500'
+                        )}>
+                          {s.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT — Contact Notes */}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />
+                <p className={cn(sectionLabel, 'mb-0')}>Contact Notes</p>
+              </div>
+              <div className="flex-1 space-y-2 max-h-72 overflow-y-auto pr-1 mb-4">
+                {notes.length === 0 ? (
+                  <div className="text-center py-10 text-zinc-400 text-xs">No notes yet.</div>
+                ) : (
+                  notes.map((n) => (
+                    <div key={n.id} className="relative pl-4 border-l-2 border-zinc-200 dark:border-zinc-700">
+                      <p className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">{n.note}</p>
+                      <p className="text-[10px] text-zinc-400 mt-1">
+                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                        {n.created_by && ` · ${n.created_by}`}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="Add a note..."
+                  rows={2}
+                  className="flex-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                />
+                <button
+                  onClick={handleAddNote}
+                  disabled={addingNote || !newNote.trim()}
+                  className="px-3 py-1 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 self-end"
+                >
+                  {addingNote ? '...' : 'Add'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -747,7 +913,7 @@ export default function ClientSuccessPage() {
 
         {/* Detail Modal */}
         {selectedRecord && (
-          <PipelineDetailModal
+          <FullStudentModal
             record={selectedRecord}
             onClose={() => setSelectedRecord(null)}
             onUpdate={handleRecordUpdate}

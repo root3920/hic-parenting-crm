@@ -24,6 +24,38 @@ import type { PwuStudent, StudentNote, Transaction, StudentPaymentPlan, Coaching
 
 export const dynamic = 'force-dynamic'
 
+// ─── Pipeline Types ─────────────────────────────────────────────────────────
+
+interface PipelineRecord {
+  id: string
+  student_id: string
+  coach: string | null
+  enrollment_date: string | null
+  notes: string | null
+  step1_status: string; step1_date: string | null
+  step2_status: string; step2_date: string | null
+  step3_status: string; step3_date: string | null
+  step4_status: string; step4_date: string | null
+  step5_status: string; step5_date: string | null
+  step6_status: string; step6_date: string | null
+  current_step: number
+  created_at: string
+  updated_at: string
+}
+
+const STEP_NAMES: Record<number, string> = {
+  1: 'Welcome Message',
+  2: 'Message Video 1:1 or Group',
+  3: 'Q & A Meeting',
+  4: 'Contract + Form',
+  5: 'Matching Cohort',
+  6: 'Session 1',
+}
+
+const STEP_COLORS: Record<number, string> = {
+  1: '#ffbd59', 2: '#89bcef', 3: '#ffbd59', 4: '#b9d496', 5: '#89bcef', 6: '#b9d496',
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function sortCohorts(cohorts: string[]): string[] {
@@ -187,6 +219,7 @@ const ONBOARDING_STEPS = [
 function OnboardingPipelineSection({ studentId }: { studentId: string }) {
   const [pipeline, setPipeline] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
   const [coaches, setCoaches] = useState<{ full_name: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [localNotes, setLocalNotes] = useState('')
@@ -207,6 +240,24 @@ function OnboardingPipelineSection({ studentId }: { studentId: string }) {
     }
     load()
     fetch('/api/growth/coaches').then((r) => r.json()).then(setCoaches).catch(() => {})
+  }, [studentId])
+
+  const handleCreate = useCallback(async () => {
+    setCreating(true)
+    const res = await fetch('/api/client-success/pipeline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: studentId }),
+    })
+    if (res.ok) {
+      const created = await res.json()
+      setPipeline(created)
+      setLocalNotes('')
+      toast.success('Added to onboarding pipeline')
+    } else {
+      toast.error('Failed to create pipeline record')
+    }
+    setCreating(false)
   }, [studentId])
 
   const patchField = useCallback(async (updates: Record<string, unknown>) => {
@@ -237,12 +288,27 @@ function OnboardingPipelineSection({ studentId }: { studentId: string }) {
   }, [pipeline, patchField])
 
   if (loading) return null
-  if (!pipeline) return null
 
   const sLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
 
+  if (!pipeline) {
+    return (
+      <div>
+        <p className={sLabel}>Onboarding Pipeline</p>
+        <button
+          onClick={handleCreate}
+          disabled={creating}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors disabled:opacity-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {creating ? 'Adding...' : 'Add to Onboarding Pipeline'}
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="mb-6">
+    <div>
       <p className={sLabel}>Onboarding Pipeline</p>
       <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-1">
         {ONBOARDING_STEPS.map((step) => {
@@ -550,9 +616,6 @@ function StudentProfileModal({
           </button>
         </div>
       </div>
-
-      {/* Onboarding Pipeline Section */}
-      <OnboardingPipelineSection studentId={student.id} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* ── LEFT ── */}
@@ -993,6 +1056,9 @@ function StudentProfileModal({
             )}
           </div>
 
+          {/* Onboarding Pipeline */}
+          <OnboardingPipelineSection studentId={student.id} />
+
           {/* Notes field */}
           {student.notes && (
             <div>
@@ -1324,6 +1390,7 @@ interface StudentActions {
   onDelete: (s: PwuStudent) => void
   onStatusChange: (s: PwuStudent, status: StudentStatus) => void
   onSelect: (s: PwuStudent) => void
+  pipelineRecords: Record<string, PipelineRecord>
 }
 
 // ─── Payment Plans Types ─────────────────────────────────────────────────────
@@ -1885,6 +1952,9 @@ export default function StudentsPage() {
   const [profilePaymentPlan, setProfilePaymentPlan] = useState<StudentPaymentPlan | null>(null)
   const [profileSessions, setProfileSessions] = useState<CoachingSession[]>([])
 
+  // Pipeline data
+  const [pipelineRecords, setPipelineRecords] = useState<Record<string, PipelineRecord>>({})
+
   // Registered cohorts (from pwu_cohorts table)
   const [registeredCohorts, setRegisteredCohorts] = useState<string[]>([])
 
@@ -1931,6 +2001,18 @@ export default function StudentsPage() {
     setLoading(false)
   }, [supabase])
 
+  const fetchPipeline = useCallback(async () => {
+    try {
+      const res = await fetch('/api/client-success/pipeline')
+      if (res.ok) {
+        const data: PipelineRecord[] = await res.json()
+        const map: Record<string, PipelineRecord> = {}
+        data.forEach((r) => { map[r.student_id] = r })
+        setPipelineRecords(map)
+      }
+    } catch { /* silent */ }
+  }, [])
+
   const calMonthKey = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`
   const fetchCalSessions = useCallback(async () => {
     setCalLoading(true)
@@ -1941,7 +2023,7 @@ export default function StudentsPage() {
     setCalLoading(false)
   }, [calMonthKey])
 
-  useEffect(() => { fetchStudents(); fetchPaymentPlans(); fetchCohorts() }, [fetchStudents, fetchPaymentPlans, fetchCohorts])
+  useEffect(() => { fetchStudents(); fetchPaymentPlans(); fetchCohorts(); fetchPipeline() }, [fetchStudents, fetchPaymentPlans, fetchCohorts, fetchPipeline])
   useEffect(() => { if (tab === 'sessions') fetchCalSessions() }, [tab, fetchCalSessions])
 
   // Fetch notes, transactions, and payment plan when a student profile is opened
@@ -2260,6 +2342,7 @@ export default function StudentsPage() {
     onDelete: setDeleteTarget,
     onStatusChange: handleStatusChange,
     onSelect: setSelectedStudent,
+    pipelineRecords,
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -2734,6 +2817,44 @@ export default function StudentsPage() {
   )
 }
 
+// ─── Pipeline Step Badge ─────────────────────────────────────────────────────
+
+function StepBadge({ pipeline }: { pipeline?: PipelineRecord }) {
+  if (!pipeline) return <span className="text-xs text-zinc-300 dark:text-zinc-600">—</span>
+
+  const step = pipeline.current_step
+  const statusKey = `step${step}_status` as keyof PipelineRecord
+  const status = (pipeline[statusKey] as string) ?? 'pending'
+  const name = STEP_NAMES[step] ?? ''
+
+  return (
+    <div className="flex items-center gap-1.5 group/step relative">
+      <span
+        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white shrink-0"
+        style={{ backgroundColor: STEP_COLORS[step] ?? '#94a3b8' }}
+      >
+        {step}
+      </span>
+      <span
+        className={cn(
+          'inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap',
+          status === 'completed' && 'bg-[#b9d496]/30 text-green-700 dark:text-green-400',
+          status === 'waiting' && 'bg-[#ffbd59]/30 text-amber-700 dark:text-amber-400',
+          status === 'pending' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400',
+        )}
+      >
+        {status === 'completed' ? 'Done' : status === 'waiting' ? 'Wait' : 'Pending'}
+      </span>
+      {/* Tooltip */}
+      <div className="absolute bottom-full left-0 mb-1 hidden group-hover/step:block z-30 pointer-events-none">
+        <div className="px-2 py-1 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-medium whitespace-nowrap shadow-lg">
+          Step {step} — {name}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── View Components ─────────────────────────────────────────────────────────
 
 function ListView({ students, actions, showCohort = true }: {
@@ -2768,6 +2889,13 @@ function ListView({ students, actions, showCohort = true }: {
               </span>
             )}
           </div>
+
+          {/* Pipeline Step — fixed 120px, hidden on small */}
+          {s.status === 'active' && (
+            <div className="hidden md:flex w-[120px] justify-end shrink-0">
+              <StepBadge pipeline={actions.pipelineRecords[s.id]} />
+            </div>
+          )}
 
           {/* Status — fixed 160px */}
           <div className="w-40 flex justify-end shrink-0">
@@ -2845,6 +2973,11 @@ function CardView({ students, actions, showCohort = true }: {
               <LastContactBadge ts={s.last_contacted_at} />
             </span>
           </div>
+          {s.status === 'active' && actions.pipelineRecords[s.id] && (
+            <div className="mb-2">
+              <StepBadge pipeline={actions.pipelineRecords[s.id]} />
+            </div>
+          )}
           <div
             className="flex items-center gap-0.5 pt-2 border-t border-zinc-100 dark:border-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
@@ -2917,6 +3050,7 @@ function TableView({ students, actions, showCohort = true, showType = false }: {
             <th className={thBase}>Phone</th>
             {showCohort && <th onClick={() => toggleSort('cohort')} className={thSort}>Cohort {sortIcon('cohort')}</th>}
             {showType && <th className={thBase}>Type</th>}
+            <th className={thBase}>Step</th>
             <th onClick={() => toggleSort('status')} className={thSort}>Status {sortIcon('status')}</th>
             <th onClick={() => toggleSort('last_contacted')} className={thSort}>Last Contacted {sortIcon('last_contacted')}</th>
             <th className={thBase}>Notes</th>
@@ -2950,6 +3084,9 @@ function TableView({ students, actions, showCohort = true, showType = false }: {
                   {s.type === 'individual' ? 'Individual' : 'Group'}
                 </td>
               )}
+              <td className="px-4 py-3 whitespace-nowrap">
+                <StepBadge pipeline={actions.pipelineRecords[s.id]} />
+              </td>
               <td className="px-4 py-3 relative" onClick={(e) => e.stopPropagation()}>
                 <button onClick={() => setStatusOpen(statusOpen === s.id ? null : s.id)}>
                   <StatusBadge status={s.status} />
