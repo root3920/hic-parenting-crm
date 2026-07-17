@@ -10,7 +10,7 @@ export async function GET() {
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('full_name')
-    .in('role', ['coach', 'admin'])
+    .in('role', ['coach', 'admin', 'csm_ht'])
     .order('full_name', { ascending: true })
 
   if (error) {

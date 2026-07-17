@@ -26,6 +26,7 @@ import {
   BarChart2,
   Eye,
   Sprout,
+  HeartHandshake,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -51,8 +52,9 @@ const ALL_NAV_ITEMS = [
   { href: '/sales',        label: 'Sales',        icon: DollarSign,      roles: ['admin', 'csm_spc', 'csm_ht'] as UserRole[] },
   { href: '/llamadas',     label: 'Calls',        icon: Phone,           roles: ['admin', 'closer'] as UserRole[] },
   { href: '/spc',          label: 'SPC Members',  icon: Users,           roles: ['admin', 'csm_spc'] as UserRole[] },
-  { href: '/students',     label: 'Students',     icon: GraduationCap,   roles: ['admin', 'csm_ht'] as UserRole[] },
-  { href: '/equipo/csm',   label: 'Team',         icon: UsersRound,      roles: ['admin', 'csm_ht'] as UserRole[] },
+  { href: '/students',        label: 'Students',        icon: GraduationCap,   roles: ['admin', 'csm_ht'] as UserRole[] },
+  { href: '/client-success', label: 'Client Success',  icon: HeartHandshake,  roles: ['admin', 'csm_ht'] as UserRole[] },
+  { href: '/equipo/csm',     label: 'Team',            icon: UsersRound,      roles: ['admin', 'csm_ht'] as UserRole[] },
   { href: '/equipo/spc',   label: 'Team',         icon: UsersRound,      roles: ['csm_spc'] as UserRole[] },
   { href: '/finance',      label: 'Finance',      icon: DollarSign,      roles: ['admin'] as UserRole[] },
   { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },

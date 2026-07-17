@@ -13,7 +13,7 @@ import {
   Phone, Mail, Calendar, Clock, MessageSquare, ExternalLink,
   CreditCard, List, LayoutGrid, Table2, ArrowUpDown,
   Users, CheckCircle2, AlertCircle, DollarSign, TrendingUp, ChevronDown, ChevronUp,
-  ChevronLeft, ChevronRight, Video, XCircle, UserX,
+  ChevronLeft, ChevronRight, Video, XCircle, UserX, Circle,
 } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { getCanonicalProduct } from '@/lib/products'
@@ -171,6 +171,166 @@ interface PaymentPlanFormData {
   currency: string
   start_date: string
   notes: string
+}
+
+// ─── Onboarding Pipeline Section ──────────────────────────────────────────────
+
+const ONBOARDING_STEPS = [
+  { num: 1, name: 'Welcome Message' },
+  { num: 2, name: 'Message Video 1:1 or Group' },
+  { num: 3, name: 'Q & A Meeting' },
+  { num: 4, name: 'Contract + Form' },
+  { num: 5, name: 'Matching Cohort' },
+  { num: 6, name: 'Session 1' },
+]
+
+function OnboardingPipelineSection({ studentId }: { studentId: string }) {
+  const [pipeline, setPipeline] = useState<Record<string, unknown> | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [coaches, setCoaches] = useState<{ full_name: string }[]>([])
+  const [saving, setSaving] = useState(false)
+  const [localNotes, setLocalNotes] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const res = await fetch('/api/client-success/pipeline')
+      if (res.ok) {
+        const all = await res.json()
+        const match = all.find((r: Record<string, unknown>) => r.student_id === studentId)
+        if (match) {
+          setPipeline(match)
+          setLocalNotes(match.notes ?? '')
+        }
+      }
+      setLoading(false)
+    }
+    load()
+    fetch('/api/growth/coaches').then((r) => r.json()).then(setCoaches).catch(() => {})
+  }, [studentId])
+
+  const patchField = useCallback(async (updates: Record<string, unknown>) => {
+    if (!pipeline) return
+    setSaving(true)
+    const res = await fetch(`/api/client-success/pipeline/${pipeline.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setPipeline((prev) => prev ? { ...prev, ...updated } : prev)
+    } else {
+      toast.error('Failed to save pipeline')
+    }
+    setSaving(false)
+  }, [pipeline])
+
+  const handleStepStatusChange = useCallback(async (stepNum: number, newStatus: string) => {
+    if (!pipeline) return
+    const updates: Record<string, unknown> = { [`step${stepNum}_status`]: newStatus }
+    if (newStatus === 'completed' && stepNum <= 5) {
+      const nextStatus = pipeline[`step${stepNum + 1}_status`] as string
+      if (nextStatus === 'pending') updates.current_step = stepNum + 1
+    }
+    await patchField(updates)
+  }, [pipeline, patchField])
+
+  if (loading) return null
+  if (!pipeline) return null
+
+  const sLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
+
+  return (
+    <div className="mb-6">
+      <p className={sLabel}>Onboarding Pipeline</p>
+      <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 space-y-1">
+        {ONBOARDING_STEPS.map((step) => {
+          const status = (pipeline[`step${step.num}_status`] as string) ?? 'pending'
+          const date = pipeline[`step${step.num}_date`] as string | null
+          const isCurrent = pipeline.current_step === step.num
+
+          return (
+            <div
+              key={step.num}
+              className={cn(
+                'flex items-center gap-3 py-2 px-2.5 rounded-lg border-l-[3px]',
+                status === 'completed' && 'border-l-[#b9d496] bg-green-50/50 dark:bg-green-900/10',
+                status === 'waiting' && 'border-l-[#ffbd59] bg-amber-50/50 dark:bg-amber-900/10',
+                status === 'pending' && 'border-l-zinc-200 dark:border-l-zinc-700',
+                isCurrent && status === 'pending' && 'bg-white dark:bg-zinc-800',
+              )}
+            >
+              <div className="shrink-0">
+                {status === 'completed' && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />}
+                {status === 'waiting' && <Clock className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />}
+                {status === 'pending' && <Circle className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-600" />}
+              </div>
+              <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex-1 min-w-0">
+                {step.num}. {step.name}
+              </span>
+              <input
+                type="date"
+                value={date ?? ''}
+                onChange={(e) => patchField({ [`step${step.num}_date`]: e.target.value || null })}
+                className="text-[11px] border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 w-[105px] focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+              />
+              <select
+                value={status}
+                onChange={(e) => handleStepStatusChange(step.num, e.target.value)}
+                className={cn(
+                  'text-[11px] font-medium rounded px-1.5 py-0.5 border-0 focus:outline-none cursor-pointer',
+                  status === 'completed' && 'bg-[#b9d496]/30 text-green-700 dark:text-green-400',
+                  status === 'waiting' && 'bg-[#ffbd59]/30 text-amber-700 dark:text-amber-400',
+                  status === 'pending' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400',
+                )}
+              >
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="waiting">Waiting</option>
+              </select>
+            </div>
+          )
+        })}
+      </div>
+      {/* Coach, enrollment date, notes */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <div>
+          <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-0.5">Coach</label>
+          <select
+            value={(pipeline.coach as string) ?? ''}
+            onChange={(e) => patchField({ coach: e.target.value || null })}
+            className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+          >
+            <option value="">—</option>
+            {coaches.map((c) => (
+              <option key={c.full_name} value={c.full_name}>{c.full_name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-0.5">Enrollment Date</label>
+          <input
+            type="date"
+            value={(pipeline.enrollment_date as string) ?? ''}
+            onChange={(e) => patchField({ enrollment_date: e.target.value || null })}
+            className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+          />
+        </div>
+      </div>
+      <div className="mt-2">
+        <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-0.5">Notes</label>
+        <textarea
+          value={localNotes}
+          onChange={(e) => setLocalNotes(e.target.value)}
+          onBlur={() => patchField({ notes: localNotes })}
+          rows={2}
+          className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30 resize-none"
+        />
+      </div>
+      {saving && <p className="text-[10px] text-blue-500 animate-pulse mt-1">Saving...</p>}
+    </div>
+  )
 }
 
 // ─── Student Profile Modal ────────────────────────────────────────────────────
@@ -390,6 +550,9 @@ function StudentProfileModal({
           </button>
         </div>
       </div>
+
+      {/* Onboarding Pipeline Section */}
+      <OnboardingPipelineSection studentId={student.id} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* ── LEFT ── */}
