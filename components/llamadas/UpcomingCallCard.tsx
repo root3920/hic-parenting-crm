@@ -57,7 +57,7 @@ export function UpcomingCallCard({ call, onDetailClick, onTypeChange }: Props) {
           </div>
           <div>
             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">{call.full_name}</p>
-            <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-0.5">
+            <p className="text-xs text-[#89bcef] dark:text-[#89bcef] font-medium mt-0.5">
               {formatDateInTimezone(call.start_date, timezone)} · {formatTimeInTimezone(call.start_date, timezone)} {tzAbbr}
             </p>
           </div>
@@ -116,7 +116,7 @@ export function UpcomingCallCard({ call, onDetailClick, onTypeChange }: Props) {
         )}
         <button
           onClick={onDetailClick}
-          className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          className="inline-flex items-center gap-1 text-xs text-[#89bcef] dark:text-[#89bcef] hover:underline"
         >
           <ExternalLink className="h-3 w-3" />
           Ver todo

@@ -362,7 +362,7 @@ export function CallDetailModal({ call, onClose, onStatusChange }: Props) {
             {!checklistLoading && !checklist && (
               <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg px-3 py-3">
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">No checklist submitted yet.</p>
-                <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
+                <div className="flex items-center gap-1.5 text-xs text-[#89bcef] dark:text-[#89bcef]">
                   <Link2 className="h-3 w-3" />
                   <span className="select-all">dashboard.hicparenting.com/checklist</span>
                 </div>

@@ -143,7 +143,7 @@ export default function ApplyPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-[#185FA5]" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-[#ffbd59]" />
       </div>
     }>
       <ApplyForm />
@@ -326,7 +326,7 @@ function ApplyForm() {
         {/* Progress bar */}
         <div className="h-1 bg-zinc-100 dark:bg-zinc-800">
           <div
-            className="h-full bg-[#185FA5] transition-all duration-500 ease-out"
+            className="h-full bg-[#ffbd59] transition-all duration-500 ease-out"
             style={{ width: `${((step + 1) / TOTAL) * 100}%` }}
           />
         </div>
@@ -368,7 +368,7 @@ function ApplyForm() {
               onChange={(e) => setAnswer(e.target.value)}
               placeholder={q.placeholder}
               autoFocus
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 placeholder:text-zinc-400"
+              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] placeholder:text-zinc-400"
             />
           )}
 
@@ -379,7 +379,7 @@ function ApplyForm() {
               onChange={(e) => setAnswer(e.target.value)}
               placeholder={q.placeholder}
               autoFocus
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 placeholder:text-zinc-400"
+              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] placeholder:text-zinc-400"
             />
           )}
 
@@ -391,7 +391,7 @@ function ApplyForm() {
                 value={answer}
                 onChange={(val) => setAnswer(val ?? '')}
                 onCountryChange={(country) => { if (country) setPhoneCountry(country) }}
-                className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus-within:ring-2 focus-within:ring-blue-500/30 focus-within:border-blue-400"
+                className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus-within:ring-2 focus-within:ring-[#ffbd59]/30 focus-within:border-[#ffbd59]"
               />
             </div>
           )}
@@ -403,7 +403,7 @@ function ApplyForm() {
               placeholder={q.placeholder}
               rows={4}
               autoFocus
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y placeholder:text-zinc-400"
+              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] resize-y placeholder:text-zinc-400"
             />
           )}
 
@@ -411,7 +411,7 @@ function ApplyForm() {
             <select
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 cursor-pointer"
+              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] cursor-pointer"
             >
               <option value="" disabled>Select an option...</option>
               {q.selectOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -428,14 +428,14 @@ function ApplyForm() {
                     onClick={() => setAnswer(opt.label)}
                     className={`w-full text-left rounded-xl border-2 px-4 py-3.5 transition-all text-sm leading-snug ${
                       selected
-                        ? 'border-[#185FA5] bg-blue-50 dark:bg-blue-900/20 text-zinc-900 dark:text-zinc-100'
+                        ? 'border-[#ffbd59] bg-blue-50 dark:bg-blue-900/20 text-zinc-900 dark:text-zinc-100'
                         : 'border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                         selected
-                          ? 'border-[#185FA5] bg-[#185FA5]'
+                          ? 'border-[#ffbd59] bg-[#ffbd59]'
                           : 'border-zinc-300 dark:border-zinc-600'
                       }`}>
                         {selected && (
@@ -475,7 +475,7 @@ function ApplyForm() {
             disabled={!isValid}
             className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white transition-all ${
               isValid
-                ? 'bg-[#185FA5] hover:bg-[#144d8a] cursor-pointer'
+                ? 'bg-[#ffbd59] hover:bg-[#144d8a] cursor-pointer'
                 : 'bg-blue-300 dark:bg-blue-900/40 opacity-50 cursor-not-allowed'
             }`}
           >

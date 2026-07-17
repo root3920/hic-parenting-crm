@@ -144,7 +144,7 @@ function NumberInput({ value, onChange, placeholder = '0', prefix }: {
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400',
+          'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]',
           prefix ? 'pl-7 pr-3' : 'px-3'
         )}
       />
@@ -228,7 +228,7 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
           <select
             value={report?.call_status ?? ''}
             onChange={(e) => onUpdate('call_status', e.target.value)}
-            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
           >
             <option value="">── Select ──</option>
             <option value="Showed Up">Showed Up</option>
@@ -242,7 +242,7 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
           <select
             value={report?.call_type ?? ''}
             onChange={(e) => onUpdate('call_type', e.target.value)}
-            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
           >
             <option value="">── Select ──</option>
             <option value="Qualified">Qualified</option>
@@ -256,7 +256,7 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
           <select
             value={report?.next_step ?? ''}
             onChange={(e) => onUpdate('next_step', e.target.value)}
-            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
           >
             <option value="">── Select ──</option>
             <option value="Follow Up">Follow Up</option>
@@ -271,7 +271,7 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
             onChange={(e) => onUpdate('call_summary', e.target.value)}
             placeholder="Describe what happened in this call..."
             rows={2}
-            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y"
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] resize-y"
           />
         </div>
       </div>
@@ -487,7 +487,7 @@ export default function NuevoReporteCloserPage() {
                   type="date"
                   value={form.date}
                   onChange={(e) => set('date', e.target.value)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                 />
               </div>
               <div>
@@ -495,7 +495,7 @@ export default function NuevoReporteCloserPage() {
                 <select
                   value={form.closer_name}
                   onChange={(e) => set('closer_name', e.target.value)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                 >
                   <option value="">Select closer...</option>
                   {closerOptions.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -616,7 +616,7 @@ export default function NuevoReporteCloserPage() {
               placeholder="Detail each prospect: name, result, next step..."
               rows={5}
               style={{ minHeight: '120px' }}
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y"
+              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] resize-y"
             />
           </SectionCard>
 
@@ -625,7 +625,7 @@ export default function NuevoReporteCloserPage() {
               type="submit"
               disabled={submitting}
               className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-              style={{ backgroundColor: '#185FA5' }}
+              style={{ backgroundColor: '#ffbd59' }}
             >
               {submitting ? 'Saving...' : 'Save daily report'}
             </button>

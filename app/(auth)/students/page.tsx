@@ -177,7 +177,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
 // ─── Transaction Status Badge ─────────────────────────────────────────────────
 
@@ -298,7 +298,7 @@ function OnboardingPipelineSection({ studentId }: { studentId: string }) {
         <button
           onClick={handleCreate}
           disabled={creating}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-[#ffbd59] hover:text-[#89bcef] dark:hover:text-[#89bcef] transition-colors disabled:opacity-50"
         >
           <Plus className="h-3.5 w-3.5" />
           {creating ? 'Adding...' : 'Add to Onboarding Pipeline'}
@@ -339,7 +339,7 @@ function OnboardingPipelineSection({ studentId }: { studentId: string }) {
                 type="date"
                 value={date ?? ''}
                 onChange={(e) => patchField({ [`step${step.num}_date`]: e.target.value || null })}
-                className="text-[11px] border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 w-[105px] focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                className="text-[11px] border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 w-[105px] focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30"
               />
               <select
                 value={status}
@@ -366,7 +366,7 @@ function OnboardingPipelineSection({ studentId }: { studentId: string }) {
           <select
             value={(pipeline.coach as string) ?? ''}
             onChange={(e) => patchField({ coach: e.target.value || null })}
-            className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+            className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30"
           >
             <option value="">—</option>
             {coaches.map((c) => (
@@ -380,7 +380,7 @@ function OnboardingPipelineSection({ studentId }: { studentId: string }) {
             type="date"
             value={(pipeline.enrollment_date as string) ?? ''}
             onChange={(e) => patchField({ enrollment_date: e.target.value || null })}
-            className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+            className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30"
           />
         </div>
       </div>
@@ -391,10 +391,10 @@ function OnboardingPipelineSection({ studentId }: { studentId: string }) {
           onChange={(e) => setLocalNotes(e.target.value)}
           onBlur={() => patchField({ notes: localNotes })}
           rows={2}
-          className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30 resize-none"
+          className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30 resize-none"
         />
       </div>
-      {saving && <p className="text-[10px] text-blue-500 animate-pulse mt-1">Saving...</p>}
+      {saving && <p className="text-[10px] text-[#ffbd59] animate-pulse mt-1">Saving...</p>}
     </div>
   )
 }
@@ -656,7 +656,7 @@ function StudentProfileModal({
                   type="date"
                   value={student.cohort_assigned_at ?? ''}
                   onChange={(e) => onCohortDateChange(e.target.value)}
-                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -708,7 +708,7 @@ function StudentProfileModal({
                       </div>
                       <a
                         href={`/sales?email=${encodeURIComponent(student.email!)}`}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
+                        className="text-xs text-[#89bcef] dark:text-[#89bcef] hover:underline flex items-center gap-0.5"
                         onClick={onClose}
                       >
                         View in Sales <ExternalLink className="h-3 w-3" />
@@ -738,7 +738,7 @@ function StudentProfileModal({
                     })
                     setShowPlanForm(true)
                   }}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-xs text-[#89bcef] dark:text-[#89bcef] hover:underline"
                 >
                   Edit
                 </button>
@@ -748,7 +748,7 @@ function StudentProfileModal({
             {!paymentPlan && !showPlanForm && (
               <button
                 onClick={() => setShowPlanForm(true)}
-                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400 hover:border-[#ffbd59] hover:text-[#89bcef] dark:hover:text-[#89bcef] transition-colors"
               >
                 <CreditCard className="h-3.5 w-3.5" /> Configure Payment Plan
               </button>
@@ -818,7 +818,7 @@ function StudentProfileModal({
                     type="submit"
                     disabled={savingPlan}
                     className="px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
-                    style={{ backgroundColor: '#185FA5' }}
+                    style={{ backgroundColor: '#ffbd59' }}
                   >
                     {savingPlan ? 'Saving…' : 'Save Plan'}
                   </button>
@@ -875,7 +875,7 @@ function StudentProfileModal({
               {!showSessionForm && (
                 <button
                   onClick={() => setShowSessionForm(true)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#89bcef] dark:text-[#89bcef] hover:underline"
                 >
                   <Plus className="h-3 w-3" /> Schedule Session
                 </button>
@@ -891,7 +891,7 @@ function StudentProfileModal({
                   {' at '}
                   {new Date(nextSession.session_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                 </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                <p className="text-xs text-[#89bcef] dark:text-[#89bcef] mt-0.5">
                   {nextSession.duration_minutes} min · {nextSession.session_type === 'individual' ? 'Individual' : 'Group'}
                 </p>
               </div>
@@ -981,7 +981,7 @@ function StudentProfileModal({
                     type="submit"
                     disabled={savingSession}
                     className="px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
-                    style={{ backgroundColor: '#185FA5' }}
+                    style={{ backgroundColor: '#ffbd59' }}
                   >
                     {savingSession ? 'Saving…' : 'Schedule'}
                   </button>
@@ -1087,7 +1087,7 @@ function StudentProfileModal({
               notes.map((note) => (
                 <div key={note.id} className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-3 border-l-4 border-blue-400">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{note.created_by}</span>
+                    <span className="text-xs font-semibold text-[#89bcef] dark:text-[#89bcef]">{note.created_by}</span>
                     <span className="text-xs text-zinc-400 flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {formatDateTime(note.created_at)}
@@ -1116,7 +1116,7 @@ function StudentProfileModal({
                 onClick={handleAddNote}
                 disabled={!newNote.trim() || addingNote}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
-                style={{ backgroundColor: '#185FA5' }}
+                style={{ backgroundColor: '#ffbd59' }}
               >
                 <MessageSquare className="h-3 w-3" />
                 {addingNote ? 'Saving…' : 'Add Note'}
@@ -1240,7 +1240,7 @@ function StudentFormModal({
           <button type="button" onClick={onClose} className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
             Cancel
           </button>
-          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#ffbd59' }}>
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
@@ -1284,7 +1284,7 @@ function NewCohortModal({
           <button type="button" onClick={onClose} className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
             Cancel
           </button>
-          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#ffbd59' }}>
             {saving ? 'Creating...' : 'Create Cohort'}
           </button>
         </div>
@@ -1327,7 +1327,7 @@ function NotesModal({
           <button type="button" onClick={onClose} className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
             Cancel
           </button>
-          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#ffbd59' }}>
             {saving ? 'Saving...' : 'Save Notes'}
           </button>
         </div>
@@ -1511,7 +1511,7 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
         className="flex items-center justify-between w-full mb-3 group"
       >
         <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
-          <CreditCard className="h-4 w-4 text-blue-500" /> Payment Plans
+          <CreditCard className="h-4 w-4 text-[#ffbd59]" /> Payment Plans
           <span className="text-xs font-normal text-zinc-400">({totals.studentsWithPlan} students)</span>
           {totals.totalOverdue > 0 && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
@@ -1714,7 +1714,7 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
                   iconSize={8}
                 />
                 <Bar dataKey="collected" name="Collected" stackId="a" fill="#1D9E75" radius={[0, 0, 0, 0]} maxBarSize={48} />
-                <Bar dataKey="pending" name="Pending" stackId="a" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={48} />
+                <Bar dataKey="pending" name="Pending" stackId="a" fill="#ffbd59" radius={[3, 3, 0, 0]} maxBarSize={48} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1811,7 +1811,7 @@ function SessionsCalendarContent({
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {[
-          { label: 'Scheduled', value: kpis.scheduled, color: 'text-blue-600 dark:text-blue-400' },
+          { label: 'Scheduled', value: kpis.scheduled, color: 'text-[#89bcef] dark:text-[#89bcef]' },
           { label: 'Completed', value: kpis.completed, color: 'text-green-600 dark:text-green-400' },
           { label: 'Cancelled', value: kpis.cancelled, color: 'text-zinc-500 dark:text-zinc-400' },
           { label: 'No Shows', value: kpis.noShow, color: kpis.noShow > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400' },
@@ -1837,7 +1837,7 @@ function SessionsCalendarContent({
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-        <button onClick={onToday} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+        <button onClick={onToday} className="text-xs text-[#89bcef] dark:text-[#89bcef] hover:underline">
           Today
         </button>
       </div>
@@ -1878,7 +1878,7 @@ function SessionsCalendarContent({
                   <span className={cn(
                     'inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full mb-0.5',
                     today
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-[#ffbd59] text-[#1a1a2e]'
                       : current
                         ? 'text-zinc-700 dark:text-zinc-300'
                         : 'text-zinc-300 dark:text-zinc-600',
@@ -2364,7 +2364,7 @@ export default function StudentsPage() {
             <button
               onClick={() => setAddOpen(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: '#185FA5' }}
+              style={{ backgroundColor: '#ffbd59' }}
             >
               <Plus className="h-3.5 w-3.5" /> Add Student
             </button>
@@ -2529,7 +2529,7 @@ export default function StudentsPage() {
               <div className="relative flex-1 min-w-[180px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
                 <input
-                  className="w-full pl-8 pr-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  className="w-full pl-8 pr-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                   placeholder="Search by name or email…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -3037,7 +3037,7 @@ function TableView({ students, actions, showCohort = true, showType = false }: {
   const thBase = 'px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap select-none'
   const thSort = cn(thBase, 'cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors')
   const sortIcon = (key: SortKey) => (
-    <ArrowUpDown className={cn('h-3 w-3 inline ml-1 -mt-0.5', sortKey === key ? 'text-blue-500' : 'text-zinc-300 dark:text-zinc-600')} />
+    <ArrowUpDown className={cn('h-3 w-3 inline ml-1 -mt-0.5', sortKey === key ? 'text-[#ffbd59]' : 'text-zinc-300 dark:text-zinc-600')} />
   )
 
   return (

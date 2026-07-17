@@ -56,7 +56,7 @@ const EMPTY: FormState = {
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 
-const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">{children}</label>
@@ -356,7 +356,7 @@ export default function HtCsmNewReportPage() {
                 type="submit"
                 disabled={saving}
                 className="px-6 py-2.5 text-sm rounded-xl text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
-                style={{ backgroundColor: '#185FA5' }}
+                style={{ backgroundColor: '#ffbd59' }}
               >
                 {saving ? 'Saving…' : 'Save report'}
               </button>

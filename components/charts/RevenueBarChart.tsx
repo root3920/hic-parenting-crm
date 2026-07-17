@@ -41,7 +41,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 export function RevenueBarChart({
   data,
   dataKey = 'revenue',
-  color = '#185FA5',
+  color = '#ffbd59',
   rotateLabels = false,
 }: RevenueBarChartProps) {
   return (

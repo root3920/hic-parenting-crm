@@ -43,6 +43,12 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        hic: {
+          yellow: '#ffbd59',
+          green: '#b9d496',
+          blue: '#89bcef',
+          dark: '#1a1a2e',
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -50,7 +56,7 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-poppins)", "sans-serif"],
+        sans: ["Verdana", "Geneva", "Tahoma", "sans-serif"],
       },
     },
   },

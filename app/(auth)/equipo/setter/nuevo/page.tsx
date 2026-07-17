@@ -102,7 +102,7 @@ function NumberInput({ value, onChange, placeholder = '0' }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
     />
   )
 }
@@ -118,7 +118,7 @@ function TextArea({ value, onChange, placeholder }: {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={3}
-      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-none"
+      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] resize-none"
     />
   )
 }
@@ -259,7 +259,7 @@ export default function NuevoReporteSetterPage() {
                   type="date"
                   value={form.date}
                   onChange={(e) => set('date', e.target.value)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                 />
               </div>
               <div>
@@ -267,7 +267,7 @@ export default function NuevoReporteSetterPage() {
                 <select
                   value={form.setter_name}
                   onChange={(e) => set('setter_name', e.target.value)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                 >
                   <option value="">Select setter...</option>
                   {setterOptions.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -411,7 +411,7 @@ export default function NuevoReporteSetterPage() {
               type="submit"
               disabled={submitting}
               className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-              style={{ backgroundColor: '#185FA5' }}
+              style={{ backgroundColor: '#ffbd59' }}
             >
               {submitting ? 'Saving...' : 'Save daily report'}
             </button>

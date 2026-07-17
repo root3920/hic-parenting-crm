@@ -84,7 +84,7 @@ function n(v: string) { return parseInt(v) || 0 }
 
 // ── Shared UI components ──────────────────────────────────────────────────────
 
-const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">{children}</label>
@@ -129,7 +129,7 @@ function ScalePicker({ value, onChange, lowLabel, highLabel }: {
             className={cn(
               'flex-1 py-2.5 rounded-lg text-sm font-bold border-2 transition-all',
               value === n
-                ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                ? 'border-[#ffbd59] bg-[#ffbd59]/10 text-[#b8860b] dark:bg-[#ffbd59]/20 dark:text-[#ffbd59]'
                 : 'border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600 hover:text-zinc-600'
             )}
           >
@@ -481,7 +481,7 @@ export default function NuevoSpcPerfPage() {
               type="submit"
               disabled={submitting}
               className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60 hover:opacity-90"
-              style={{ backgroundColor: '#185FA5' }}
+              style={{ backgroundColor: '#ffbd59' }}
             >
               {submitting ? 'Saving…' : 'Save report'}
             </button>

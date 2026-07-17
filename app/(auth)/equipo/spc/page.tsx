@@ -86,7 +86,7 @@ function scoreBadge(score: number): { label: string; cls: string } {
 
 function scoreColor(score: number): string {
   if (score >= 90) return 'text-green-600 dark:text-green-400'
-  if (score >= 75) return 'text-blue-600 dark:text-blue-400'
+  if (score >= 75) return 'text-[#89bcef] dark:text-[#89bcef]'
   if (score >= 60) return 'text-amber-600 dark:text-amber-400'
   return 'text-red-600 dark:text-red-400'
 }
@@ -189,7 +189,7 @@ function DetailRow({ r, m }: { r: SpcPerfReport; m: Metrics }) {
     <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-4 mt-1 grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Engagement */}
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-2">Engagement</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-[#89bcef] dark:text-[#89bcef] mb-2">Engagement</p>
         <Pair label="Participated" value={r.members_participated} />
         <Pair label="Total active" value={r.active_members_count} />
         <Pair label="% Engagement" value={`${m.pctEngagement}%`} />
@@ -526,7 +526,7 @@ export default function SpcPerfDashboard() {
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors border-r border-zinc-200 dark:border-zinc-700 last:border-r-0',
                     preset === p
-                      ? p === 'week' ? 'bg-indigo-600 text-white' : 'bg-[#185FA5] text-white'
+                      ? p === 'week' ? 'bg-[#89bcef] text-[#1a1a2e]' : 'bg-[#ffbd59] text-[#1a1a2e]'
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
@@ -552,7 +552,7 @@ export default function SpcPerfDashboard() {
             <Link
               href="/equipo/spc/nuevo"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#185FA5' }}
+              style={{ backgroundColor: '#ffbd59' }}
             >
               <Plus className="h-3.5 w-3.5" />
               New report
@@ -673,7 +673,7 @@ export default function SpcPerfDashboard() {
                 label="Support Messages"
                 value={kpis ? String(kpis.totalSupportMessages) : '—'}
                 sub="messages sent to community"
-                color="text-blue-600 dark:text-blue-400"
+                color="text-[#89bcef] dark:text-[#89bcef]"
               />
               <KpiCard
                 label="Retention Contacts"
@@ -685,7 +685,7 @@ export default function SpcPerfDashboard() {
                 label="Failed Purchase Follow-up"
                 value={kpis ? String(kpis.totalFailedPurchaseContact) : '—'}
                 sub="contacts after failed payment"
-                color="text-blue-600 dark:text-blue-400"
+                color="text-[#89bcef] dark:text-[#89bcef]"
               />
               <KpiCard
                 label="Check-ins (active/inactive)"
@@ -742,7 +742,7 @@ export default function SpcPerfDashboard() {
                       <YAxis tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} allowDecimals={false} />
                       <Tooltip contentStyle={{ fontSize: 11 }} />
                       <Legend formatter={(v) => <span className="text-xs">{v}</span>} iconSize={8} />
-                      <Bar dataKey="supportMessages" name="Support Messages" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                      <Bar dataKey="supportMessages" name="Support Messages" fill="#ffbd59" radius={[3, 3, 0, 0]} maxBarSize={24} />
                       <Bar dataKey="checkinActiveInactive" name="Check-ins" fill="#14B8A6" radius={[3, 3, 0, 0]} maxBarSize={24} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -764,7 +764,7 @@ export default function SpcPerfDashboard() {
                       <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <Tooltip formatter={(v) => [`${v}`, 'Score']} contentStyle={{ fontSize: 11 }} />
-                      <Line type="monotone" dataKey="score" stroke="#185FA5" strokeWidth={2.5} dot={{ r: 3, fill: '#185FA5' }} />
+                      <Line type="monotone" dataKey="score" stroke="#ffbd59" strokeWidth={2.5} dot={{ r: 3, fill: '#ffbd59' }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -783,7 +783,7 @@ export default function SpcPerfDashboard() {
                       <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
                       <Tooltip formatter={(v, name) => [`${v}%`, name]} contentStyle={{ fontSize: 11 }} />
                       <Legend formatter={(v) => <span className="text-xs">{v}</span>} iconSize={8} />
-                      <Line type="monotone" dataKey="engagement" name="Engagement" stroke="#185FA5" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="engagement" name="Engagement" stroke="#ffbd59" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="reactivacion" name="Reactivation" stroke="#3B6D11" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -834,14 +834,14 @@ export default function SpcPerfDashboard() {
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => setExpandedId(expanded ? null : r.id)}
-                                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                    className="inline-flex items-center gap-1 text-xs font-medium text-[#89bcef] dark:text-[#89bcef] hover:underline"
                                   >
                                     {expanded ? 'Close' : 'View'}
                                     {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                                   </button>
                                   <button
                                     onClick={() => openEdit(r)}
-                                    className="p-1 rounded text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                    className="p-1 rounded text-zinc-400 hover:text-[#ffbd59] dark:hover:text-[#ffbd59] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                     title="Edit report"
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
@@ -951,7 +951,7 @@ export default function SpcPerfDashboard() {
                       type="text"
                       value={editForm.rep_name}
                       onChange={(e) => setField('rep_name', e.target.value)}
-                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                     />
                   </div>
                   <div>
@@ -960,31 +960,31 @@ export default function SpcPerfDashboard() {
                       type="date"
                       value={editForm.date}
                       onChange={(e) => setField('date', e.target.value)}
-                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Active members</label>
-                    <input type="number" min={0} value={editForm.active_members_count} onChange={(e) => setField('active_members_count', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.active_members_count} onChange={(e) => setField('active_members_count', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Total members</label>
-                    <input type="number" min={0} value={editForm.total_members_count} onChange={(e) => setField('total_members_count', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.total_members_count} onChange={(e) => setField('total_members_count', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                 </div>
               </div>
 
               {/* Engagement */}
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-3">Engagement</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#89bcef] dark:text-[#89bcef] mb-3">Engagement</p>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Members participated</label>
-                    <input type="number" min={0} value={editForm.members_participated} onChange={(e) => setField('members_participated', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.members_participated} onChange={(e) => setField('members_participated', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Avg daily messages</label>
-                    <input type="number" min={0} value={editForm.avg_daily_messages} onChange={(e) => setField('avg_daily_messages', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.avg_daily_messages} onChange={(e) => setField('avg_daily_messages', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                 </div>
                 <div>
@@ -998,7 +998,7 @@ export default function SpcPerfDashboard() {
                         className={cn(
                           'flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all',
                           Number(editForm.conversation_quality) === v
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                            ? 'border-[#ffbd59] bg-[#ffbd59]/10 text-[#b8860b] dark:bg-[#ffbd59]/20 dark:text-[#ffbd59]'
                             : 'border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:border-zinc-300'
                         )}
                       >
@@ -1015,20 +1015,20 @@ export default function SpcPerfDashboard() {
                 <div className="grid grid-cols-3 gap-3 mb-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">New members</label>
-                    <input type="number" min={0} value={editForm.new_members} onChange={(e) => setField('new_members', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.new_members} onChange={(e) => setField('new_members', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Welcomes sent</label>
-                    <input type="number" min={0} value={editForm.welcome_sent} onChange={(e) => setField('welcome_sent', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.welcome_sent} onChange={(e) => setField('welcome_sent', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Introduced themselves</label>
-                    <input type="number" min={0} value={editForm.new_members_introduced} onChange={(e) => setField('new_members_introduced', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.new_members_introduced} onChange={(e) => setField('new_members_introduced', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Check-ins responded</label>
-                  <input type="number" min={0} value={editForm.checkins_responded} onChange={(e) => setField('checkins_responded', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                  <input type="number" min={0} value={editForm.checkins_responded} onChange={(e) => setField('checkins_responded', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                 </div>
               </div>
 
@@ -1038,11 +1038,11 @@ export default function SpcPerfDashboard() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Trials contacted</label>
-                    <input type="number" min={0} value={editForm.trials_contacted} onChange={(e) => setField('trials_contacted', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.trials_contacted} onChange={(e) => setField('trials_contacted', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Cancellation requests</label>
-                    <input type="number" min={0} value={editForm.cancellation_requests} onChange={(e) => setField('cancellation_requests', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.cancellation_requests} onChange={(e) => setField('cancellation_requests', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                 </div>
               </div>
@@ -1053,15 +1053,15 @@ export default function SpcPerfDashboard() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Questions total</label>
-                    <input type="number" min={0} value={editForm.questions_total} onChange={(e) => setField('questions_total', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.questions_total} onChange={(e) => setField('questions_total', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Answered {'<'}24h</label>
-                    <input type="number" min={0} value={editForm.questions_answered_24h} onChange={(e) => setField('questions_answered_24h', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.questions_answered_24h} onChange={(e) => setField('questions_answered_24h', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Referrals generated</label>
-                    <input type="number" min={0} value={editForm.referrals_generated} onChange={(e) => setField('referrals_generated', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    <input type="number" min={0} value={editForm.referrals_generated} onChange={(e) => setField('referrals_generated', e.target.value)} className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30" />
                   </div>
                 </div>
               </div>
@@ -1075,7 +1075,7 @@ export default function SpcPerfDashboard() {
                     value={editForm.insights}
                     onChange={(e) => setField('insights', e.target.value)}
                     rows={3}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 resize-none"
                   />
                 </div>
                 <div className="mb-3">
@@ -1084,7 +1084,7 @@ export default function SpcPerfDashboard() {
                     value={editForm.top_action}
                     onChange={(e) => setField('top_action', e.target.value)}
                     rows={2}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 resize-none"
                   />
                 </div>
                 <div>
@@ -1098,7 +1098,7 @@ export default function SpcPerfDashboard() {
                         className={cn(
                           'flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all',
                           Number(editForm.community_energy) === v
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                            ? 'border-[#ffbd59] bg-[#ffbd59]/10 text-[#b8860b] dark:bg-[#ffbd59]/20 dark:text-[#ffbd59]'
                             : 'border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:border-zinc-300'
                         )}
                       >
@@ -1122,7 +1122,7 @@ export default function SpcPerfDashboard() {
                 onClick={handleEditSave}
                 disabled={saving}
                 className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
-                style={{ backgroundColor: '#185FA5' }}
+                style={{ backgroundColor: '#ffbd59' }}
               >
                 {saving ? 'Saving…' : 'Save changes'}
               </button>

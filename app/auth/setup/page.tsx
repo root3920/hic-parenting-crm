@@ -120,7 +120,7 @@ export default function SetupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 8 caracteres"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffbd59]"
               />
             </div>
 
@@ -133,7 +133,7 @@ export default function SetupPage() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="Repite tu contraseña"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffbd59]"
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               />
             </div>
@@ -141,7 +141,7 @@ export default function SetupPage() {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="w-full bg-[#ffbd59] text-[#1a1a2e] rounded-lg py-2.5 text-sm font-medium hover:bg-[#e5a94f] disabled:opacity-50 transition-colors"
             >
               {loading ? 'Creando contraseña...' : 'Crear contraseña y entrar'}
             </button>

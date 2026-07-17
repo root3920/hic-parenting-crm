@@ -124,7 +124,7 @@ function SurveyDetail({ survey, onClose }: { survey: SurveyResponse; onClose: ()
       <div className="space-y-5 mt-2">
         {/* Contact — full width */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Contact</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#ffbd59] mb-2">Contact</p>
           <ContactRow label="Name" value={survey.name} />
           <ContactRow label="Email" value={survey.email} />
           <ContactRow label="Phone" value={survey.phone ? `${countryFlag(survey.country)} ${survey.phone}` : null} />
@@ -421,7 +421,7 @@ export default function SurveysPage() {
                   onClick={() => { setPreset(p); setPage(0) }}
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors',
-                    preset === p ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    preset === p ? 'bg-[#ffbd59] text-[#1a1a2e]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
                   {p === 'todo' ? 'All' : p}
@@ -465,7 +465,7 @@ export default function SurveysPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <ClipboardList className="h-4 w-4 text-blue-500" />
+                  <ClipboardList className="h-4 w-4 text-[#ffbd59]" />
                 </div>
                 <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{kpis.total}</p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Total Applications</p>
@@ -591,7 +591,7 @@ export default function SurveysPage() {
                           <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
                           <Tooltip contentStyle={{ fontSize: 11 }} />
                           <Legend formatter={(v) => <span className="text-xs capitalize">{v}</span>} />
-                          <Line type="monotone" dataKey="total" stroke="#185FA5" strokeWidth={2} dot={{ r: 2 }} name="Total" />
+                          <Line type="monotone" dataKey="total" stroke="#ffbd59" strokeWidth={2} dot={{ r: 2 }} name="Total" />
                           <Line type="monotone" dataKey="qualified" stroke="#22C55E" strokeWidth={2} dot={{ r: 2 }} name="Qualified" />
                           <Line type="monotone" dataKey="disqualified" stroke="#EF4444" strokeWidth={2} dot={{ r: 2 }} name="Disqualified" />
                         </LineChart>
@@ -750,7 +750,7 @@ export default function SurveysPage() {
                 /apply{linkCalendar ? `?calendarName=${encodeURIComponent(linkCalendar)}` : ''}
               </span>
               {linkCalendar && (
-                <span className="text-xs text-blue-500 dark:text-blue-400">
+                <span className="text-xs text-[#89bcef] dark:text-[#89bcef]">
                   &rarr; {linkCalendar}&apos;s Calendar
                 </span>
               )}
@@ -802,7 +802,7 @@ export default function SurveysPage() {
                                       if (e.key === 'Escape') setEditingSetterId(null)
                                     }}
                                     autoFocus
-                                    className="text-xs border border-blue-400 dark:border-blue-500 rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 w-32"
+                                    className="text-xs border border-[#ffbd59] dark:border-[#ffbd59] rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 w-32"
                                   />
                                 ) : (
                                   <button

@@ -244,7 +244,7 @@ export default function DashboardPage() {
           className="mb-6"
         >
           <Link href="/spc" className="block group">
-            <Card className="border-l-4 border-l-[#185FA5] hover:shadow-md transition-shadow duration-200 cursor-pointer">
+            <Card className="border-l-4 border-l-[#ffbd59] hover:shadow-md transition-shadow duration-200 cursor-pointer">
               <CardContent className="py-4 px-5">
                 {loading ? (
                   <div className="h-8 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
@@ -305,7 +305,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Right arrow hint */}
-                    <span className="ml-auto text-xs text-zinc-400 group-hover:text-[#185FA5] transition-colors hidden sm:block">
+                    <span className="ml-auto text-xs text-zinc-400 group-hover:text-[#ffbd59] transition-colors hidden sm:block">
                       View SPC →
                     </span>
                   </div>

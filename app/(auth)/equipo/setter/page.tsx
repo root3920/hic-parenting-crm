@@ -200,7 +200,7 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
     }
   }
 
-  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
   return (
     <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -229,7 +229,7 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
 
         {/* Activity */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Activity</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#ffbd59] mb-2">Activity</p>
           <div className="grid grid-cols-3 gap-3 mb-2">
             <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Total convos</label><input type="number" min={0} value={form.total_convos} onChange={(e) => set('total_convos', e.target.value)} className={inputCls} /></div>
             <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Active convos</label><input type="number" min={0} value={form.active_conversations} onChange={(e) => set('active_conversations', e.target.value)} className={inputCls} /></div>
@@ -311,7 +311,7 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
         <button onClick={onClose} className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
           Cancel
         </button>
-        <button onClick={handleSave} disabled={saving} className="px-4 py-1.5 text-xs rounded-lg text-white font-semibold transition-colors disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+        <button onClick={handleSave} disabled={saving} className="px-4 py-1.5 text-xs rounded-lg text-white font-semibold transition-colors disabled:opacity-60" style={{ backgroundColor: '#ffbd59' }}>
           {saving ? 'Saving...' : 'Save changes'}
         </button>
       </div>
@@ -356,7 +356,7 @@ function ReportDetail({ report, onClose }: { report: Row; onClose: () => void })
           ))}
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Conversations</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#ffbd59] mb-2">Conversations</p>
           <Row label="Total convos" value={report.total_convos} />
           <Row label="Proposed calls" value={report.call_proposed} />
           <Row label="Scheduled calls" value={report.qualified_calls} />
@@ -567,14 +567,14 @@ export default function SetterDashboardPage() {
       <div className="max-w-7xl mx-auto">
         {/* Setter role: prominent daily report CTA */}
         {isSetter && (
-          <div className="mb-6 flex items-center justify-between bg-[#185FA5] rounded-xl px-5 py-4 text-white">
+          <div className="mb-6 flex items-center justify-between bg-[#ffbd59] rounded-xl px-5 py-4 text-white">
             <div>
               <p className="text-sm font-semibold">Hey{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</p>
               <p className="text-xs opacity-80 mt-0.5">Did you file today's report?</p>
             </div>
             <Link
               href="/equipo/setter/nuevo"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#185FA5] text-xs font-bold hover:bg-blue-50 transition-colors shrink-0"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#ffbd59] text-xs font-bold hover:bg-[#ffbd59]/10 transition-colors shrink-0"
             >
               File today's report →
             </Link>
@@ -591,7 +591,7 @@ export default function SetterDashboardPage() {
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors',
                     preset === p
-                      ? p === 'week' ? 'bg-indigo-600 text-white' : 'bg-[#185FA5] text-white'
+                      ? p === 'week' ? 'bg-[#89bcef] text-[#1a1a2e]' : 'bg-[#ffbd59] text-[#1a1a2e]'
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
@@ -631,7 +631,7 @@ export default function SetterDashboardPage() {
             <Link
               href="/equipo/setter/nuevo"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#185FA5' }}
+              style={{ backgroundColor: '#ffbd59' }}
             >
               <Plus className="h-3.5 w-3.5" />
               New Report
@@ -739,7 +739,7 @@ export default function SetterDashboardPage() {
                       <Tooltip contentStyle={{ fontSize: 11 }} />
                       <Legend formatter={(v) => <span className="text-xs">{v === 'call_proposed' ? 'Proposed' : 'Scheduled'}</span>} />
                       <Bar dataKey="call_proposed"   fill="#71717a" maxBarSize={32} />
-                      <Bar dataKey="qualified_calls" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                      <Bar dataKey="qualified_calls" fill="#ffbd59" radius={[3, 3, 0, 0]} maxBarSize={32} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -806,7 +806,7 @@ export default function SetterDashboardPage() {
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => setDetailReport(r)}
-                                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                  className="text-[#89bcef] dark:text-[#89bcef] hover:underline font-medium"
                                 >
                                   View
                                 </button>
@@ -821,7 +821,7 @@ export default function SetterDashboardPage() {
                                       if (data) setEditTarget(data)
                                       else toast.error('Could not load report for editing')
                                     }}
-                                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-[#ffbd59] hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/20 transition-all"
                                     title="Edit report"
                                   >
                                     <Pencil className="h-3.5 w-3.5" />

@@ -69,8 +69,8 @@ function statusBadge(status: string) {
   return map[status] || map['N/A']
 }
 
-const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
-const selectCls = 'text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
+const selectCls = 'text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
 type Tab = 'dashboard' | 'commissions' | 'pnl'
 
@@ -702,7 +702,7 @@ export default function FinancePage() {
           <input
             autoFocus
             type="number"
-            className="w-24 text-sm border border-blue-400 rounded px-2 py-1 text-right bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+            className="w-24 text-sm border border-[#ffbd59] rounded px-2 py-1 text-right bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
             defaultValue={plEditValue}
             onBlur={(e) => handlePLSave(mk, field, parseFloat(e.target.value) || 0)}
             onKeyDown={(e) => {
@@ -716,13 +716,13 @@ export default function FinancePage() {
 
     return (
       <td
-        className="px-3 py-2 text-right text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group/plc"
+        className="px-3 py-2 text-right text-sm cursor-pointer hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/10 transition-colors group/plc"
         onClick={() => { setPlEditingCell({ id: mk, field }); setPlEditValue(String(value)) }}
       >
         <span className={cn(value === 0 && 'text-zinc-300 dark:text-zinc-600', value < 0 && 'text-red-600 dark:text-red-400')}>
           {fmtCurrency(value)}
         </span>
-        <span className="opacity-0 group-hover/plc:opacity-100 ml-1 text-[10px] text-blue-400">&#9998;</span>
+        <span className="opacity-0 group-hover/plc:opacity-100 ml-1 text-[10px] text-[#ffbd59]">&#9998;</span>
       </td>
     )
   }
@@ -816,14 +816,14 @@ export default function FinancePage() {
                 onClick={() => setActiveTab(key)}
                 className={cn(
                   'relative px-5 py-3 text-sm font-medium transition-colors',
-                  isActive ? 'text-[#185FA5]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  isActive ? 'text-[#ffbd59]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
                 )}
               >
                 {label}
                 {isActive && (
                   <motion.span
                     layoutId="finance-tab-underline"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#185FA5]"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ffbd59]"
                     transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                   />
                 )}
@@ -1071,7 +1071,7 @@ export default function FinancePage() {
                                   value={commEditValue}
                                   onChange={(e) => { setCommEditValue(e.target.value); handleSaveCommEdit(c.id, 'closer', e.target.value) }}
                                   onBlur={() => setCommEditingCell(null)}
-                                  className="border border-blue-400 rounded px-1 py-0.5 text-xs w-44 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                  className="border border-[#ffbd59] rounded px-1 py-0.5 text-xs w-44 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
                                 >
                                   <option value="">— None —</option>
                                   {CLOSERS.map(name => <option key={name} value={name}>{name}</option>)}
@@ -1079,10 +1079,10 @@ export default function FinancePage() {
                               ) : (
                                 <button
                                   onClick={() => { setCommEditingCell({ id: c.id, field: 'closer' }); setCommEditValue(c.closer || '') }}
-                                  className="text-left hover:text-blue-600 dark:hover:text-blue-400 group/edit w-full"
+                                  className="text-left hover:text-[#89bcef] dark:hover:text-[#89bcef] group/edit w-full"
                                 >
                                   {c.closer || <span className="text-zinc-300 dark:text-zinc-600">—</span>}
-                                  <span className="opacity-0 group-hover/edit:opacity-100 ml-1 text-[10px] text-blue-400">&#9998;</span>
+                                  <span className="opacity-0 group-hover/edit:opacity-100 ml-1 text-[10px] text-[#ffbd59]">&#9998;</span>
                                 </button>
                               )}
                             </TableCell>
@@ -1097,7 +1097,7 @@ export default function FinancePage() {
                                   value={commEditValue}
                                   onChange={(e) => { setCommEditValue(e.target.value); handleSaveCommEdit(c.id, 'setter', e.target.value) }}
                                   onBlur={() => setCommEditingCell(null)}
-                                  className="border border-blue-400 rounded px-1 py-0.5 text-xs w-44 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                  className="border border-[#ffbd59] rounded px-1 py-0.5 text-xs w-44 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none"
                                 >
                                   <option value="">— None —</option>
                                   {SETTERS.map(name => <option key={name} value={name}>{name}</option>)}
@@ -1105,10 +1105,10 @@ export default function FinancePage() {
                               ) : (
                                 <button
                                   onClick={() => { setCommEditingCell({ id: c.id, field: 'setter' }); setCommEditValue(c.setter || '') }}
-                                  className="text-left hover:text-blue-600 dark:hover:text-blue-400 group/edit w-full"
+                                  className="text-left hover:text-[#89bcef] dark:hover:text-[#89bcef] group/edit w-full"
                                 >
                                   {c.setter || <span className="text-zinc-300 dark:text-zinc-600">—</span>}
-                                  <span className="opacity-0 group-hover/edit:opacity-100 ml-1 text-[10px] text-blue-400">&#9998;</span>
+                                  <span className="opacity-0 group-hover/edit:opacity-100 ml-1 text-[10px] text-[#ffbd59]">&#9998;</span>
                                 </button>
                               )}
                             </TableCell>
@@ -1144,7 +1144,7 @@ export default function FinancePage() {
                     className={cn(
                       'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
                       plYear === y
-                        ? 'bg-[#185FA5] text-white'
+                        ? 'bg-[#ffbd59] text-[#1a1a2e]'
                         : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
                     )}
                   >

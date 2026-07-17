@@ -163,7 +163,7 @@ export function Sidebar() {
               <div ref={!isMobile ? quickMenuRef : undefined} className="relative">
                 <button
                   onClick={() => setQuickMenuOpen((v) => !v)}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-[#ffbd59]/20 text-[#ffbd59] hover:bg-[#ffbd59]/30 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Quick Action
@@ -201,7 +201,7 @@ export function Sidebar() {
                   onClick={() => setQuickMenuOpen((v) => !v)}
                   onMouseEnter={(e) => handleMouseEnter('Quick Action', e)}
                   onMouseLeave={handleMouseLeave}
-                  className="w-full flex items-center justify-center h-9 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                  className="w-full flex items-center justify-center h-9 rounded-lg bg-[#ffbd59]/20 text-[#ffbd59] hover:bg-[#ffbd59]/30 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -251,14 +251,14 @@ export function Sidebar() {
                   'relative group flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150',
                   isExpanded ? 'px-3 h-10' : 'justify-center h-10',
                   active
-                    ? 'bg-amber-500/15 text-amber-400'
-                    : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+                    ? 'bg-[#ffbd59]/20 text-[#ffbd59]'
+                    : 'text-zinc-400 hover:bg-[#ffbd59]/10 hover:text-white'
                 )}
               >
-                <Icon className={cn('h-[18px] w-[18px] shrink-0', active && 'text-amber-400')} />
+                <Icon className={cn('h-[18px] w-[18px] shrink-0', active && 'text-[#ffbd59]')} />
                 {isExpanded && <span className="truncate">{label}</span>}
                 {active && !isExpanded && (
-                  <span className="absolute left-0 w-[3px] h-5 rounded-r-full bg-amber-400" />
+                  <span className="absolute left-0 w-[3px] h-5 rounded-r-full bg-[#ffbd59]" />
                 )}
               </Link>
             )
@@ -276,8 +276,8 @@ export function Sidebar() {
               'flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150',
               isExpanded ? 'px-3 h-10' : 'justify-center h-10',
               pathname === '/settings'
-                ? 'bg-amber-500/15 text-amber-400'
-                : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+                ? 'bg-[#ffbd59]/20 text-[#ffbd59]'
+                : 'text-zinc-400 hover:bg-[#ffbd59]/10 hover:text-white'
             )}
           >
             <Settings className="h-[18px] w-[18px] shrink-0" />
@@ -300,7 +300,7 @@ export function Sidebar() {
           {!isMobile && (
             <button
               onClick={toggleCollapsed}
-              className="flex items-center justify-center gap-2 w-full h-9 rounded-lg text-zinc-500 hover:bg-white/5 hover:text-white transition-colors mt-1"
+              className="flex items-center justify-center gap-2 w-full h-9 rounded-lg text-zinc-500 hover:bg-[#ffbd59]/10 hover:text-white transition-colors mt-1"
             >
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
               {isExpanded && <span className="text-xs">Collapse</span>}
@@ -376,19 +376,19 @@ export function Sidebar() {
       {previewRole && (
         <div
           className={cn(
-            'fixed top-12 right-0 z-30 bg-amber-100 dark:bg-amber-900/60 border-b border-amber-300 dark:border-amber-700 transition-all duration-200 no-print',
+            'fixed top-12 right-0 z-30 bg-[#ffbd59]/20 dark:bg-[#ffbd59]/15 border-b border-[#ffbd59]/40 dark:border-[#ffbd59]/30 transition-all duration-200 no-print',
             'md:left-16 left-0',
             !collapsed && 'md:left-60'
           )}
         >
           <div className="px-4 md:px-6 py-1.5 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-medium text-amber-900 dark:text-amber-100">
+            <div className="flex items-center gap-2 text-xs font-medium text-[#1a1a2e] dark:text-[#ffbd59]">
               <Eye className="h-3.5 w-3.5" />
               Previewing as: <span className="font-bold">{ROLE_LABELS[previewRole]}</span>
             </div>
             <button
               onClick={() => setPreviewRole(null)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 hover:bg-amber-300 dark:hover:bg-amber-700 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-[#ffbd59]/30 dark:bg-[#ffbd59]/25 text-[#1a1a2e] dark:text-[#ffbd59] hover:bg-[#ffbd59]/40 dark:hover:bg-[#ffbd59]/35 transition-colors"
             >
               <X className="h-3 w-3" />
               Exit

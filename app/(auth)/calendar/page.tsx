@@ -114,7 +114,7 @@ function Modal({ title, onClose, children, wide = false }: {
   )
 }
 
-const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
 // ─── Event Form Modal ───────────────────────────────────────────────────────
 
@@ -178,7 +178,7 @@ function EventFormModal({
           <button type="button" onClick={onClose} className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
             Cancel
           </button>
-          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+          <button type="submit" disabled={saving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#ffbd59' }}>
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
@@ -401,7 +401,7 @@ export default function CalendarPage() {
               <button
                 onClick={() => setCreateOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: '#185FA5' }}
+                style={{ backgroundColor: '#ffbd59' }}
               >
                 <Plus className="h-3.5 w-3.5" /> New Event
               </button>
@@ -434,7 +434,7 @@ export default function CalendarPage() {
               </div>
               <button
                 onClick={() => { setYear(new Date().getFullYear()); setMonth(new Date().getMonth()) }}
-                className="w-full text-center text-[10px] text-blue-600 dark:text-blue-400 hover:underline mt-1"
+                className="w-full text-center text-[10px] text-[#89bcef] dark:text-[#89bcef] hover:underline mt-1"
               >
                 Today
               </button>
@@ -469,7 +469,7 @@ export default function CalendarPage() {
                 <div className="px-3 pb-3">
                   <button
                     onClick={() => setCatFormOpen(true)}
-                    className="flex items-center gap-1 text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                    className="flex items-center gap-1 text-[10px] font-medium text-[#89bcef] dark:text-[#89bcef] hover:underline"
                   >
                     <Plus className="h-3 w-3" /> Add Category
                   </button>
@@ -530,7 +530,7 @@ export default function CalendarPage() {
                         <span className={cn(
                           'inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full mb-0.5',
                           today
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-[#ffbd59] text-[#1a1a2e]'
                             : current
                               ? 'text-zinc-700 dark:text-zinc-300'
                               : 'text-zinc-300 dark:text-zinc-600',

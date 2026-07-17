@@ -171,10 +171,10 @@ type ConfirmAction =
   | null
 
 const inputClass =
-  'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+  'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
 const selectClass =
-  'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+  'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
 const labelClass = 'block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1'
 
@@ -379,7 +379,7 @@ export default function SalesPage() {
   const kajabi = active.filter((t) => t.source === 'Kajabi').reduce((s, t) => s + (Number(t.cost) || 0), 0)
   const ghl = active.filter((t) => t.source === 'GoHighLevel').reduce((s, t) => s + (Number(t.cost) || 0), 0)
   const sourceData = [
-    { name: 'Kajabi', value: kajabi, color: '#185FA5' },
+    { name: 'Kajabi', value: kajabi, color: '#ffbd59' },
     { name: 'GoHighLevel', value: ghl, color: '#3B6D11' },
   ]
 
@@ -1026,7 +1026,7 @@ export default function SalesPage() {
                     className={cn(
                       'px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all',
                       csvSource === s
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                        ? 'border-[#ffbd59] bg-[#ffbd59]/10 text-[#ffbd59] dark:bg-[#ffbd59]/10 dark:text-[#ffbd59]'
                         : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
                     )}
                   >
@@ -1121,7 +1121,7 @@ export default function SalesPage() {
                   onClick={handleImport}
                   disabled={!csvContent || importing}
                   className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-                  style={{ backgroundColor: '#185FA5' }}
+                  style={{ backgroundColor: '#ffbd59' }}
                 >
                   {importing ? 'Importing…' : 'Import'}
                 </button>
@@ -1211,7 +1211,7 @@ export default function SalesPage() {
                   placeholder="Search by name or email..."
                   value={recoverySearch}
                   onChange={e => setRecoverySearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  className="w-full pl-8 pr-3 py-1.5 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                 />
               </div>
             </div>

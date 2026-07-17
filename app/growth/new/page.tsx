@@ -21,10 +21,10 @@ const SIGNAL_OPTIONS = [
 /* ─── Styling ───────────────────────────────────────────────── */
 
 const inputClass =
-  'w-full px-3 py-2 rounded-xl border border-zinc-200 bg-white text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30'
+  'w-full px-3 py-2 rounded-xl border border-zinc-200 bg-white text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30'
 
 const textareaClass =
-  'w-full px-3 py-2 rounded-xl border border-zinc-200 bg-white text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 mt-2'
+  'w-full px-3 py-2 rounded-xl border border-zinc-200 bg-white text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 mt-2'
 
 /* ─── Sub-components ────────────────────────────────────────── */
 
@@ -33,7 +33,7 @@ function FormSection({ number, title, children }: { number: string; title: strin
     <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm">
       <div className="px-5 pt-5 pb-0 space-y-4">
         <div className="flex items-center gap-3 pb-3 border-b border-zinc-200">
-          <span className="flex items-center justify-center h-7 w-7 rounded-full bg-[#185FA5] text-white text-xs font-bold">{number}</span>
+          <span className="flex items-center justify-center h-7 w-7 rounded-full bg-[#ffbd59] text-[#1a1a2e] text-xs font-bold">{number}</span>
           <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
         </div>
         <div className="pb-5 space-y-4">{children}</div>
@@ -429,7 +429,7 @@ export default function PublicGrowthReportPage() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-6 px-6 py-2.5 bg-[#185FA5] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity"
+            className="mt-6 px-6 py-2.5 bg-[#ffbd59] text-[#1a1a2e] text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity"
           >
             Submit another report
           </button>
@@ -551,7 +551,7 @@ export default function PublicGrowthReportPage() {
                     onClick={() => toggleSignal(s)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                       clientSignals.includes(s)
-                        ? 'bg-[#185FA5] text-white border-[#185FA5]'
+                        ? 'bg-[#ffbd59] text-[#1a1a2e] border-[#ffbd59]'
                         : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
                     }`}
                   >
@@ -568,7 +568,7 @@ export default function PublicGrowthReportPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full md:w-auto px-8 py-3 bg-[#185FA5] text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-60 transition-opacity"
+            className="w-full md:w-auto px-8 py-3 bg-[#ffbd59] text-[#1a1a2e] text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-60 transition-opacity"
           >
             {submitting ? 'Saving...' : "Save this week's report"}
           </button>

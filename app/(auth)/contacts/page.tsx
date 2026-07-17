@@ -321,13 +321,13 @@ export default function ContactsPage() {
             placeholder="Search clients across all groups…"
             value={globalSearch}
             onChange={(e) => setGlobalSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
           />
         </div>
         <select
           value={scoreFilter}
           onChange={(e) => setScoreFilter(e.target.value as ScoreFilter)}
-          className="px-3 py-2 text-xs font-medium border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          className="px-3 py-2 text-xs font-medium border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
         >
           <option value="all">All Scores</option>
           <option value="cold">Cold (0-20)</option>
@@ -388,7 +388,7 @@ export default function ContactsPage() {
               onChange={(e) => setCsvContent(e.target.value)}
               placeholder="Paste CSV content here…"
               rows={10}
-              className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none font-mono mb-4"
+              className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 resize-none font-mono mb-4"
             />
             <div className="flex items-center justify-end gap-2">
               <button
@@ -401,7 +401,7 @@ export default function ContactsPage() {
                 onClick={handleImport}
                 disabled={!csvContent.trim() || importing}
                 className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
-                style={{ backgroundColor: '#185FA5' }}
+                style={{ backgroundColor: '#ffbd59' }}
               >
                 {importing ? 'Importing…' : 'Import'}
               </button>
@@ -646,7 +646,7 @@ function GroupContent({
               placeholder={`Search in ${group.name}…`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
             />
           </div>
         </div>
@@ -689,7 +689,7 @@ function GroupContent({
                         }
                       >
                         Score
-                        <ArrowUpDown className={cn('h-3 w-3', sortByScore && 'text-blue-500')} />
+                        <ArrowUpDown className={cn('h-3 w-3', sortByScore && 'text-[#ffbd59]')} />
                       </button>
                     </th>
                   </tr>

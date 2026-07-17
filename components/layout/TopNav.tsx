@@ -173,7 +173,7 @@ export function TopNav() {
                   {active && (
                     <motion.span
                       layoutId="nav-active-pill"
-                      className="absolute inset-0 rounded-full bg-[#185FA5]"
+                      className="absolute inset-0 rounded-full bg-[#ffbd59]"
                       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                     />
                   )}
@@ -243,7 +243,7 @@ export function TopNav() {
               {pathname === '/settings' && (
                 <motion.span
                   layoutId="nav-active-pill"
-                  className="absolute inset-0 rounded-full bg-[#185FA5]"
+                  className="absolute inset-0 rounded-full bg-[#ffbd59]"
                   transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                 />
               )}
@@ -326,7 +326,7 @@ export function TopNav() {
                       className={cn(
                         'flex items-center gap-3 px-4 h-12 rounded-xl text-sm font-medium transition-colors',
                         active
-                          ? 'bg-[#185FA5] text-white'
+                          ? 'bg-[#ffbd59] text-[#1a1a2e]'
                           : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                       )}
                     >
@@ -355,7 +355,7 @@ export function TopNav() {
                   className={cn(
                     'flex items-center gap-3 px-4 h-12 rounded-xl text-sm font-medium transition-colors',
                     pathname === '/settings'
-                      ? 'bg-[#185FA5] text-white'
+                      ? 'bg-[#ffbd59] text-[#1a1a2e]'
                       : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                   )}
                 >

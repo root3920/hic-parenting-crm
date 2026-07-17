@@ -61,7 +61,7 @@ const PIE_COLORS: Record<string, string> = {
   'Cancelled':   '#A32D2D',
   'No show':     '#BA7517',
   'Rescheduled': '#534AB7',
-  'Scheduled':   '#185FA5',
+  'Scheduled':   '#ffbd59',
 }
 
 const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show', 'Follow-up'] as const
@@ -151,7 +151,7 @@ interface KpiCardDef {
 }
 
 const KPI_CARDS: KpiCardDef[] = [
-  { key: 'scheduled_future', label: 'Upcoming',    icon: CalendarIcon, iconColor: 'text-blue-500',   borderActive: 'border-blue-500',   borderIdle: 'border-zinc-200 dark:border-zinc-800' },
+  { key: 'scheduled_future', label: 'Upcoming',    icon: CalendarIcon, iconColor: 'text-[#89bcef]',   borderActive: 'border-[#ffbd59]',   borderIdle: 'border-zinc-200 dark:border-zinc-800' },
   { key: 'Showed Up',        label: 'Showed Up',  icon: CheckCircle, iconColor: 'text-green-500', borderActive: 'border-green-500',  borderIdle: 'border-zinc-200 dark:border-zinc-800' },
   { key: 'Cancelled',        label: 'Cancelled',  icon: XCircle,     iconColor: 'text-red-500',   borderActive: 'border-red-500',    borderIdle: 'border-zinc-200 dark:border-zinc-800' },
   { key: 'No show',          label: 'No Show',    icon: UserX,       iconColor: 'text-amber-500', borderActive: 'border-amber-500',  borderIdle: 'border-zinc-200 dark:border-zinc-800' },
@@ -546,14 +546,14 @@ export default function LlamadasPage() {
       <div className="max-w-7xl mx-auto">
         {/* Closer role: prominent daily report CTA */}
         {isCloser && (
-          <div className="mb-6 flex items-center justify-between bg-[#185FA5] rounded-xl px-5 py-4 text-white">
+          <div className="mb-6 flex items-center justify-between bg-[#ffbd59] rounded-xl px-5 py-4 text-white">
             <div>
               <p className="text-sm font-semibold">Hey{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</p>
               <p className="text-xs opacity-80 mt-0.5">Did you file today's report?</p>
             </div>
             <Link
               href="/equipo/closer/nuevo"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#185FA5] text-xs font-bold hover:bg-blue-50 transition-colors shrink-0"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#ffbd59] text-xs font-bold hover:bg-[#ffbd59]/10 transition-colors shrink-0"
             >
               File today's report →
             </Link>
@@ -569,7 +569,7 @@ export default function LlamadasPage() {
                   onClick={() => setPreset(p)}
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors',
-                    preset === p ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    preset === p ? 'bg-[#ffbd59] text-[#1a1a2e]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
                   {p === 'todo' ? 'All' : p}
@@ -640,14 +640,14 @@ export default function LlamadasPage() {
             <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
               <button
                 onClick={() => setCalView('list')}
-                className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', calView === 'list' ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200')}
+                className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', calView === 'list' ? 'bg-[#ffbd59] text-[#1a1a2e]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200')}
               >
                 <List className="h-3.5 w-3.5" />
                 List
               </button>
               <button
                 onClick={() => setCalView('calendar')}
-                className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', calView === 'calendar' ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200')}
+                className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', calView === 'calendar' ? 'bg-[#ffbd59] text-[#1a1a2e]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200')}
               >
                 <CalendarDays className="h-3.5 w-3.5" />
                 Calendar
@@ -657,7 +657,7 @@ export default function LlamadasPage() {
             {/* New call button */}
             <button
               onClick={() => setShowNewCall(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#185FA5] text-[#185FA5] dark:text-blue-400 dark:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#ffbd59] text-[#ffbd59] dark:text-[#89bcef] dark:border-[#89bcef] hover:bg-[#ffbd59]/10 dark:hover:bg-blue-900/20 transition-colors"
             >
               <Plus className="h-3.5 w-3.5" />
               New Call
@@ -667,7 +667,7 @@ export default function LlamadasPage() {
             <Link
               href="/equipo/closer/nuevo"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#185FA5' }}
+              style={{ backgroundColor: '#ffbd59' }}
             >
               + New Report
             </Link>
@@ -678,7 +678,7 @@ export default function LlamadasPage() {
         <div className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 mb-4">
           <span>Showing times in <strong className="text-zinc-600 dark:text-zinc-400">{tzAbbr}</strong></span>
           <span>·</span>
-          <Link href="/settings" className="text-blue-500 hover:underline">Change</Link>
+          <Link href="/settings" className="text-[#89bcef] hover:underline">Change</Link>
         </div>
 
         {loading ? (
@@ -803,7 +803,7 @@ export default function LlamadasPage() {
                                         if (e.key === 'Escape') setEditingDateId(null)
                                       }}
                                       autoFocus
-                                      className="text-xs border border-blue-400 dark:border-blue-500 rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 w-44"
+                                      className="text-xs border border-[#ffbd59] dark:border-[#ffbd59] rounded-md px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 w-44"
                                     />
                                   ) : (
                                     <button
@@ -811,7 +811,7 @@ export default function LlamadasPage() {
                                         setEditingDateId(call.id)
                                         setEditingDateValue(toDatetimeLocal(call.start_date))
                                       }}
-                                      className={cn('font-medium text-left group flex items-center gap-1 rounded px-1 py-0.5 -mx-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer', showBlue ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400')}
+                                      className={cn('font-medium text-left group flex items-center gap-1 rounded px-1 py-0.5 -mx-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer', showBlue ? 'text-[#89bcef] dark:text-[#89bcef]' : 'text-zinc-500 dark:text-zinc-400')}
                                       title="Click to edit date/time"
                                     >
                                       {formatDateShort(call.start_date, timezone)} {tzAbbr}
@@ -1084,7 +1084,7 @@ export default function LlamadasPage() {
                           <Bar dataKey="Cancelled" stackId="a" fill="#A32D2D" maxBarSize={36} />
                           <Bar dataKey="No show" stackId="a" fill="#BA7517" maxBarSize={36} />
                           <Bar dataKey="Rescheduled" stackId="a" fill="#534AB7" maxBarSize={36} />
-                          <Bar dataKey="Scheduled" stackId="a" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={36} />
+                          <Bar dataKey="Scheduled" stackId="a" fill="#ffbd59" radius={[3, 3, 0, 0]} maxBarSize={36} />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -1113,7 +1113,7 @@ export default function LlamadasPage() {
             <div className="px-6 py-4 space-y-5">
               {/* Contact Info */}
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-3">Contact Info</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#89bcef] dark:text-[#89bcef] mb-3">Contact Info</p>
                 <div className="space-y-2.5">
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Full name <span className="text-red-400">*</span></label>
@@ -1121,7 +1121,7 @@ export default function LlamadasPage() {
                       type="text"
                       value={newCall.full_name}
                       onChange={(e) => { setNewCall(p => ({ ...p, full_name: e.target.value })); setNewCallErrors(p => ({ ...p, full_name: false })) }}
-                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.full_name ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]', newCallErrors.full_name ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
                       placeholder="Jane Doe"
                     />
                   </div>
@@ -1131,7 +1131,7 @@ export default function LlamadasPage() {
                       type="email"
                       value={newCall.email}
                       onChange={(e) => { setNewCall(p => ({ ...p, email: e.target.value })); setNewCallErrors(p => ({ ...p, email: false })) }}
-                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.email ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]', newCallErrors.email ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
                       placeholder="jane@example.com"
                     />
                   </div>
@@ -1141,7 +1141,7 @@ export default function LlamadasPage() {
                       type="tel"
                       value={newCall.phone}
                       onChange={(e) => setNewCall(p => ({ ...p, phone: e.target.value }))}
-                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                       placeholder="+1 555 123 4567"
                     />
                   </div>
@@ -1159,7 +1159,7 @@ export default function LlamadasPage() {
                         type="datetime-local"
                         value={newCall.start_date}
                         onChange={(e) => { setNewCall(p => ({ ...p, start_date: e.target.value })); setNewCallErrors(p => ({ ...p, start_date: false })) }}
-                        className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.start_date ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                        className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]', newCallErrors.start_date ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
                       />
                     </div>
                     <div>
@@ -1167,7 +1167,7 @@ export default function LlamadasPage() {
                       <select
                         value={newCall.timezone}
                         onChange={(e) => setNewCall(p => ({ ...p, timezone: e.target.value }))}
-                        className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                        className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                       >
                         {US_TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
                         <option value="America/Bogota">COT — Colombia</option>
@@ -1180,7 +1180,7 @@ export default function LlamadasPage() {
                       <select
                         value={newCall.closer_name}
                         onChange={(e) => { setNewCall(p => ({ ...p, closer_name: e.target.value })); setNewCallErrors(p => ({ ...p, closer_name: false })) }}
-                        className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.closer_name ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                        className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]', newCallErrors.closer_name ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
                       >
                         <option value="">Select closer...</option>
                         {CLOSERS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1191,7 +1191,7 @@ export default function LlamadasPage() {
                       <select
                         value={newCall.setter_name}
                         onChange={(e) => setNewCall(p => ({ ...p, setter_name: e.target.value }))}
-                        className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                        className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                       >
                         <option value="">None</option>
                         {SETTERS.map(s => <option key={s} value={s}>{s}</option>)}
@@ -1210,7 +1210,7 @@ export default function LlamadasPage() {
                     <select
                       value={newCall.call_type}
                       onChange={(e) => { setNewCall(p => ({ ...p, call_type: e.target.value })); setNewCallErrors(p => ({ ...p, call_type: false })) }}
-                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.call_type ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]', newCallErrors.call_type ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
                     >
                       <option value="Qualified">Qualified</option>
                       <option value="Disqualified">Disqualified</option>
@@ -1223,7 +1223,7 @@ export default function LlamadasPage() {
                     <select
                       value={newCall.status}
                       onChange={(e) => { setNewCall(p => ({ ...p, status: e.target.value })); setNewCallErrors(p => ({ ...p, status: false })) }}
-                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400', newCallErrors.status ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
+                      className={cn('w-full text-sm border rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]', newCallErrors.status ? 'border-red-400' : 'border-zinc-200 dark:border-zinc-700')}
                     >
                       {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -1233,7 +1233,7 @@ export default function LlamadasPage() {
                     <select
                       value={newCall.activity_type}
                       onChange={(e) => setNewCall(p => ({ ...p, activity_type: e.target.value }))}
-                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                      className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                     >
                       <option value="Appointment Booked">Appointment Booked</option>
                       <option value="Manual">Manual</option>
@@ -1252,7 +1252,7 @@ export default function LlamadasPage() {
                   onChange={(e) => setNewCall(p => ({ ...p, notes: e.target.value }))}
                   placeholder="Notes or summary..."
                   rows={3}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] resize-y"
                 />
               </div>
             </div>
@@ -1269,7 +1269,7 @@ export default function LlamadasPage() {
                 onClick={handleNewCallSave}
                 disabled={newCallSaving}
                 className="px-4 py-1.5 text-xs rounded-md font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                style={{ backgroundColor: '#185FA5' }}
+                style={{ backgroundColor: '#ffbd59' }}
               >
                 {newCallSaving ? 'Saving...' : 'Save Call'}
               </button>

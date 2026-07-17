@@ -126,7 +126,7 @@ export default function ProfilesPage() {
           <button
             onClick={() => { setForm(emptyForm); setModalOpen(true) }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#185FA5' }}
+            style={{ backgroundColor: '#ffbd59' }}
           >
             <Plus className="h-3.5 w-3.5" />
             Add member
@@ -208,7 +208,7 @@ export default function ProfilesPage() {
                   value={form.full_name}
                   onChange={(e) => set('full_name', e.target.value)}
                   placeholder="E.g.: Valentina Llano"
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                   required
                 />
               </div>
@@ -220,7 +220,7 @@ export default function ProfilesPage() {
                   value={form.email}
                   onChange={(e) => set('email', e.target.value)}
                   placeholder="email@example.com"
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                   required
                 />
               </div>
@@ -230,7 +230,7 @@ export default function ProfilesPage() {
                 <select
                   value={form.role}
                   onChange={(e) => set('role', e.target.value as Role)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                 >
                   <option value="admin">Admin</option>
                   <option value="closer">Closer</option>
@@ -246,7 +246,7 @@ export default function ProfilesPage() {
                   <select
                     value={form.closer_name}
                     onChange={(e) => set('closer_name', e.target.value)}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                     required
                   >
                     <option value="">Select...</option>
@@ -263,7 +263,7 @@ export default function ProfilesPage() {
                   <select
                     value={form.setter_name}
                     onChange={(e) => set('setter_name', e.target.value)}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                     required
                   >
                     <option value="">Select...</option>
@@ -284,7 +284,7 @@ export default function ProfilesPage() {
                   type="submit"
                   disabled={submitting}
                   className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
-                  style={{ backgroundColor: '#185FA5' }}
+                  style={{ backgroundColor: '#ffbd59' }}
                 >
                   {submitting ? 'Sending...' : 'Send Invitation'}
                 </button>

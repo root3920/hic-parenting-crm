@@ -144,7 +144,7 @@ function ReportDetail({ report, onClose }: { report: CloserDailyReport; onClose:
         </div>
         {/* Meetings */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Meetings</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#ffbd59] mb-2">Meetings</p>
           <Row label="Total meetings" value={report.total_meetings} />
           <Row label="Showed" value={report.showed_meetings} />
           <Row label="Follow-up" value={report.followup_meetings} />
@@ -243,7 +243,7 @@ function EditCloserReportModal({ report, onClose, onSaved }: { report: CloserDai
     }
   }
 
-  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
   return (
     <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -265,7 +265,7 @@ function EditCloserReportModal({ report, onClose, onSaved }: { report: CloserDai
 
         {/* Meetings */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-2">Meetings</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#ffbd59] mb-2">Meetings</p>
           <div className="grid grid-cols-3 gap-3 mb-2">
             <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Total Meetings</label><input type="number" min={0} value={form.total_meetings} onChange={(e) => set('total_meetings', e.target.value)} className={inputCls} /></div>
             <div><label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Showed</label><input type="number" min={0} value={form.showed_meetings} onChange={(e) => set('showed_meetings', e.target.value)} className={inputCls} /></div>
@@ -313,7 +313,7 @@ function EditCloserReportModal({ report, onClose, onSaved }: { report: CloserDai
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-1.5 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors disabled:opacity-60"
+            className="px-4 py-1.5 text-xs rounded-lg bg-[#ffbd59] hover:bg-[#e5a94f] text-[#1a1a2e] font-semibold transition-colors disabled:opacity-60"
           >
             {saving ? 'Saving...' : 'Save changes'}
           </button>
@@ -523,7 +523,7 @@ export default function CloserDashboardPage() {
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors',
                     preset === p
-                      ? p === 'week' ? 'bg-indigo-600 text-white' : 'bg-[#185FA5] text-white'
+                      ? p === 'week' ? 'bg-[#89bcef] text-[#1a1a2e]' : 'bg-[#ffbd59] text-[#1a1a2e]'
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
@@ -563,7 +563,7 @@ export default function CloserDashboardPage() {
             <Link
               href="/equipo/closer/nuevo"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#185FA5' }}
+              style={{ backgroundColor: '#ffbd59' }}
             >
               <Plus className="h-3.5 w-3.5" />
               New Report
@@ -659,7 +659,7 @@ export default function CloserDashboardPage() {
                 label="Cash Collected"
                 value={fmtCash(revenue.cash)}
                 sub={`${revenue.won} closed deals`}
-                color="bg-blue-600 text-white border-blue-700"
+                color="bg-[#ffbd59] text-[#1a1a2e] border-blue-700"
               />
               <RevenueCard
                 label="Recurring Pipeline"
@@ -719,7 +719,7 @@ export default function CloserDashboardPage() {
                       <Bar dataKey="cash_collected" maxBarSize={36} radius={[3, 3, 0, 0]}>
                         {cashChartData.map((entry, i) => {
                           const ratio = entry.cash_collected / maxCash
-                          const fill = ratio >= 0.7 ? '#185FA5' : ratio >= 0.3 ? '#3B82F6' : '#93C5FD'
+                          const fill = ratio >= 0.7 ? '#ffbd59' : ratio >= 0.3 ? '#3B82F6' : '#93C5FD'
                           return <Cell key={i} fill={fill} />
                         })}
                       </Bar>
@@ -743,7 +743,7 @@ export default function CloserDashboardPage() {
                         v === 'total_meetings' ? 'Total' : v === 'showed_meetings' ? 'Showed' : v === 'offers_proposed' ? 'Offers' : 'Won'
                       }</span>} />
                       <Line type="monotone" dataKey="total_meetings" stroke="#71717a" strokeWidth={2} strokeDasharray="4 2" dot={false} />
-                      <Line type="monotone" dataKey="showed_meetings" stroke="#185FA5" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="showed_meetings" stroke="#ffbd59" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="offers_proposed" stroke="#EF9F27" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="won_deals" stroke="#22C55E" strokeWidth={2} dot={false} />
                     </LineChart>
@@ -789,7 +789,7 @@ export default function CloserDashboardPage() {
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => setDetailReport(r)}
-                                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                  className="text-[#89bcef] dark:text-[#89bcef] hover:underline font-medium"
                                 >
                                   Ver
                                 </button>
@@ -801,7 +801,7 @@ export default function CloserDashboardPage() {
                                         if (data) setEditTarget(data)
                                         else toast.error('Could not load report for editing')
                                       }}
-                                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-[#ffbd59] hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/20 transition-all"
                                       title="Edit report"
                                     >
                                       <Pencil className="h-3.5 w-3.5" />

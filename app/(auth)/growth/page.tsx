@@ -72,7 +72,7 @@ const SIGNAL_OPTIONS = [
 ]
 
 const LINE_COLORS: Record<string, string> = {
-  awareness: '#6366f1',
+  awareness: '#89bcef',
   implementation: '#f59e0b',
   growth: '#10b981',
   conn_self: '#ec4899',
@@ -257,7 +257,7 @@ function DashboardTab({
           <select
             value={coachFilter}
             onChange={e => setCoachFilter(e.target.value)}
-            className="pl-3 pr-8 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+            className="pl-3 pr-8 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 appearance-none"
           >
             <option value="">All Coaches</option>
             {coaches.map(c => <option key={c} value={c}>{c}</option>)}
@@ -272,7 +272,7 @@ function DashboardTab({
             placeholder="Search by client name..."
             value={clientSearch}
             onChange={e => setClientSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
           />
         </div>
       </div>
@@ -323,7 +323,7 @@ function DashboardTab({
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71717a' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#71717a' }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
                   <Tooltip content={<CountTooltip />} cursor={{ fill: '#f4f4f5' }} />
-                  <Bar dataKey="count" fill="#185FA5" radius={[3, 3, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="count" fill="#ffbd59" radius={[3, 3, 0, 0]} maxBarSize={48} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -359,7 +359,7 @@ function DashboardTab({
                   <XAxis type="number" tick={{ fontSize: 11, fill: '#71717a' }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <YAxis type="category" dataKey="label" tick={{ fontSize: 11, fill: '#71717a' }} axisLine={false} tickLine={false} width={190} />
                   <Tooltip content={<CountTooltip />} cursor={{ fill: '#f4f4f5' }} />
-                  <Bar dataKey="count" fill="#6366f1" radius={[0, 3, 3, 0]} maxBarSize={24} />
+                  <Bar dataKey="count" fill="#89bcef" radius={[0, 3, 3, 0]} maxBarSize={24} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -624,7 +624,7 @@ function NewReportTab({ onSaved }: { onSaved: () => void }) {
                 onClick={() => toggleSignal(s)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                   clientSignals.includes(s)
-                    ? 'bg-[#185FA5] text-white border-[#185FA5]'
+                    ? 'bg-[#ffbd59] text-[#1a1a2e] border-[#ffbd59]'
                     : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400'
                 }`}
               >
@@ -961,17 +961,17 @@ function ReportDetailModal({ report: r, onClose }: { report: GrowthReport; onClo
 /* ─── Shared Form Components ─────────────────────────────────── */
 
 const inputClass =
-  'w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30'
+  'w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30'
 
 const textareaClass =
-  'w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 mt-2'
+  'w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 mt-2'
 
 function FormSection({ number, title, children }: { number: string; title: string; children: React.ReactNode }) {
   return (
     <Card>
       <CardContent className="pt-5 space-y-4">
         <div className="flex items-center gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
-          <span className="flex items-center justify-center h-7 w-7 rounded-full bg-[#185FA5] text-white text-xs font-bold">{number}</span>
+          <span className="flex items-center justify-center h-7 w-7 rounded-full bg-[#ffbd59] text-[#1a1a2e] text-xs font-bold">{number}</span>
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
         </div>
         {children}

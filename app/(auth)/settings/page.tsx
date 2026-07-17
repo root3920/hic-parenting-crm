@@ -336,12 +336,12 @@ export default function SettingsPage() {
                       className={cn(
                         'relative p-4 rounded-xl border-2 text-left transition-all',
                         timezone === tz.value
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          ? 'border-[#ffbd59] bg-blue-50 dark:bg-blue-900/20'
                           : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
                       )}
                     >
                       {timezone === tz.value && (
-                        <Check className="absolute top-3 right-3 h-3.5 w-3.5 text-blue-500" />
+                        <Check className="absolute top-3 right-3 h-3.5 w-3.5 text-[#ffbd59]" />
                       )}
                       <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{tz.abbr}</div>
                       <div className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{tz.label}</div>
@@ -384,7 +384,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => { setInviteForm(emptyInviteForm); setModalOpen(true) }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 shrink-0"
-                  style={{ backgroundColor: '#185FA5' }}
+                  style={{ backgroundColor: '#ffbd59' }}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add Member
@@ -426,7 +426,7 @@ export default function SettingsPage() {
                                   value={p.role}
                                   onChange={(e) => handleRoleChange(p.id, p.full_name, e.target.value as Role)}
                                   onBlur={() => setEditingRoleId(null)}
-                                  className="text-xs border border-zinc-300 dark:border-zinc-600 rounded-lg px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                  className="text-xs border border-zinc-300 dark:border-zinc-600 rounded-lg px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                                 >
                                   {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
                                     <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -482,7 +482,7 @@ export default function SettingsPage() {
                       className={cn(
                         'px-4 py-2 text-xs font-semibold transition-colors border-b-2 -mb-px',
                         teamTab === tab
-                          ? 'border-[#185FA5] text-[#185FA5]'
+                          ? 'border-[#ffbd59] text-[#ffbd59]'
                           : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                       )}
                     >
@@ -493,7 +493,7 @@ export default function SettingsPage() {
                   <button
                     onClick={() => { setTmModalRole(teamTab === 'closer' ? 'closer' : 'setter'); setTmForm(emptyTeamMemberForm); setTmModalOpen(true) }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 mb-1"
-                    style={{ backgroundColor: '#185FA5' }}
+                    style={{ backgroundColor: '#ffbd59' }}
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Add {teamTab === 'closer' ? 'Closer' : 'Setter'}
@@ -531,7 +531,7 @@ export default function SettingsPage() {
                                   onChange={e => setTmEditName(e.target.value)}
                                   onBlur={() => handleSaveTeamMemberName(m)}
                                   onKeyDown={e => { if (e.key === 'Enter') handleSaveTeamMemberName(m); if (e.key === 'Escape') setTmEditingId(null) }}
-                                  className="text-xs border border-blue-400 rounded px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none w-48"
+                                  className="text-xs border border-[#ffbd59] rounded px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none w-48"
                                 />
                               ) : (
                                 <span className="font-medium text-zinc-900 dark:text-zinc-100">{m.name}</span>
@@ -659,7 +659,7 @@ export default function SettingsPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-[#ffbd59] hover:bg-[#e5a94f] text-[#1a1a2e]"
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Update Password
@@ -695,7 +695,7 @@ export default function SettingsPage() {
                   value={inviteForm.full_name}
                   onChange={(e) => setInvite('full_name', e.target.value)}
                   placeholder="Ej: Valentina Llano"
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                   required
                 />
               </div>
@@ -707,7 +707,7 @@ export default function SettingsPage() {
                   value={inviteForm.email}
                   onChange={(e) => setInvite('email', e.target.value)}
                   placeholder="email@example.com"
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                   required
                 />
               </div>
@@ -717,7 +717,7 @@ export default function SettingsPage() {
                 <select
                   value={inviteForm.role}
                   onChange={(e) => setInvite('role', e.target.value as Role)}
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                 >
                   <option value="admin">Admin</option>
                   <option value="closer">Closer</option>
@@ -736,7 +736,7 @@ export default function SettingsPage() {
                   <select
                     value={inviteForm.closer_name}
                     onChange={(e) => setInvite('closer_name', e.target.value)}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                     required
                   >
                     <option value="">Select...</option>
@@ -753,7 +753,7 @@ export default function SettingsPage() {
                   <select
                     value={inviteForm.setter_name}
                     onChange={(e) => setInvite('setter_name', e.target.value)}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                     required
                   >
                     <option value="">Select...</option>
@@ -774,7 +774,7 @@ export default function SettingsPage() {
                   type="submit"
                   disabled={inviting}
                   className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
-                  style={{ backgroundColor: '#185FA5' }}
+                  style={{ backgroundColor: '#ffbd59' }}
                 >
                   {inviting ? 'Sending...' : 'Send Invitation'}
                 </button>
@@ -804,7 +804,7 @@ export default function SettingsPage() {
                   value={tmForm.name}
                   onChange={e => setTmForm(p => ({ ...p, name: e.target.value }))}
                   placeholder="Full name"
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                   required
                 />
               </div>
@@ -815,14 +815,14 @@ export default function SettingsPage() {
                   value={tmForm.email}
                   onChange={e => setTmForm(p => ({ ...p, email: e.target.value }))}
                   placeholder="email@example.com"
-                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                 />
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setTmModalOpen(false)} className="px-4 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
                   Cancel
                 </button>
-                <button type="submit" disabled={tmSaving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#185FA5' }}>
+                <button type="submit" disabled={tmSaving} className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: '#ffbd59' }}>
                   {tmSaving ? 'Saving...' : 'Add'}
                 </button>
               </div>

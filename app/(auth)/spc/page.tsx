@@ -314,7 +314,7 @@ function MemberProfileModal({
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
   const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
   const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
-  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
 
   const notesRef = useRef<HTMLDivElement>(null)
   const [notesFocused, setNotesFocused] = useState(false)
@@ -976,7 +976,7 @@ function MemberProfileModal({
                                 {selected.data.email && (
                                   <a
                                     href={`/sales?email=${encodeURIComponent(selected.data.email)}`}
-                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
+                                    className="text-xs text-[#89bcef] dark:text-[#89bcef] hover:underline flex items-center gap-0.5"
                                   >
                                     Sales <ExternalLink className="h-3 w-3" />
                                   </a>
@@ -1065,7 +1065,7 @@ function MemberProfileModal({
                           placeholder="Search by email or transaction ID..."
                           value={linkSearch}
                           onChange={(e) => setLinkSearch(e.target.value)}
-                          className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                          className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
                         />
                       </div>
                       {linkSearching && <p className="text-[10px] text-zinc-400 mt-1">Searching...</p>}
@@ -1087,7 +1087,7 @@ function MemberProfileModal({
                                   <button
                                     onClick={() => handleLinkTransaction(tx)}
                                     disabled={linkingId === tx.transaction_id}
-                                    className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-0.5 whitespace-nowrap disabled:opacity-50"
+                                    className="text-xs font-medium text-[#89bcef] dark:text-[#89bcef] hover:text-[#89bcef]/80 dark:hover:text-[#89bcef]/80 flex items-center gap-0.5 whitespace-nowrap disabled:opacity-50"
                                   >
                                     <Link2 className="h-3 w-3" /> Link
                                   </button>
@@ -1203,7 +1203,7 @@ function MemberProfileModal({
                   onClick={handleSaveCancellation}
                   disabled={saving}
                   className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
-                  style={{ backgroundColor: '#185FA5' }}
+                  style={{ backgroundColor: '#ffbd59' }}
                 >
                   {saving ? 'Saving…' : 'Save Changes'}
                 </button>
@@ -1301,7 +1301,7 @@ function MemberProfileModal({
                   onClick={handleSave}
                   disabled={saving}
                   className="px-4 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
-                  style={{ backgroundColor: '#185FA5' }}
+                  style={{ backgroundColor: '#ffbd59' }}
                 >
                   {saving ? 'Saving…' : 'Save Changes'}
                 </button>
@@ -1311,7 +1311,7 @@ function MemberProfileModal({
         </div>
 
         {/* ── RIGHT: Contact Notes (always visible) ── */}
-        <div ref={notesRef} className={cn('flex flex-col rounded-xl transition-all duration-500', notesFocused && 'ring-2 ring-blue-400 ring-offset-2 p-2')}>
+        <div ref={notesRef} className={cn('flex flex-col rounded-xl transition-all duration-500', notesFocused && 'ring-2 ring-[#ffbd59] ring-offset-2 p-2')}>
           <div className="flex items-center gap-2 mb-3">
             <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />
             <p className={cn(sectionLabel, 'mb-0')}>Contact Notes</p>
@@ -1326,7 +1326,7 @@ function MemberProfileModal({
               notes.map((note) => (
                 <div key={note.id} className={cn('rounded-xl p-3 border-l-4', noteBorderCls(note.created_at))}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{note.created_by}</span>
+                    <span className="text-xs font-semibold text-[#89bcef] dark:text-[#89bcef]">{note.created_by}</span>
                     <span className="text-xs text-zinc-400 flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {formatDateTime(note.created_at)}
@@ -1350,14 +1350,14 @@ function MemberProfileModal({
               }}
               placeholder="Add a contact note… (⌘+Enter to save)"
               rows={3}
-              className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-none"
+              className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] resize-none"
             />
             <div className="flex justify-end mt-2">
               <button
                 onClick={onAddNote}
                 disabled={!noteText.trim() || addingNote}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
-                style={{ backgroundColor: '#185FA5' }}
+                style={{ backgroundColor: '#ffbd59' }}
               >
                 <MessageSquare className="h-3 w-3" />
                 {addingNote ? 'Saving…' : 'Add Note'}
@@ -2039,7 +2039,7 @@ export default function SpcPage() {
   const annualCount = activeMembers.filter((m) => m.plan === 'annual').length
 
   const compositionData = [
-    { name: 'Monthly', value: monthlyCount, color: '#185FA5' },
+    { name: 'Monthly', value: monthlyCount, color: '#ffbd59' },
     { name: 'Annual', value: annualCount, color: '#3B6D11' },
   ].filter((d) => d.value > 0)
 
@@ -2641,7 +2641,7 @@ export default function SpcPage() {
                   className={cn(
                     'relative px-4 h-10 text-sm font-medium whitespace-nowrap',
                     isActive
-                      ? 'text-[#185FA5] font-semibold'
+                      ? 'text-[#ffbd59] font-semibold'
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >
@@ -2649,7 +2649,7 @@ export default function SpcPage() {
                   {isActive && (
                     <motion.span
                       layoutId="spc-tab-underline"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#185FA5]"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ffbd59]"
                       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                     />
                   )}
@@ -2696,7 +2696,7 @@ export default function SpcPage() {
               <button
                 onClick={() => setCsvModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#185FA5' }}
+                style={{ backgroundColor: '#ffbd59' }}
               >
                 <Upload className="h-3.5 w-3.5" />
                 Upload CSV
@@ -2725,7 +2725,7 @@ export default function SpcPage() {
                     className={cn(
                       'px-3 py-1.5 text-xs font-medium transition-colors border-r border-zinc-200 dark:border-zinc-700 last:border-r-0',
                       growthPeriod === key
-                        ? 'bg-[#185FA5] text-white'
+                        ? 'bg-[#ffbd59] text-[#1a1a2e]'
                         : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                     )}
                   >
@@ -2925,7 +2925,7 @@ export default function SpcPage() {
                         <div className="h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                           <motion.div
                             className="h-full rounded-full"
-                            style={{ backgroundColor: '#185FA5' }}
+                            style={{ backgroundColor: '#ffbd59' }}
                             initial={{ width: 0 }}
                             animate={{ width: `${(monthlyCount / progressMax) * 100}%` }}
                             transition={{ duration: 0.7, ease: 'easeOut' }}
@@ -3006,7 +3006,7 @@ export default function SpcPage() {
                             </span>
                           )}
                         />
-                        <Bar dataKey="monthly" name="monthly" stackId="a" fill="#185FA5" maxBarSize={72} />
+                        <Bar dataKey="monthly" name="monthly" stackId="a" fill="#ffbd59" maxBarSize={72} />
                         <Bar dataKey="annual" name="annual" stackId="a" fill="#3B6D11" maxBarSize={72}>
                           <LabelList
                             dataKey="total"
@@ -3220,7 +3220,7 @@ export default function SpcPage() {
                     ) : cohortData.length === 0 ? (
                       <EmptyState title="No data" />
                     ) : (
-                      <RevenueBarChart data={cohortData} color="#185FA5" />
+                      <RevenueBarChart data={cohortData} color="#ffbd59" />
                     )}
                   </CardContent>
                 </Card>
@@ -3287,7 +3287,7 @@ export default function SpcPage() {
                       value={activeSearch}
                       onChange={(e) => setActiveSearch(e.target.value)}
                       placeholder="Search by name or email..."
-                      className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                     />
                   </div>
                   <button
@@ -3318,7 +3318,7 @@ export default function SpcPage() {
                   </select>
                   <button
                     onClick={() => { resetAddForm(); setAddMemberOpen(true) }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-[#ffbd59]/50 dark:border-[#ffbd59]/30 text-[#89bcef] dark:text-[#89bcef] hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/10 transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add Member
                   </button>
@@ -3386,7 +3386,7 @@ export default function SpcPage() {
                           custom={i}
                           className={cn(
                             i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
-                            'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
+                            'cursor-pointer hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/10 transition-colors'
                           )}
                           onClick={() => openModal({ kind: 'member', data: m })}
                         >
@@ -3501,7 +3501,7 @@ export default function SpcPage() {
                         value={trialSearch}
                         onChange={(e) => setTrialSearch(e.target.value)}
                         placeholder="Search by name or email..."
-                        className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                       />
                     </div>
                     <select
@@ -3561,7 +3561,7 @@ export default function SpcPage() {
                             custom={i}
                             className={cn(
                               i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
-                              'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
+                              'cursor-pointer hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/10 transition-colors'
                             )}
                             onClick={() => openModal({ kind: 'member', data: m })}
                           >
@@ -3615,7 +3615,7 @@ export default function SpcPage() {
                       value={expiredSearch}
                       onChange={(e) => setExpiredSearch(e.target.value)}
                       placeholder="Search by name or email..."
-                      className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                     />
                   </div>
                   <select
@@ -3681,7 +3681,7 @@ export default function SpcPage() {
                             custom={i}
                             className={cn(
                               i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
-                              'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
+                              'cursor-pointer hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/10 transition-colors'
                             )}
                             onClick={() => openModal({ kind: 'member', data: m })}
                           >
@@ -3920,7 +3920,7 @@ export default function SpcPage() {
                         value={cancelSearch}
                         onChange={(e) => { setCancelSearch(e.target.value); setCancelPage(0) }}
                         placeholder="Search by name or email..."
-                        className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        className="w-full sm:w-56 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                       />
                     </div>
                     <select
@@ -3953,7 +3953,7 @@ export default function SpcPage() {
                       type="date"
                       value={cancelDateFrom}
                       onChange={(e) => { setCancelDateFrom(e.target.value); setCancelPage(0) }}
-                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                     />
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -3962,7 +3962,7 @@ export default function SpcPage() {
                       type="date"
                       value={cancelDateTo}
                       onChange={(e) => { setCancelDateTo(e.target.value); setCancelPage(0) }}
-                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
                     />
                   </div>
                   <select
@@ -3993,7 +3993,7 @@ export default function SpcPage() {
                       </span>
                       <button
                         onClick={resetCancelFilters}
-                        className="text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                        className="text-[10px] font-medium text-[#89bcef] dark:text-[#89bcef] hover:underline"
                       >
                         Reset filters
                       </button>
@@ -4041,7 +4041,7 @@ export default function SpcPage() {
                                 custom={i}
                                 className={cn(
                                   i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
-                                  'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors'
+                                  'cursor-pointer hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/10 transition-colors'
                                 )}
                                 onClick={() => openModal({ kind: 'cancellation', data: c })}
                               >
@@ -4204,7 +4204,7 @@ export default function SpcPage() {
                     className={cn(
                       'px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all',
                       csvMode === m
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                        ? 'border-[#ffbd59] bg-[#ffbd59]/10 text-[#1a1a2e] dark:bg-[#ffbd59]/20 dark:text-[#ffbd59]'
                         : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
                     )}
                   >
@@ -4225,7 +4225,7 @@ export default function SpcPage() {
                     className={cn(
                       'px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all',
                       csvSource === s
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                        ? 'border-[#ffbd59] bg-[#ffbd59]/10 text-[#1a1a2e] dark:bg-[#ffbd59]/20 dark:text-[#ffbd59]'
                         : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
                     )}
                   >
@@ -4351,7 +4351,7 @@ export default function SpcPage() {
                   onClick={handleImport}
                   disabled={!csvContent || importing}
                   className="px-4 py-2 text-xs rounded-lg text-white font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-                  style={{ backgroundColor: '#185FA5' }}
+                  style={{ backgroundColor: '#ffbd59' }}
                 >
                   {importing ? 'Importing…' : 'Import'}
                 </button>
@@ -4432,12 +4432,12 @@ export default function SpcPage() {
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Full Name *</label>
                   <input type="text" value={addForm.name} onChange={(e) => setAddForm(p => ({ ...p, name: e.target.value }))}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Email *</label>
                   <input type="email" value={addForm.email} onChange={(e) => setAddForm(p => ({ ...p, email: e.target.value }))}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]" />
                 </div>
               </div>
               {/* Phone & Plan */}
@@ -4445,12 +4445,12 @@ export default function SpcPage() {
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Phone</label>
                   <input type="text" value={addForm.phone} onChange={(e) => setAddForm(p => ({ ...p, phone: e.target.value }))}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Plan *</label>
                   <select value={addForm.plan} onChange={(e) => handleAddFormPlanChange(e.target.value as 'monthly' | 'annual')}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]">
                     <option value="monthly">Monthly — $47</option>
                     <option value="annual">Annual — $470</option>
                   </select>
@@ -4461,12 +4461,12 @@ export default function SpcPage() {
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Amount</label>
                   <input type="number" value={addForm.amount} onChange={(e) => setAddForm(p => ({ ...p, amount: parseFloat(e.target.value) || 0 }))}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Provider</label>
                   <select value={addForm.provider} onChange={(e) => setAddForm(p => ({ ...p, provider: e.target.value }))}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]">
                     <option value="Stripe">Stripe</option>
                     <option value="PayPal">PayPal</option>
                     <option value="Kajabi">Kajabi Payments</option>
@@ -4485,24 +4485,24 @@ export default function SpcPage() {
                     const npd = new Date(new Date(jd).getTime() + days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
                     setAddForm(p => ({ ...p, joined_at: jd, next_payment_date: npd }))
                   }}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Next Payment Date</label>
                   <input type="date" value={addForm.next_payment_date} onChange={(e) => setAddForm(p => ({ ...p, next_payment_date: e.target.value }))}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]" />
                 </div>
               </div>
               {/* Toggles */}
               <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={addForm.whatsapp_active} onChange={(e) => setAddForm(p => ({ ...p, whatsapp_active: e.target.checked }))}
-                    className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500" />
+                    className="rounded border-zinc-300 text-[#ffbd59] focus:ring-[#ffbd59]" />
                   <span className="text-xs text-zinc-700 dark:text-zinc-300">WhatsApp Active</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={addForm.converted_from_trial} onChange={(e) => setAddForm(p => ({ ...p, converted_from_trial: e.target.checked }))}
-                    className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500" />
+                    className="rounded border-zinc-300 text-[#ffbd59] focus:ring-[#ffbd59]" />
                   <span className="text-xs text-zinc-700 dark:text-zinc-300">Converted from Trial</span>
                 </label>
               </div>
@@ -4513,7 +4513,7 @@ export default function SpcPage() {
                   Cancel
                 </button>
                 <button onClick={handleAddMember} disabled={addMemberSaving}
-                  className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium">
+                  className="px-4 py-2 text-sm rounded-lg bg-[#ffbd59] text-[#1a1a2e] hover:bg-[#e5a94f] disabled:opacity-50 transition-colors font-medium">
                   {addMemberSaving ? 'Saving...' : 'Add Member'}
                 </button>
               </div>

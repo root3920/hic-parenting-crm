@@ -201,7 +201,7 @@ export function CallsCalendar({ calls, timezone, onCallClick }: Props) {
               onClick={() => setCalView(v)}
               className={cn(
                 'px-3 py-1.5 text-xs font-medium transition-colors',
-                calView === v ? 'bg-[#185FA5] text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                calView === v ? 'bg-[#ffbd59] text-[#1a1a2e]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
               )}
             >
               {v === 'week' ? 'Week' : 'Month'}
@@ -221,7 +221,7 @@ export function CallsCalendar({ calls, timezone, onCallClick }: Props) {
               return (
                 <div key={i} className={cn('text-center py-2.5 border-r border-zinc-100 dark:border-zinc-800 last:border-r-0', isToday && 'bg-blue-50/50 dark:bg-blue-900/10')}>
                   <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase">{DAY_NAMES[d.getDay()]}</p>
-                  <p className={cn('text-lg font-bold', isToday ? 'text-[#185FA5]' : 'text-zinc-800 dark:text-zinc-200')}>{d.getDate()}</p>
+                  <p className={cn('text-lg font-bold', isToday ? 'text-[#ffbd59]' : 'text-zinc-800 dark:text-zinc-200')}>{d.getDate()}</p>
                 </div>
               )
             })}
@@ -345,7 +345,7 @@ export function CallsCalendar({ calls, timezone, onCallClick }: Props) {
                     isToday && 'bg-blue-50/50 dark:bg-blue-900/10',
                   )}
                 >
-                  <p className={cn('text-xs font-medium mb-1', isToday ? 'text-[#185FA5] font-bold' : 'text-zinc-600 dark:text-zinc-400')}>
+                  <p className={cn('text-xs font-medium mb-1', isToday ? 'text-[#ffbd59] font-bold' : 'text-zinc-600 dark:text-zinc-400')}>
                     {day.getDate()}
                   </p>
                   <div className="space-y-0.5">

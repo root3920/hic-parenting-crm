@@ -33,7 +33,7 @@ export function EquipoSubNav() {
                 className={cn(
                   'inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                   active
-                    ? 'border-[#185FA5] text-[#185FA5] dark:text-blue-400 dark:border-blue-400'
+                    ? 'border-[#ffbd59] text-[#ffbd59] dark:text-[#ffbd59] dark:border-[#ffbd59]'
                     : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600'
                 )}
               >

@@ -144,7 +144,7 @@ export default function DMSetterApplicationPage() {
                     onClick={() => toggleItem(channels, setChannels, ch)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                       channels.includes(ch)
-                        ? 'bg-[#185FA5] text-white border-[#185FA5]'
+                        ? 'bg-[#ffbd59] text-[#1a1a2e] border-[#ffbd59]'
                         : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
                     }`}
                   >
@@ -162,7 +162,7 @@ export default function DMSetterApplicationPage() {
                     onClick={() => toggleItem(crmTools, setCrmTools, t)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                       crmTools.includes(t)
-                        ? 'bg-[#185FA5] text-white border-[#185FA5]'
+                        ? 'bg-[#ffbd59] text-[#1a1a2e] border-[#ffbd59]'
                         : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
                     }`}
                   >

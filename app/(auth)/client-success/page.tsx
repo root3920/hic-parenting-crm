@@ -224,7 +224,7 @@ function DroppableColumn({
       ref={setNodeRef}
       className={cn(
         'flex flex-col bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 min-w-[220px] w-[220px] shrink-0',
-        isOver && 'ring-2 ring-blue-400/50'
+        isOver && 'ring-2 ring-[#ffbd59]/50'
       )}
     >
       {/* Colored top border */}
@@ -480,7 +480,7 @@ function FullStudentModal({
                       type="date"
                       value={date ?? ''}
                       onChange={(e) => patchField({ [`step${step.num}_date`]: e.target.value || null })}
-                      className="text-[11px] border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 w-[105px] focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                      className="text-[11px] border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 w-[105px] focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30"
                     />
                     <select
                       value={status}
@@ -506,7 +506,7 @@ function FullStudentModal({
                 <select
                   value={localRecord.coach ?? ''}
                   onChange={(e) => patchField({ coach: e.target.value || null })}
-                  className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                  className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30"
                 >
                   <option value="">—</option>
                   {coaches.map((c) => (
@@ -520,7 +520,7 @@ function FullStudentModal({
                   type="date"
                   value={localRecord.enrollment_date ?? ''}
                   onChange={(e) => patchField({ enrollment_date: e.target.value || null })}
-                  className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                  className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30"
                 />
               </div>
             </div>
@@ -531,10 +531,10 @@ function FullStudentModal({
                 onChange={(e) => setLocalRecord((prev) => ({ ...prev, notes: e.target.value }))}
                 onBlur={() => patchField({ notes: localRecord.notes })}
                 rows={2}
-                className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500/30 resize-none"
+                className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30 resize-none"
               />
             </div>
-            {saving && <p className="text-[10px] text-blue-500 animate-pulse mt-1">Saving...</p>}
+            {saving && <p className="text-[10px] text-[#ffbd59] animate-pulse mt-1">Saving...</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -647,12 +647,12 @@ function FullStudentModal({
                   onChange={(e) => setNewNote(e.target.value)}
                   placeholder="Add a note..."
                   rows={2}
-                  className="flex-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                  className="flex-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 resize-none focus:outline-none focus:ring-1 focus:ring-[#ffbd59]/30"
                 />
                 <button
                   onClick={handleAddNote}
                   disabled={addingNote || !newNote.trim()}
-                  className="px-3 py-1 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 self-end"
+                  className="px-3 py-1 rounded-lg text-xs font-medium bg-[#ffbd59] text-[#1a1a2e] hover:bg-[#e5a94f] disabled:opacity-50 self-end"
                 >
                   {addingNote ? '...' : 'Add'}
                 </button>
@@ -822,7 +822,7 @@ export default function ClientSuccessPage() {
               <select
                 value={coachFilter}
                 onChange={(e) => setCoachFilter(e.target.value)}
-                className="text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
               >
                 <option value="">All Coaches</option>
                 {coaches.map((c) => (
@@ -834,7 +834,7 @@ export default function ClientSuccessPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
               >
                 <option value="all">All Status</option>
                 <option value="in_progress">In Progress</option>
@@ -848,7 +848,7 @@ export default function ClientSuccessPage() {
                 <button
                   onClick={handleSync}
                   disabled={syncing}
-                  className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium bg-[#ffbd59] text-[#1a1a2e] hover:bg-[#e5a94f] disabled:opacity-50 transition-colors"
                 >
                   <RefreshCw className={cn('h-4 w-4', syncing && 'animate-spin')} />
                   {syncing ? 'Syncing...' : 'Sync Students'}
@@ -906,7 +906,7 @@ export default function ClientSuccessPage() {
 
           {loading && (
             <div className="mt-6 flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ffbd59]" />
             </div>
           )}
         </div>

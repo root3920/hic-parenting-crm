@@ -337,7 +337,7 @@ function EditModal({
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]'
   const readonlyCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400'
   const labelCls = 'block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1'
   const sectionCls = 'text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 mt-4 first:mt-0'
@@ -496,7 +496,7 @@ function EditModal({
             onClick={handleSave}
             disabled={saving}
             className="px-5 py-2 text-xs rounded-lg text-white font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
-            style={{ backgroundColor: '#185FA5' }}
+            style={{ backgroundColor: '#ffbd59' }}
           >
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
@@ -597,7 +597,7 @@ export default function HtCsmDashboardPage() {
                   className={cn(
                     'px-2.5 py-1.5 text-xs font-medium transition-colors',
                     preset === p
-                      ? p === 'week' ? 'bg-indigo-600 text-white' : 'bg-[#185FA5] text-white'
+                      ? p === 'week' ? 'bg-[#89bcef] text-[#1a1a2e]' : 'bg-[#ffbd59] text-[#1a1a2e]'
                       : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                   )}
                 >

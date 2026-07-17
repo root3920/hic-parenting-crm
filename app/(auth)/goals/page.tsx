@@ -331,7 +331,7 @@ export default function GoalsPage() {
             <CardContent>
               <div className="grid grid-cols-3 gap-6">
                 {[
-                  { label: 'Pitch Rate', key: 'pitchRate', color: '#185FA5' },
+                  { label: 'Pitch Rate', key: 'pitchRate', color: '#ffbd59' },
                   { label: 'Booking Rate', key: 'bookingRate', color: '#3B6D11' },
                   { label: 'General Conversion', key: 'conversionGeneral', color: '#BA7517' },
                 ].map(({ label, key, color }) => (
@@ -397,7 +397,7 @@ export default function GoalsPage() {
                           <StatusCell value={row.caliValue} goal={row.goal} />
                           <td className="px-2 py-1 w-28 hidden md:table-cell">
                             {row.caliSparkKey
-                              ? <Sparkline dataKey={row.caliSparkKey} color="#185FA5" />
+                              ? <Sparkline dataKey={row.caliSparkKey} color="#ffbd59" />
                               : <span className="text-xs text-zinc-300 dark:text-zinc-600 block text-center">—</span>
                             }
                           </td>
