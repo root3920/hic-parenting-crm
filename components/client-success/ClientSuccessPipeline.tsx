@@ -76,6 +76,12 @@ const STEPS = [
   { num: 6, name: 'Session 1', color: '#b9d496' },
 ]
 
+const ALL_COLUMNS = [
+  { num: 0, name: 'Not Started', color: '#e5e7eb' },
+  ...STEPS,
+  { num: 7, name: 'Completed', color: '#b9d496' },
+]
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function fullName(s: { first_name: string; last_name: string | null }) {
@@ -93,6 +99,20 @@ function formatDate(d: string | null) {
 
 function getStepStatus(record: PipelineRecord, stepNum: number): string {
   return (record as unknown as Record<string, unknown>)[`step${stepNum}_status`] as string ?? 'pending'
+}
+
+function isAllPending(r: PipelineRecord): boolean {
+  return [r.step1_status, r.step2_status, r.step3_status, r.step4_status, r.step5_status, r.step6_status].every((s) => s === 'pending')
+}
+
+function isCompleted(r: PipelineRecord): boolean {
+  return r.step6_status === 'completed' || r.current_step === 7
+}
+
+function getEffectiveColumn(r: PipelineRecord): number {
+  if (isCompleted(r)) return 7
+  if (isAllPending(r) && r.current_step <= 1) return 0
+  return Math.min(Math.max(r.current_step, 1), 6)
 }
 
 // ─── Draggable Card ─────────────────────────────────────────────────────────
@@ -114,7 +134,8 @@ function DraggableCard({
 
   if (!record.student) return null
 
-  const status = getStepStatus(record, record.current_step)
+  const col = getEffectiveColumn(record)
+  const status = col === 0 ? 'pending' : col === 7 ? 'completed' : getStepStatus(record, record.current_step)
 
   return (
     <div
@@ -173,7 +194,8 @@ function DraggableCard({
 
 function CardPreview({ record }: { record: PipelineRecord }) {
   if (!record.student) return null
-  const status = getStepStatus(record, record.current_step)
+  const col = getEffectiveColumn(record)
+  const status = col === 0 ? 'pending' : col === 7 ? 'completed' : getStepStatus(record, record.current_step)
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-700 rounded-lg p-3 shadow-xl w-[200px] opacity-90">
@@ -361,7 +383,9 @@ function FullStudentModal({
 
   const handleStepStatusChange = useCallback(async (stepNum: number, newStatus: string) => {
     const updates: Record<string, unknown> = { [`step${stepNum}_status`]: newStatus }
-    if (newStatus === 'completed' && stepNum <= 5) {
+    if (newStatus === 'completed' && stepNum === 6) {
+      updates.current_step = 7
+    } else if (newStatus === 'completed' && stepNum <= 5) {
       const nextStepStatus = (localRecord as unknown as Record<string, unknown>)[`step${stepNum + 1}_status`] as string
       if (nextStepStatus === 'pending') updates.current_step = stepNum + 1
     }
@@ -732,10 +756,9 @@ export function ClientSuccessPipeline() {
   }, [records, coachFilter, statusFilter])
 
   const columnRecords = useMemo(() => {
-    const cols: Record<number, PipelineRecord[]> = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
+    const cols: Record<number, PipelineRecord[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] }
     filteredRecords.forEach((r) => {
-      const step = Math.min(Math.max(r.current_step, 1), 6)
-      cols[step].push(r)
+      cols[getEffectiveColumn(r)].push(r)
     })
     return cols
   }, [filteredRecords])
@@ -768,16 +791,28 @@ export function ClientSuccessPipeline() {
     const newStep = parseInt(overId.replace('step-', ''))
     const recordId = active.id as string
     const record = records.find((r) => r.id === recordId)
-    if (!record || record.current_step === newStep) return
+    if (!record) return
 
+    const currentCol = getEffectiveColumn(record)
+    if (currentCol === newStep) return
+
+    // Build the update payload
+    const updates: Record<string, unknown> = { current_step: newStep }
+
+    // When moving to Completed column, also mark step6 as completed
+    if (newStep === 7) {
+      updates.step6_status = 'completed'
+    }
+
+    // Optimistic update
     setRecords((prev) =>
-      prev.map((r) => (r.id === recordId ? { ...r, current_step: newStep } : r))
+      prev.map((r) => (r.id === recordId ? { ...r, ...updates } : r))
     )
 
     const res = await fetch(`/api/client-success/pipeline/${recordId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ current_step: newStep }),
+      body: JSON.stringify(updates),
     })
 
     if (!res.ok) {
@@ -841,10 +876,10 @@ export function ClientSuccessPipeline() {
         {/* KPI Cards */}
         <KPICardGrid>
           <KPICard title="Total in Pipeline" value={kpis.total} icon={<Users className="h-4 w-4" />} loading={loading} />
-          <KPICard title="Completed All Steps" value={kpis.completed} icon={<CheckCircle2 className="h-4 w-4" />} loading={loading} />
+          <KPICard title="Not Started" value={kpis.notStarted} icon={<Circle className="h-4 w-4" />} loading={loading} />
           <KPICard title="In Progress" value={kpis.inProgress} icon={<Clock className="h-4 w-4" />} loading={loading} />
           <KPICard title="Waiting / Blocked" value={kpis.waiting} icon={<AlertCircle className="h-4 w-4" />} loading={loading} />
-          <KPICard title="Not Started" value={kpis.notStarted} icon={<Circle className="h-4 w-4" />} loading={loading} />
+          <KPICard title="Completed" value={kpis.completed} icon={<CheckCircle2 className="h-4 w-4" />} loading={loading} />
         </KPICardGrid>
 
         {/* Kanban Board */}
@@ -856,7 +891,7 @@ export function ClientSuccessPipeline() {
             onDragEnd={handleDragEnd}
           >
             <div className="hidden md:flex gap-3 mt-6 overflow-x-auto pb-4">
-              {STEPS.map((step) => (
+              {ALL_COLUMNS.map((step) => (
                 <DroppableColumn
                   key={step.num}
                   step={step}
@@ -867,7 +902,7 @@ export function ClientSuccessPipeline() {
             </div>
 
             <div className="md:hidden mt-6 space-y-3">
-              {STEPS.map((step) => (
+              {ALL_COLUMNS.map((step) => (
                 <AccordionColumn
                   key={step.num}
                   step={step}
