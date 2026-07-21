@@ -8,13 +8,14 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronRight, Download, Pencil, Trash2, X, BarChart3, Users } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Download, Pencil, Trash2, X, Users, Kanban } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 // recharts removed — no charts in current dashboard
 import { motion, AnimatePresence } from 'framer-motion'
 import { getCurrentWeekRange } from '@/lib/dateUtils'
 import { ClientSuccessPipeline } from '@/components/client-success/ClientSuccessPipeline'
+import { ClientsGroupsView } from '@/components/contacts/ClientsGroupsView'
 import { useProfile } from '@/hooks/useProfile'
 import { usePreviewRole } from '@/contexts/PreviewRoleContext'
 
@@ -511,23 +512,14 @@ function EditModal({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-type CsmTab = 'dashboard' | 'clients'
+type CsmTab = 'clients' | 'pipeline' | 'dashboard'
 
 export default function HtCsmDashboardPage() {
   const { profile } = useProfile()
   const { previewRole } = usePreviewRole()
   const effectiveRole = previewRole ?? profile?.role ?? null
   const [activeTab, setActiveTab] = useState<CsmTab>('clients')
-  const [tabInitialized, setTabInitialized] = useState(false)
   const supabase = useMemo(() => createClient(), [])
-
-  // Default to 'clients' for csm_ht, 'dashboard' for admin
-  useEffect(() => {
-    if (!tabInitialized && effectiveRole) {
-      setActiveTab(effectiveRole === 'admin' ? 'dashboard' : 'clients')
-      setTabInitialized(true)
-    }
-  }, [effectiveRole, tabInitialized])
   const [reports, setReports] = useState<HtReport[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('week')
@@ -607,18 +599,6 @@ export default function HtCsmDashboardPage() {
       <div className="max-w-7xl mx-auto mb-4">
         <div className="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800">
           <button
-            onClick={() => setActiveTab('dashboard')}
-            className={cn(
-              'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
-              activeTab === 'dashboard'
-                ? 'border-[#ffbd59] text-[#ffbd59]'
-                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
-            )}
-          >
-            <BarChart3 className="h-4 w-4" />
-            Dashboard
-          </button>
-          <button
             onClick={() => setActiveTab('clients')}
             className={cn(
               'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
@@ -630,10 +610,24 @@ export default function HtCsmDashboardPage() {
             <Users className="h-4 w-4" />
             Clients
           </button>
+          <button
+            onClick={() => setActiveTab('pipeline')}
+            className={cn(
+              'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+              activeTab === 'pipeline'
+                ? 'border-[#ffbd59] text-[#ffbd59]'
+                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
+            )}
+          >
+            <Kanban className="h-4 w-4" />
+            Pipeline
+          </button>
         </div>
       </div>
 
       {activeTab === 'clients' ? (
+        <ClientsGroupsView />
+      ) : activeTab === 'pipeline' ? (
         <ClientSuccessPipeline />
       ) : (
       <>
