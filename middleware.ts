@@ -9,6 +9,7 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/llamadas':           ['admin', 'closer'],
   '/spc':                ['admin', 'csm_spc'],
   '/students':           ['admin', 'csm_ht'],
+  '/client-success':     ['admin', 'csm_ht'],
   '/equipo/csm':         ['admin', 'csm_ht'],
   '/equipo/spc':         ['admin', 'csm_spc'],
   '/equipo/setter':      ['admin', 'setter'],
@@ -29,7 +30,7 @@ const ROLE_HOME: Record<UserRole, string> = {
   closer:  '/llamadas',
   setter:  '/equipo/setter',
   csm_spc: '/spc',
-  csm_ht:  '/students',
+  csm_ht:  '/equipo/csm',
   coach:   '/growth',
 }
 

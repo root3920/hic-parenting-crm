@@ -15,6 +15,8 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getCurrentWeekRange } from '@/lib/dateUtils'
 import { ClientSuccessPipeline } from '@/components/client-success/ClientSuccessPipeline'
+import { useProfile } from '@/hooks/useProfile'
+import { usePreviewRole } from '@/contexts/PreviewRoleContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -512,8 +514,20 @@ function EditModal({
 type CsmTab = 'dashboard' | 'clients'
 
 export default function HtCsmDashboardPage() {
-  const [activeTab, setActiveTab] = useState<CsmTab>('dashboard')
+  const { profile } = useProfile()
+  const { previewRole } = usePreviewRole()
+  const effectiveRole = previewRole ?? profile?.role ?? null
+  const [activeTab, setActiveTab] = useState<CsmTab>('clients')
+  const [tabInitialized, setTabInitialized] = useState(false)
   const supabase = useMemo(() => createClient(), [])
+
+  // Default to 'clients' for csm_ht, 'dashboard' for admin
+  useEffect(() => {
+    if (!tabInitialized && effectiveRole) {
+      setActiveTab(effectiveRole === 'admin' ? 'dashboard' : 'clients')
+      setTabInitialized(true)
+    }
+  }, [effectiveRole, tabInitialized])
   const [reports, setReports] = useState<HtReport[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('week')
