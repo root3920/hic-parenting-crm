@@ -8,12 +8,13 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronRight, Download, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Download, Pencil, Trash2, X, BarChart3, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 // recharts removed — no charts in current dashboard
 import { motion, AnimatePresence } from 'framer-motion'
 import { getCurrentWeekRange } from '@/lib/dateUtils'
+import { ClientSuccessPipeline } from '@/components/client-success/ClientSuccessPipeline'
 
 export const dynamic = 'force-dynamic'
 
@@ -508,7 +509,10 @@ function EditModal({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+type CsmTab = 'dashboard' | 'clients'
+
 export default function HtCsmDashboardPage() {
+  const [activeTab, setActiveTab] = useState<CsmTab>('dashboard')
   const supabase = useMemo(() => createClient(), [])
   const [reports, setReports] = useState<HtReport[]>([])
   const [loading, setLoading] = useState(true)
@@ -585,6 +589,40 @@ export default function HtCsmDashboardPage() {
 
   return (
     <PageTransition>
+      {/* Tab switcher */}
+      <div className="max-w-7xl mx-auto mb-4">
+        <div className="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={cn(
+              'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+              activeTab === 'dashboard'
+                ? 'border-[#ffbd59] text-[#ffbd59]'
+                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
+            )}
+          >
+            <BarChart3 className="h-4 w-4" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab('clients')}
+            className={cn(
+              'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+              activeTab === 'clients'
+                ? 'border-[#ffbd59] text-[#ffbd59]'
+                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
+            )}
+          >
+            <Users className="h-4 w-4" />
+            Clients
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'clients' ? (
+        <ClientSuccessPipeline />
+      ) : (
+      <>
       <div className="max-w-7xl mx-auto">
         <PageHeader title="Client Success — High Ticket" description={preset === 'week' ? `Current week: ${weekRange.label} (Fri → Thu)` : 'Daily HT CSM performance'}>
           <div className="flex items-center gap-2 flex-wrap">
@@ -886,6 +924,8 @@ export default function HtCsmDashboardPage() {
             setEditingReport(null)
           }}
         />
+      )}
+      </>
       )}
     </PageTransition>
   )
