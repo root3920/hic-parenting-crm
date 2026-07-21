@@ -21,6 +21,9 @@ export function EquipoSubNav() {
 
   const tabs = BASE_TABS.filter((t) => !role || t.roles.includes(role))
 
+  // Don't render the sub-nav if there are no visible tabs for this role
+  if (tabs.length === 0) return null
+
   return (
     <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 mb-6">
       <div className="max-w-7xl mx-auto px-4 md:px-8">
