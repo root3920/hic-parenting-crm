@@ -16,12 +16,13 @@ const BASE_TABS = [
 
 export function EquipoSubNav() {
   const pathname = usePathname()
-  const { profile } = useProfile()
+  const { profile, loading } = useProfile()
   const role = profile?.role ?? null
 
-  const tabs = BASE_TABS.filter((t) => !role || t.roles.includes(role))
+  // Don't render while profile is loading or if no tabs match this role
+  if (loading || !role) return null
 
-  // Don't render the sub-nav if there are no visible tabs for this role
+  const tabs = BASE_TABS.filter((t) => t.roles.includes(role))
   if (tabs.length === 0) return null
 
   return (
