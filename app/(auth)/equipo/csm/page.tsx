@@ -518,8 +518,15 @@ export default function HtCsmDashboardPage() {
   const { profile } = useProfile()
   const { previewRole } = usePreviewRole()
   const effectiveRole = previewRole ?? profile?.role ?? null
-  const [activeTab, setActiveTab] = useState<CsmTab>('clients')
+  const isCsmHt = effectiveRole === 'csm_ht'
+  const [activeTab, setActiveTab] = useState<CsmTab>('dashboard')
   const supabase = useMemo(() => createClient(), [])
+
+  // Set default tab based on role once loaded
+  useEffect(() => {
+    if (effectiveRole === 'csm_ht') setActiveTab('clients')
+    else if (effectiveRole) setActiveTab('dashboard')
+  }, [effectiveRole])
   const [reports, setReports] = useState<HtReport[]>([])
   const [loading, setLoading] = useState(true)
   const [preset, setPreset] = useState<Preset>('week')
@@ -595,39 +602,41 @@ export default function HtCsmDashboardPage() {
 
   return (
     <PageTransition>
-      {/* Tab switcher */}
-      <div className="max-w-7xl mx-auto mb-4">
-        <div className="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800">
-          <button
-            onClick={() => setActiveTab('clients')}
-            className={cn(
-              'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
-              activeTab === 'clients'
-                ? 'border-[#ffbd59] text-[#ffbd59]'
-                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
-            )}
-          >
-            <Users className="h-4 w-4" />
-            Clients
-          </button>
-          <button
-            onClick={() => setActiveTab('pipeline')}
-            className={cn(
-              'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
-              activeTab === 'pipeline'
-                ? 'border-[#ffbd59] text-[#ffbd59]'
-                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
-            )}
-          >
-            <Kanban className="h-4 w-4" />
-            Pipeline
-          </button>
+      {/* Tab switcher — only for csm_ht role */}
+      {isCsmHt && (
+        <div className="max-w-7xl mx-auto mb-4">
+          <div className="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setActiveTab('clients')}
+              className={cn(
+                'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'clients'
+                  ? 'border-[#ffbd59] text-[#ffbd59]'
+                  : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
+              )}
+            >
+              <Users className="h-4 w-4" />
+              Clients
+            </button>
+            <button
+              onClick={() => setActiveTab('pipeline')}
+              className={cn(
+                'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'pipeline'
+                  ? 'border-[#ffbd59] text-[#ffbd59]'
+                  : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
+              )}
+            >
+              <Kanban className="h-4 w-4" />
+              Pipeline
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {activeTab === 'clients' ? (
+      {isCsmHt && activeTab === 'clients' ? (
         <ClientsGroupsView />
-      ) : activeTab === 'pipeline' ? (
+      ) : isCsmHt && activeTab === 'pipeline' ? (
         <ClientSuccessPipeline />
       ) : (
       <>
