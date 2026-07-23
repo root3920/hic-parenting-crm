@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check, Trash2, AlertTriangle, ChevronRight, Link2, GripVertical, Filter } from 'lucide-react'
+import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check, Trash2, AlertTriangle, ChevronRight, Link2, GripVertical, Filter, RefreshCw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -450,6 +450,7 @@ export default function CareersAdminPage() {
           onUpdate={(updated) => {
             setPipelineApps(prev => prev.map(a => a.id === updated.id ? updated : a))
           }}
+          onRefresh={setPipelineApps}
         />
       )}
 
@@ -1613,16 +1614,19 @@ function HiringPipeline({
   loading,
   onSelect,
   onUpdate,
+  onRefresh,
 }: {
   applications: Application[]
   loading: boolean
   onSelect: (app: Application) => void
   onUpdate: (app: Application) => void
+  onRefresh: (apps: Application[]) => void
 }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [englishFilter, setEnglishFilter] = useState('')
   const [stage2Filter, setStage2Filter] = useState<'all' | 'yes' | 'no'>('all')
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -1708,22 +1712,49 @@ function HiringPipeline({
 
   const activeApp = activeId ? applications.find(a => a.id === activeId) ?? null : null
 
+  async function handleSync() {
+    setSyncing(true)
+    const res = await fetch('/api/careers/pipeline?position=dm_setter&sync=true')
+    if (res.ok) {
+      const data = await res.json()
+      onRefresh(data.applications)
+      const { advanced, created } = data.sync
+      const parts: string[] = []
+      if (advanced > 0) parts.push(`${advanced} advanced to Stage 3`)
+      if (created > 0) parts.push(`${created} new from Stage 2`)
+      toast.success(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Pipeline is up to date')
+    } else {
+      toast.error('Sync failed')
+    }
+    setSyncing(false)
+  }
+
   return (
     <>
-      {/* Position selector */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs font-medium text-zinc-500">Position:</span>
-        <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
-          <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm">
-            DM Setter
-          </button>
-          <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 cursor-not-allowed">
-            Closer
-          </button>
-          <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 cursor-not-allowed">
-            CSM
-          </button>
+      {/* Position selector + Sync */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-zinc-500">Position:</span>
+          <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
+            <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm">
+              DM Setter
+            </button>
+            <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 cursor-not-allowed">
+              Closer
+            </button>
+            <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 cursor-not-allowed">
+              CSM
+            </button>
+          </div>
         </div>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium bg-[#ffbd59] text-[#1a1a2e] hover:bg-[#e5a94f] disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={cn('h-4 w-4', syncing && 'animate-spin')} />
+          {syncing ? 'Syncing...' : 'Sync Pipeline'}
+        </button>
       </div>
 
       {/* KPIs */}

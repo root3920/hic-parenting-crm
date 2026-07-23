@@ -3,9 +3,15 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function GET(request: NextRequest) {
-  const cookieStore = await cookies()
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
+async function authenticateAdmin(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -18,7 +24,7 @@ export async function GET(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return null
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -26,19 +32,30 @@ export async function GET(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  return profile?.role === 'admin' ? user : null
+}
 
-  const serviceClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
+/* ─── GET — returns pipeline data with auto-advance ──────────── */
+
+export async function GET(request: NextRequest) {
+  const cookieStore = await cookies()
+  const user = await authenticateAdmin(cookieStore)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const serviceClient = getServiceClient()
+  const position = request.nextUrl.searchParams.get('position') || 'dm_setter'
+  const sync = request.nextUrl.searchParams.get('sync') === 'true'
+
+  // Fetch all Stage 2 submissions
+  const { data: stage2Submissions } = await serviceClient
+    .from('dm_setter_stage2')
+    .select('email')
+
+  const stage2Emails = new Set(
+    (stage2Submissions || []).map((s: { email: string }) => s.email.toLowerCase())
   )
 
-  const position = request.nextUrl.searchParams.get('position') || 'dm_setter'
-
-  // Fetch all applications for this position
+  // Fetch all existing applications for this position
   const { data: applications, error } = await serviceClient
     .from('job_applications')
     .select('*')
@@ -49,40 +66,64 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
-  // Fetch all Stage 2 submissions to check which applicants have completed it
-  const { data: stage2Submissions } = await serviceClient
-    .from('dm_setter_stage2')
-    .select('email')
-
-  const stage2Emails = new Set(
-    (stage2Submissions || []).map((s: { email: string }) => s.email.toLowerCase())
+  const existingEmails = new Set(
+    (applications || []).map((a: Record<string, unknown>) => (a.email as string).toLowerCase())
   )
 
-  // Auto-advance: if applicant has Stage 2 AND pipeline_stage < 3, advance to 3
-  const autoAdvancePromises: PromiseLike<unknown>[] = []
-  const results = (applications || []).map((app: Record<string, unknown>) => {
-    const hasStage2 = stage2Emails.has((app.email as string).toLowerCase())
+  let advanced = 0
+  let created = 0
+
+  // Auto-advance existing applicants with Stage 2
+  for (const app of (applications || [])) {
+    const appEmail = (app.email as string).toLowerCase()
+    const hasStage2 = stage2Emails.has(appEmail)
     const currentStage = (app.pipeline_stage as number) || 1
 
     if (hasStage2 && currentStage < 3) {
-      // Auto-advance
-      autoAdvancePromises.push(
-        serviceClient
-          .from('job_applications')
-          .update({ pipeline_stage: 3, pipeline_stage_updated_at: new Date().toISOString() })
-          .eq('id', app.id)
-          .then()
-      )
-      return { ...app, pipeline_stage: 3, has_stage2: true }
+      await serviceClient
+        .from('job_applications')
+        .update({ pipeline_stage: 3, pipeline_stage_updated_at: new Date().toISOString() })
+        .eq('id', app.id)
+      app.pipeline_stage = 3
+      advanced++
     }
 
-    return { ...app, has_stage2: hasStage2 }
-  })
-
-  // Execute auto-advance updates in background
-  if (autoAdvancePromises.length > 0) {
-    await Promise.all(autoAdvancePromises)
+    app.has_stage2 = hasStage2
   }
 
-  return NextResponse.json(results)
+  // Create records for Stage 2 orphans (no Stage 1 application)
+  const orphanEmails = Array.from(stage2Emails).filter(email => !existingEmails.has(email))
+
+  const newRecords: Record<string, unknown>[] = []
+  for (const email of orphanEmails) {
+    const { data: inserted, error: insertError } = await serviceClient
+      .from('job_applications')
+      .insert({
+        email,
+        full_name: email,
+        position: 'dm_setter',
+        pipeline_stage: 3,
+        pipeline_stage_updated_at: new Date().toISOString(),
+        status: 'pending',
+      })
+      .select()
+      .single()
+
+    if (!insertError && inserted) {
+      inserted.has_stage2 = true
+      newRecords.push(inserted)
+      created++
+    }
+  }
+
+  // Combine and re-sort
+  const allApps = [...(applications || []), ...newRecords]
+    .sort((a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime())
+
+  // If sync was requested, include stats in response
+  if (sync) {
+    return NextResponse.json({ applications: allApps, sync: { advanced, created } })
+  }
+
+  return NextResponse.json(allApps)
 }
