@@ -2,12 +2,25 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check, Trash2, AlertTriangle, ChevronRight, Link2 } from 'lucide-react'
+import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check, Trash2, AlertTriangle, ChevronRight, Link2, GripVertical, Filter } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { KPICard } from '@/components/shared/KPICard'
+import { toast } from 'sonner'
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { useDroppable, useDraggable } from '@dnd-kit/core'
+import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +72,14 @@ interface Application {
   re_engagement_steps: string | null
   culture_fit_why: string | null
   excites_most: string | null
+  // Pipeline fields
+  pipeline_stage: number | null
+  pipeline_stage_updated_at: string | null
+  pipeline_notes: string | null
+  // DM Setter v2 fields
+  ai_score: number | null
+  // Enriched by pipeline API
+  has_stage2?: boolean
 }
 
 interface Stage2Submission {
@@ -86,7 +107,7 @@ interface Stage2Submission {
   created_at: string
 }
 
-type MainTab = 'stage1' | 'stage2'
+type MainTab = 'stage1' | 'stage2' | 'pipeline'
 
 type PositionFilter = 'all' | 'dm_setter' | 'closer' | 'csm'
 
@@ -98,6 +119,18 @@ const STATUS_COLORS: Record<string, string> = {
   approved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
   rejected: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
 }
+
+const PIPELINE_STAGES = [
+  { num: 1, name: 'Aplicación inicial', color: '#89bcef', desc: 'La candidata completa el formulario de aplicación.' },
+  { num: 2, name: 'Filtro inicial', color: '#ffbd59', desc: 'Revisión de experiencia, escritura, disponibilidad y ajuste básico al rol.' },
+  { num: 3, name: 'Prueba práctica', color: '#b9d496', desc: 'Evaluación de conversación, empatía, preguntas y capacidad para agendar.' },
+  { num: 4, name: 'Pruebas psicotécnicas', color: '#89bcef', desc: 'DISC + CMT + 16PF para conocer estilo, motivación y forma de trabajo.' },
+  { num: 5, name: 'Revisión integral', color: '#ffbd59', desc: 'Análisis conjunto de pruebas, perfil y señales de ajuste al cargo.' },
+  { num: 6, name: 'Entrevista estructurada', color: '#b9d496', desc: 'Preguntas sobre seguimiento, metas, feedback, organización y ética laboral.' },
+  { num: 7, name: 'Simulación final', color: '#89bcef', desc: 'Role play en vivo para evaluar reacción, manejo de objeciones y cierre hacia agenda.' },
+  { num: 8, name: 'Decisión final', color: '#ffbd59', desc: 'Clasificación: avanza, reserva o no avanza.' },
+  { num: 9, name: 'Oferta y onboarding', color: '#b9d496', desc: 'Se presenta la oferta y se inicia el proceso de integración al equipo HIC.' },
+]
 
 const AVATAR_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-700',
@@ -130,6 +163,8 @@ export default function CareersAdminPage() {
   const [stage2Submissions, setStage2Submissions] = useState<Stage2Submission[]>([])
   const [stage2Loading, setStage2Loading] = useState(false)
   const [selectedStage2, setSelectedStage2] = useState<Stage2Submission | null>(null)
+  const [pipelineApps, setPipelineApps] = useState<Application[]>([])
+  const [pipelineLoading, setPipelineLoading] = useState(false)
 
   const fetchApplications = useCallback(async () => {
     setLoading(true)
@@ -160,9 +195,20 @@ export default function CareersAdminPage() {
     fetchApplications()
   }, [fetchApplications])
 
+  const fetchPipeline = useCallback(async () => {
+    setPipelineLoading(true)
+    const res = await fetch('/api/careers/pipeline?position=dm_setter')
+    if (res.ok) {
+      const data = await res.json()
+      setPipelineApps(data)
+    }
+    setPipelineLoading(false)
+  }, [])
+
   useEffect(() => {
     if (mainTab === 'stage2') fetchStage2()
-  }, [mainTab, fetchStage2])
+    if (mainTab === 'pipeline') fetchPipeline()
+  }, [mainTab, fetchStage2, fetchPipeline])
 
   const deleteApplication = useCallback(async (id: string) => {
     if (!confirm('Are you sure you want to delete this application? This action cannot be undone.')) return
@@ -219,6 +265,16 @@ export default function CareersAdminPage() {
           }`}
         >
           Stage 2 — DM Setter
+        </button>
+        <button
+          onClick={() => setMainTab('pipeline')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            mainTab === 'pipeline'
+              ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+          }`}
+        >
+          Pipeline
         </button>
       </div>
 
@@ -386,6 +442,17 @@ export default function CareersAdminPage() {
         />
       )}
 
+      {mainTab === 'pipeline' && (
+        <HiringPipeline
+          applications={pipelineApps}
+          loading={pipelineLoading}
+          onSelect={setSelectedApp}
+          onUpdate={(updated) => {
+            setPipelineApps(prev => prev.map(a => a.id === updated.id ? updated : a))
+          }}
+        />
+      )}
+
       {/* Share Forms Modal */}
       <AnimatePresence>
         {showShareModal && (
@@ -440,11 +507,15 @@ function ApplicationModal({
 }) {
   const [status, setStatus] = useState(app.status)
   const [notes, setNotes] = useState(app.notes || '')
+  const [pipelineStage, setPipelineStage] = useState(app.pipeline_stage || 1)
+  const [pipelineNotes, setPipelineNotes] = useState(app.pipeline_notes || '')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     setStatus(app.status)
     setNotes(app.notes || '')
+    setPipelineStage(app.pipeline_stage || 1)
+    setPipelineNotes(app.pipeline_notes || '')
   }, [app])
 
   async function handleSave() {
@@ -452,7 +523,7 @@ function ApplicationModal({
     const res = await fetch(`/api/careers/applications/${app.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, notes }),
+      body: JSON.stringify({ status, notes, pipeline_stage: pipelineStage, pipeline_notes: pipelineNotes }),
     })
     if (res.ok) {
       const updated = await res.json()
@@ -619,7 +690,34 @@ function ApplicationModal({
                 <option value="rejected">Rejected</option>
               </select>
             </div>
+            {app.position === 'dm_setter' && (
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">Pipeline Stage</label>
+                <select
+                  value={pipelineStage}
+                  onChange={e => setPipelineStage(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
+                >
+                  {PIPELINE_STAGES.map(s => (
+                    <option key={s.num} value={s.num}>{s.num}. {s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
+
+          {app.position === 'dm_setter' && (
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">Pipeline Notes</label>
+              <textarea
+                value={pipelineNotes}
+                onChange={e => setPipelineNotes(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
+                placeholder="Pipeline-specific notes..."
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">Internal Notes</label>
@@ -1386,6 +1484,323 @@ function Stage2LinkSection({
         </div>
       )}
     </div>
+  )
+}
+
+/* ─── Hiring Pipeline ────────────────────────────────────────── */
+
+function PipelineDraggableCard({
+  app,
+  onClick,
+}: {
+  app: Application
+  onClick: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: app.id,
+  })
+
+  const style = transform
+    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
+    : undefined
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-700 rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md',
+        isDragging && 'opacity-50 shadow-lg'
+      )}
+      {...attributes}
+      {...listeners}
+      onClick={() => { if (!isDragging) onClick() }}
+    >
+      <div className="flex items-start gap-2.5">
+        <Avatar className="h-8 w-8 shrink-0">
+          <AvatarFallback className={`text-[10px] font-semibold ${AVATAR_COLORS[app.status] || AVATAR_COLORS.pending}`}>
+            {getInitials(app.full_name)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-tight">
+            {app.full_name}
+          </p>
+          <p className="text-[11px] text-zinc-400 truncate">{app.email}</p>
+          <p className="text-[10px] text-zinc-400 mt-0.5">Applied {formatDate(app.created_at)}</p>
+          <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+            {app.english_level && (
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0">{app.english_level}</Badge>
+            )}
+            {app.has_stage2 && (
+              <Badge className="text-[9px] px-1.5 py-0 bg-[#89bcef]/20 text-[#3b82f6] border-[#89bcef]/40">Stage 2 &#10003;</Badge>
+            )}
+            {app.ai_score != null && (
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0">AI: {app.ai_score}</Badge>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PipelineCardPreview({ app }: { app: Application }) {
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-700 rounded-lg p-3 shadow-xl w-[200px] opacity-90">
+      <div className="flex items-start gap-2.5">
+        <Avatar className="h-8 w-8 shrink-0">
+          <AvatarFallback className={`text-[10px] font-semibold ${AVATAR_COLORS[app.status] || AVATAR_COLORS.pending}`}>
+            {getInitials(app.full_name)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-tight">
+            {app.full_name}
+          </p>
+          <p className="text-[10px] text-zinc-400 truncate">{app.email}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PipelineDroppableColumn({
+  stage,
+  apps,
+  onCardClick,
+}: {
+  stage: typeof PIPELINE_STAGES[number]
+  apps: Application[]
+  onCardClick: (app: Application) => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `pipeline-${stage.num}` })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'flex flex-col bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 min-w-[220px] w-[220px] shrink-0',
+        isOver && 'ring-2 ring-[#ffbd59]/50'
+      )}
+    >
+      <div className="h-[3px] rounded-t-lg" style={{ backgroundColor: stage.color }} />
+      <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 leading-tight">
+            {stage.num}. {stage.name}
+          </h3>
+          <span className="text-[10px] font-medium text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
+            {apps.length}
+          </span>
+        </div>
+        <p className="text-[10px] text-zinc-400 mt-1 leading-snug">{stage.desc}</p>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-[calc(100vh-380px)]">
+        {apps.map((app) => (
+          <PipelineDraggableCard key={app.id} app={app} onClick={() => onCardClick(app)} />
+        ))}
+        {apps.length === 0 && (
+          <div className="text-center py-6 text-xs text-zinc-400">No applicants</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function HiringPipeline({
+  applications,
+  loading,
+  onSelect,
+  onUpdate,
+}: {
+  applications: Application[]
+  loading: boolean
+  onSelect: (app: Application) => void
+  onUpdate: (app: Application) => void
+}) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [englishFilter, setEnglishFilter] = useState('')
+  const [stage2Filter, setStage2Filter] = useState<'all' | 'yes' | 'no'>('all')
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
+
+  const englishLevels = useMemo(() => {
+    const set = new Set<string>()
+    applications.forEach(a => { if (a.english_level) set.add(a.english_level) })
+    return Array.from(set).sort()
+  }, [applications])
+
+  const filtered = useMemo(() => {
+    return applications.filter(app => {
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase()
+        if (!app.full_name.toLowerCase().includes(q) && !app.email.toLowerCase().includes(q)) return false
+      }
+      if (englishFilter && app.english_level !== englishFilter) return false
+      if (stage2Filter === 'yes' && !app.has_stage2) return false
+      if (stage2Filter === 'no' && app.has_stage2) return false
+      return true
+    })
+  }, [applications, searchTerm, englishFilter, stage2Filter])
+
+  const columnApps = useMemo(() => {
+    const cols: Record<number, Application[]> = {}
+    PIPELINE_STAGES.forEach(s => { cols[s.num] = [] })
+    filtered.forEach(app => {
+      const stage = app.pipeline_stage || 1
+      if (cols[stage]) cols[stage].push(app)
+      else cols[1].push(app)
+    })
+    return cols
+  }, [filtered])
+
+  const kpis = useMemo(() => {
+    const total = filtered.length
+    const early = filtered.filter(a => (a.pipeline_stage || 1) <= 2).length
+    const assessment = filtered.filter(a => { const s = a.pipeline_stage || 1; return s >= 3 && s <= 5 }).length
+    const final = filtered.filter(a => (a.pipeline_stage || 1) >= 6).length
+    return { total, early, assessment, final }
+  }, [filtered])
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }, [])
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    setActiveId(null)
+    const { active, over } = event
+    if (!over) return
+
+    const overId = over.id as string
+    if (!overId.startsWith('pipeline-')) return
+
+    const newStage = parseInt(overId.replace('pipeline-', ''))
+    const appId = active.id as string
+    const app = applications.find(a => a.id === appId)
+    if (!app) return
+
+    const currentStage = app.pipeline_stage || 1
+    if (currentStage === newStage) return
+
+    // Optimistic update
+    const updated = { ...app, pipeline_stage: newStage }
+    onUpdate(updated)
+
+    const res = await fetch(`/api/careers/applications/${appId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pipeline_stage: newStage }),
+    })
+
+    if (res.ok) {
+      const stageName = PIPELINE_STAGES.find(s => s.num === newStage)?.name || `Stage ${newStage}`
+      toast.success(`Moved to ${stageName}`)
+    } else {
+      // Revert
+      onUpdate(app)
+      toast.error('Failed to move applicant')
+    }
+  }, [applications, onUpdate])
+
+  const activeApp = activeId ? applications.find(a => a.id === activeId) ?? null : null
+
+  return (
+    <>
+      {/* Position selector */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs font-medium text-zinc-500">Position:</span>
+        <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
+          <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm">
+            DM Setter
+          </button>
+          <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 cursor-not-allowed">
+            Closer
+          </button>
+          <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 cursor-not-allowed">
+            CSM
+          </button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <motion.div
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+        initial="hidden"
+        animate="visible"
+        variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+      >
+        <KPICard title="Total DM Setter" value={kpis.total} icon={<Users className="h-4 w-4" />} loading={loading} />
+        <KPICard title="Early stages (1-2)" value={kpis.early} icon={<Clock className="h-4 w-4" />} loading={loading} />
+        <KPICard title="Assessment (3-5)" value={kpis.assessment} icon={<FileText className="h-4 w-4" />} loading={loading} />
+        <KPICard title="Final stages (6-9)" value={kpis.final} icon={<CheckCircle2 className="h-4 w-4" />} loading={loading} />
+      </motion.div>
+
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-3 items-start md:items-center mt-4">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
+          />
+        </div>
+        <select
+          value={englishFilter}
+          onChange={e => setEnglishFilter(e.target.value)}
+          className="text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
+        >
+          <option value="">All English Levels</option>
+          {englishLevels.map(l => (
+            <option key={l} value={l}>{l}</option>
+          ))}
+        </select>
+        <select
+          value={stage2Filter}
+          onChange={e => setStage2Filter(e.target.value as 'all' | 'yes' | 'no')}
+          className="text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
+        >
+          <option value="all">Stage 2: All</option>
+          <option value="yes">Stage 2: Submitted</option>
+          <option value="no">Stage 2: Not submitted</option>
+        </select>
+      </div>
+
+      {/* Kanban Board */}
+      {loading ? (
+        <div className="mt-6 flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ffbd59]" />
+        </div>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-3 mt-6 overflow-x-auto pb-4">
+            {PIPELINE_STAGES.map(stage => (
+              <PipelineDroppableColumn
+                key={stage.num}
+                stage={stage}
+                apps={columnApps[stage.num]}
+                onCardClick={onSelect}
+              />
+            ))}
+          </div>
+
+          <DragOverlay>
+            {activeApp ? <PipelineCardPreview app={activeApp} /> : null}
+          </DragOverlay>
+        </DndContext>
+      )}
+    </>
   )
 }
 

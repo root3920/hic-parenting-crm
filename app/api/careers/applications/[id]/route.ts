@@ -45,6 +45,11 @@ export async function PATCH(
 
   if (body.status !== undefined) updates.status = body.status
   if (body.notes !== undefined) updates.notes = body.notes
+  if (body.pipeline_stage !== undefined) {
+    updates.pipeline_stage = body.pipeline_stage
+    updates.pipeline_stage_updated_at = new Date().toISOString()
+  }
+  if (body.pipeline_notes !== undefined) updates.pipeline_notes = body.pipeline_notes
 
   const { data, error } = await serviceClient
     .from('job_applications')
