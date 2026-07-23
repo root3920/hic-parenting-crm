@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check, Trash2 } from 'lucide-react'
+import { Search, X, Play, ExternalLink, FileText, Clock, CheckCircle2, XCircle, Users, Share2, Copy, Check, Trash2, AlertTriangle, ChevronRight, Link2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -61,6 +61,33 @@ interface Application {
   excites_most: string | null
 }
 
+interface Stage2Submission {
+  id: string
+  email: string
+  q1: number; q2: number; q3: number; q4: number
+  q5: number; q6: number; q7: number; q8: number
+  q9: string; q10: string; q11: string; q12: string
+  q13_ranking: string[]
+  q14: string | null
+  q15: string
+  section1_score: number
+  section2_score: number
+  total_auto_score: number
+  score_label: string
+  alerts: string[]
+  q13_human_score: number | null
+  q14_human_score: number | null
+  q15_human_score: number | null
+  section3_score: number | null
+  final_score: number | null
+  final_label: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+type MainTab = 'stage1' | 'stage2'
+
 type PositionFilter = 'all' | 'dm_setter' | 'closer' | 'csm'
 
 type StatusFilter = 'all' | 'pending' | 'reviewing' | 'approved' | 'rejected'
@@ -99,6 +126,10 @@ export default function CareersAdminPage() {
   const [search, setSearch] = useState('')
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [mainTab, setMainTab] = useState<MainTab>('stage1')
+  const [stage2Submissions, setStage2Submissions] = useState<Stage2Submission[]>([])
+  const [stage2Loading, setStage2Loading] = useState(false)
+  const [selectedStage2, setSelectedStage2] = useState<Stage2Submission | null>(null)
 
   const fetchApplications = useCallback(async () => {
     setLoading(true)
@@ -115,9 +146,23 @@ export default function CareersAdminPage() {
     setLoading(false)
   }, [statusFilter, positionFilter, search])
 
+  const fetchStage2 = useCallback(async () => {
+    setStage2Loading(true)
+    const res = await fetch('/api/careers/stage2')
+    if (res.ok) {
+      const data = await res.json()
+      setStage2Submissions(data)
+    }
+    setStage2Loading(false)
+  }, [])
+
   useEffect(() => {
     fetchApplications()
   }, [fetchApplications])
+
+  useEffect(() => {
+    if (mainTab === 'stage2') fetchStage2()
+  }, [mainTab, fetchStage2])
 
   const deleteApplication = useCallback(async (id: string) => {
     if (!confirm('Are you sure you want to delete this application? This action cannot be undone.')) return
@@ -153,6 +198,31 @@ export default function CareersAdminPage() {
         </Button>
       </div>
 
+      {/* Main Tabs */}
+      <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setMainTab('stage1')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            mainTab === 'stage1'
+              ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+          }`}
+        >
+          Stage 1 — Applications
+        </button>
+        <button
+          onClick={() => setMainTab('stage2')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            mainTab === 'stage2'
+              ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+          }`}
+        >
+          Stage 2 — DM Setter
+        </button>
+      </div>
+
+      {mainTab === 'stage1' && (<>
       {/* KPI Cards */}
       <motion.div
         className="grid grid-cols-2 md:grid-cols-4 gap-4"
@@ -306,6 +376,16 @@ export default function CareersAdminPage() {
         </div>
       )}
 
+      </>)}
+
+      {mainTab === 'stage2' && (
+        <Stage2Panel
+          submissions={stage2Submissions}
+          loading={stage2Loading}
+          onSelect={setSelectedStage2}
+        />
+      )}
+
       {/* Share Forms Modal */}
       <AnimatePresence>
         {showShareModal && (
@@ -323,6 +403,21 @@ export default function CareersAdminPage() {
               setApplications(prev => prev.map(a => a.id === updated.id ? updated : a))
               setSelectedApp(updated)
             }}
+            stage2Submissions={stage2Submissions}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Stage 2 Review Modal */}
+      <AnimatePresence>
+        {selectedStage2 && (
+          <Stage2ReviewModal
+            submission={selectedStage2}
+            onClose={() => setSelectedStage2(null)}
+            onUpdate={(updated) => {
+              setStage2Submissions(prev => prev.map(s => s.id === updated.id ? updated : s))
+              setSelectedStage2(updated)
+            }}
           />
         )}
       </AnimatePresence>
@@ -336,10 +431,12 @@ function ApplicationModal({
   app,
   onClose,
   onUpdate,
+  stage2Submissions,
 }: {
   app: Application
   onClose: () => void
   onUpdate: (app: Application) => void
+  stage2Submissions?: Stage2Submission[]
 }) {
   const [status, setStatus] = useState(app.status)
   const [notes, setNotes] = useState(app.notes || '')
@@ -499,6 +596,11 @@ function ApplicationModal({
           )}
 
           <TextSection title="Additional Comments" content={app.additional_comments} />
+
+          {/* Stage 2 Assessment Link */}
+          {app.position === 'dm_setter' && (
+            <Stage2LinkSection email={app.email} stage2Submissions={stage2Submissions} />
+          )}
         </div>
 
         {/* Admin actions */}
@@ -543,6 +645,7 @@ function ApplicationModal({
 
 const FORM_LINKS = [
   { label: 'DM Setter Application', url: 'https://dashboard.hicparenting.com/careers/dm-setter' },
+  { label: 'DM Setter — Stage 2', url: 'https://dashboard.hicparenting.com/careers/dm-setter-stage2' },
   { label: 'Closer Application', url: 'https://dashboard.hicparenting.com/careers/closer' },
   { label: 'Client Success Manager Application', url: 'https://dashboard.hicparenting.com/careers/csm' },
 ]
@@ -691,6 +794,598 @@ function VideoEmbed({ url }: { url: string }) {
       <ExternalLink className="h-5 w-5 text-[#89bcef]" />
       <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Open Video Link</span>
     </a>
+  )
+}
+
+/* ─── Stage 2 Panel ──────────────────────────────────────────── */
+
+function Stage2Panel({
+  submissions,
+  loading,
+  onSelect,
+}: {
+  submissions: Stage2Submission[]
+  loading: boolean
+  onSelect: (s: Stage2Submission) => void
+}) {
+  const kpis = useMemo(() => {
+    const total = submissions.length
+    const pending = submissions.filter(s => !s.reviewed_at).length
+    const reviewed = submissions.filter(s => !!s.reviewed_at).length
+    const avgScore = submissions.length > 0
+      ? Math.round(submissions.reduce((sum, s) => sum + s.total_auto_score, 0) / submissions.length)
+      : 0
+    return { total, pending, reviewed, avgScore }
+  }, [submissions])
+
+  return (
+    <>
+      <motion.div
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+        initial="hidden"
+        animate="visible"
+        variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+      >
+        <KPICard title="Total Submissions" value={kpis.total} icon={<Users className="h-4 w-4" />} loading={loading} />
+        <KPICard title="Pending Review" value={kpis.pending} icon={<Clock className="h-4 w-4" />} loading={loading} />
+        <KPICard title="Reviewed" value={kpis.reviewed} icon={<CheckCircle2 className="h-4 w-4" />} loading={loading} />
+        <KPICard title="Avg Auto Score" value={`${kpis.avgScore}/60`} icon={<FileText className="h-4 w-4" />} loading={loading} />
+      </motion.div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 w-32 bg-zinc-200 dark:bg-zinc-700 rounded" />
+                    <div className="h-3 w-40 bg-zinc-200 dark:bg-zinc-700 rounded" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : submissions.length === 0 ? (
+        <div className="text-center py-16">
+          <FileText className="h-10 w-10 text-zinc-300 dark:text-zinc-600 mx-auto mb-3" />
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">No Stage 2 submissions yet</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {submissions.map(sub => (
+            <motion.div
+              key={sub.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Card
+                className="hover:shadow-md transition-shadow cursor-pointer border-[#89bcef]/30"
+                style={{ backgroundColor: '#f0f7ff' }}
+                onClick={() => onSelect(sub)}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{sub.email}</p>
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">Submitted {formatDate(sub.created_at)}</p>
+                    </div>
+                    <Badge className="text-[10px] px-2 py-0.5 bg-[#89bcef]/20 text-[#3b82f6] border-[#89bcef]/40 shrink-0">
+                      Stage 2
+                    </Badge>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{sub.total_auto_score}</p>
+                      <p className="text-[10px] text-zinc-400">/60 auto</p>
+                    </div>
+                    {sub.final_score !== null && (
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{sub.final_score}</p>
+                        <p className="text-[10px] text-zinc-400">/80 final</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {sub.alerts && sub.alerts.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {sub.alerts.slice(0, 3).map(alert => (
+                        <span key={alert} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                          <AlertTriangle className="h-2.5 w-2.5" />
+                          {alert}
+                        </span>
+                      ))}
+                      {sub.alerts.length > 3 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700">
+                          +{sub.alerts.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex items-center justify-between">
+                    <Badge className={`text-[10px] px-2 py-0.5 ${
+                      sub.reviewed_at
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
+                    }`}>
+                      {sub.reviewed_at ? 'Reviewed' : 'Pending Review'}
+                    </Badge>
+                    {sub.final_label && (
+                      <Badge className={`text-[10px] px-2 py-0.5 ${
+                        sub.final_label === 'Ajuste alto' ? 'bg-emerald-100 text-emerald-800' :
+                        sub.final_label === 'Avanza a entrevista' ? 'bg-blue-100 text-blue-800' :
+                        sub.final_label === 'Revisión manual' ? 'bg-amber-100 text-amber-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {sub.final_label}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-4 w-full text-xs"
+                  >
+                    Review
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+/* ─── Stage 2 Review Modal ───────────────────────────────────── */
+
+const LIKERT_LABELS = ['Strongly disagree', 'Disagree', 'Neither agree nor disagree', 'Agree', 'Strongly agree']
+
+const WORK_STYLE_QUESTIONS: Record<string, string> = {
+  q1: 'I can stay consistent with follow-ups even when I do not receive immediate responses or results.',
+  q2: 'I feel comfortable working with weekly goals and having my performance reviewed using numbers.',
+  q3: 'I follow agreed processes even when I believe there may be a better way to do something.',
+  q4: 'I can receive direct feedback without taking it personally.',
+  q5: 'When I make a mistake, I report it promptly instead of trying to solve it without telling anyone.',
+  q6: 'Repetitive tasks can affect my motivation.',
+  q7: 'I remain calm and professional when several prospects respond at the same time.',
+  q8: 'I am comfortable asking for help when I am unsure how to handle a conversation.',
+}
+
+const SITUATIONAL_QUESTIONS: Record<string, { question: string; options: Record<string, string> }> = {
+  q9: {
+    question: 'You notice that one of your conversations was not properly updated in the CRM, and another team member may not have the full context. What would you do?',
+    options: {
+      A: 'Update the information and continue working without mentioning it.',
+      B: 'Update the information, notify the person involved, and explain what happened.',
+      C: 'Wait to see if the missing information causes a problem.',
+      D: 'Ask another team member to fix it.',
+    },
+  },
+  q10: {
+    question: 'A prospect appears emotionally overwhelmed and asks you what she should do with her child. What is the best response?',
+    options: {
+      A: 'Give her a detailed parenting recommendation.',
+      B: 'Tell her that you cannot help and end the conversation.',
+      C: 'Validate how she feels, avoid giving clinical advice, and ask questions to understand what support she is looking for.',
+      D: 'Immediately send the booking link.',
+    },
+  },
+  q11: {
+    question: 'You believe a prospect is not a good fit for the program, but she is ready to book a call. What would you do?',
+    options: {
+      A: 'Send the booking link because booking calls is the main goal.',
+      B: 'Ask additional questions and only guide her toward a call if the program may genuinely fit her needs.',
+      C: 'Stop responding.',
+      D: 'Tell her directly that she cannot join.',
+    },
+  },
+  q12: {
+    question: 'Your booking numbers are below target for the second week in a row. What would you do first?',
+    options: {
+      A: 'Assume the leads are not qualified enough.',
+      B: 'Increase the number of messages without reviewing anything else.',
+      C: 'Review your conversations, follow-up rate, response time, objections, and ask for feedback.',
+      D: 'Wait until the end of the month to determine whether there is a real problem.',
+    },
+  },
+}
+
+const ALL_ALERTS = [
+  'Baja tolerancia al seguimiento',
+  'Resistencia a métricas',
+  'Dificultad para aceptar feedback',
+  'Riesgo de ocultar errores',
+  'Tendencia a cambiar procesos sin autorización',
+  'Baja tolerancia a tareas repetitivas',
+  'Dificultad para manejar volumen',
+  'Confusión entre empatía y asesoría clínica',
+  'Orientación excesiva a agendar sin calificar',
+  'Motivación principalmente económica',
+  'Contradicciones entre respuestas',
+  'Motivación principalmente externa',
+]
+
+function Stage2ReviewModal({
+  submission,
+  onClose,
+  onUpdate,
+}: {
+  submission: Stage2Submission
+  onClose: () => void
+  onUpdate: (s: Stage2Submission) => void
+}) {
+  const [q13Score, setQ13Score] = useState<number | null>(submission.q13_human_score)
+  const [q14Score, setQ14Score] = useState<number | null>(submission.q14_human_score)
+  const [q15Score, setQ15Score] = useState<number | null>(submission.q15_human_score)
+  const [alerts, setAlerts] = useState<string[]>(submission.alerts || [])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setQ13Score(submission.q13_human_score)
+    setQ14Score(submission.q14_human_score)
+    setQ15Score(submission.q15_human_score)
+    setAlerts(submission.alerts || [])
+  }, [submission])
+
+  function toggleAlert(alert: string) {
+    setAlerts(prev =>
+      prev.includes(alert) ? prev.filter(a => a !== alert) : [...prev, alert]
+    )
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const res = await fetch(`/api/careers/stage2/${submission.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q13_human_score: q13Score,
+        q14_human_score: q14Score,
+        q15_human_score: q15Score,
+        alerts,
+      }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      onUpdate(updated)
+    }
+    setSaving(false)
+  }
+
+  function getAnswerLetter(qKey: string, answer: string): string {
+    const q = SITUATIONAL_QUESTIONS[qKey]
+    if (!q) return answer
+    for (const [letter, text] of Object.entries(q.options)) {
+      if (answer === text || answer.startsWith(text.substring(0, 20))) return letter
+    }
+    if (answer.length === 1 && 'ABCD'.includes(answer.toUpperCase())) return answer.toUpperCase()
+    return answer
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8 px-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+          <div>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Stage 2 Review</h2>
+            <p className="text-xs text-zinc-500">{submission.email} · Submitted {formatDate(submission.created_at)}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+            <X className="h-5 w-5 text-zinc-500" />
+          </button>
+        </div>
+
+        <div className="flex flex-col md:flex-row max-h-[80vh]">
+          {/* LEFT SIDE — Responses */}
+          <div className="flex-1 px-6 py-5 space-y-6 overflow-y-auto border-r border-zinc-200 dark:border-zinc-800">
+            {/* Section 1 */}
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Section 1 — Work Style</h3>
+              <div className="space-y-3">
+                {(['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'] as const).map(qKey => {
+                  const val = submission[qKey] as number
+                  return (
+                    <div key={qKey} className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-3">
+                      <p className="text-xs text-zinc-500 mb-1">{qKey.toUpperCase()}</p>
+                      <p className="text-sm text-zinc-800 dark:text-zinc-200 mb-2">{WORK_STYLE_QUESTIONS[qKey]}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center justify-center h-7 w-7 rounded-lg text-xs font-bold ${
+                          val <= 2 ? 'bg-red-100 text-red-700' : val === 3 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                        }`}>{val}</span>
+                        <span className="text-xs text-zinc-500">{LIKERT_LABELS[val - 1]}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Section 2 */}
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Section 2 — Situational Judgment</h3>
+              <div className="space-y-3">
+                {(['q9', 'q10', 'q11', 'q12'] as const).map(qKey => {
+                  const answer = submission[qKey] as string
+                  const letter = getAnswerLetter(qKey, answer)
+                  const qData = SITUATIONAL_QUESTIONS[qKey]
+                  return (
+                    <div key={qKey} className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-3">
+                      <p className="text-xs text-zinc-500 mb-1">{qKey.toUpperCase()}</p>
+                      <p className="text-sm text-zinc-800 dark:text-zinc-200 mb-2">{qData.question}</p>
+                      <p className="text-sm font-medium text-[#1C2B3A] dark:text-zinc-100">
+                        <span className="font-bold">{letter}.</span> {qData.options[letter] || answer}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Section 3 */}
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Section 3 — Motivation & Commitment</h3>
+
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-3 mb-3">
+                <p className="text-xs text-zinc-500 mb-1">Q13 — Motivation Ranking</p>
+                <ol className="space-y-1">
+                  {(submission.q13_ranking || []).map((item, i) => (
+                    <li key={i} className="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200">
+                      <span className="flex items-center justify-center h-6 w-6 rounded-full bg-[#F59E0B] text-white text-xs font-bold">{i + 1}</span>
+                      {item}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-3 mb-3">
+                <p className="text-xs text-zinc-500 mb-1">Q14 — Most Challenging Part</p>
+                <p className="text-sm text-zinc-800 dark:text-zinc-200">{submission.q14 || '—'}</p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-3">
+                <p className="text-xs text-zinc-500 mb-1">Q15 — Commitment & Resilience</p>
+                <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">{submission.q15}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT SIDE — Scoring panel */}
+          <div className="w-full md:w-[400px] px-6 py-5 space-y-6 overflow-y-auto bg-zinc-50 dark:bg-zinc-800/50">
+            {/* Auto scores */}
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Auto Scores</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-center">
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{submission.section1_score}</p>
+                  <p className="text-[10px] text-zinc-400">/40 Section 1</p>
+                </div>
+                <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-center">
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{submission.section2_score}</p>
+                  <p className="text-[10px] text-zinc-400">/20 Section 2</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Alerts */}
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Alerts</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_ALERTS.map(alert => {
+                  const isActive = alerts.includes(alert)
+                  return (
+                    <button
+                      key={alert}
+                      type="button"
+                      onClick={() => toggleAlert(alert)}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium border transition-colors ${
+                        isActive
+                          ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700'
+                          : 'bg-white text-zinc-400 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700'
+                      }`}
+                    >
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      {alert}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Human scoring */}
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Human Scoring</h3>
+
+              {/* Q13 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Q13 — Motivation Ranking (1-5)</label>
+                <p className="text-[10px] text-zinc-400 mb-2">Does the ranking show intrinsic motivation? Helping others and learning ranked above commissions/recognition = higher score.</p>
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setQ13Score(n)}
+                      className={`h-9 w-9 rounded-lg border text-sm font-semibold transition-colors ${
+                        q13Score === n
+                          ? n <= 2 ? 'bg-red-500 text-white border-red-500' : n === 3 ? 'bg-amber-500 text-white border-amber-500' : 'bg-emerald-500 text-white border-emerald-500'
+                          : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Q14 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Q14 — Self-awareness (1-5)</label>
+                <p className="text-[10px] text-zinc-400 mb-2">Does the answer show realistic self-awareness? &quot;None of the above&quot; with no explanation = lower. Specific honest challenge = higher.</p>
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setQ14Score(n)}
+                      className={`h-9 w-9 rounded-lg border text-sm font-semibold transition-colors ${
+                        q14Score === n
+                          ? n <= 2 ? 'bg-red-500 text-white border-red-500' : n === 3 ? 'bg-amber-500 text-white border-amber-500' : 'bg-emerald-500 text-white border-emerald-500'
+                          : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Q15 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Q15 — Resilience (1-10)</label>
+                <p className="text-[10px] text-zinc-400 mb-2">Does the response show internal strategies (review, ask for help, stay consistent) vs. external blame or vague positivity?</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setQ15Score(n)}
+                      className={`h-9 w-9 rounded-lg border text-sm font-semibold transition-colors ${
+                        q15Score === n
+                          ? n <= 3 ? 'bg-red-500 text-white border-red-500' : n <= 6 ? 'bg-amber-500 text-white border-amber-500' : 'bg-emerald-500 text-white border-emerald-500'
+                          : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={handleSave} disabled={saving} className="w-full">
+              {saving ? 'Saving...' : 'Save Review'}
+            </Button>
+
+            {/* Final result */}
+            {submission.final_score !== null && (
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 space-y-2">
+                <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Final Result</h3>
+                <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{submission.final_score}<span className="text-base font-normal text-zinc-400">/80</span></p>
+                {submission.final_label && (
+                  <Badge className={`text-xs px-3 py-1 ${
+                    submission.final_label === 'Ajuste alto' ? 'bg-emerald-100 text-emerald-800' :
+                    submission.final_label === 'Avanza a entrevista' ? 'bg-blue-100 text-blue-800' :
+                    submission.final_label === 'Revisión manual' ? 'bg-amber-100 text-amber-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {submission.final_label}
+                  </Badge>
+                )}
+                {alerts.length > 0 && (
+                  <div className="pt-2 space-y-1">
+                    <p className="text-[10px] text-zinc-400 uppercase">Active Alerts</p>
+                    {alerts.map(a => (
+                      <p key={a} className="text-xs text-red-600 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> {a}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/* ─── Stage 2 Link Section (in Stage 1 modal) ───────────────── */
+
+function Stage2LinkSection({
+  email,
+  stage2Submissions,
+}: {
+  email: string
+  stage2Submissions?: Stage2Submission[]
+}) {
+  const [copied, setCopied] = useState(false)
+  const match = stage2Submissions?.find(s => s.email.toLowerCase() === email.toLowerCase())
+
+  async function handleCopyLink() {
+    await navigator.clipboard.writeText('https://dashboard.hicparenting.com/careers/dm-setter-stage2')
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="rounded-xl border border-[#89bcef]/30 bg-[#f0f7ff] p-4">
+      <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+        <Link2 className="h-3.5 w-3.5" />
+        Stage 2 Assessment
+      </h3>
+      {match ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                Auto Score: {match.total_auto_score}/60
+                {match.final_score !== null && ` · Final: ${match.final_score}/80`}
+              </p>
+              <p className="text-xs text-zinc-500">Submitted {formatDate(match.created_at)}</p>
+            </div>
+          </div>
+          {match.final_label && (
+            <Badge className={`text-[10px] px-2 py-0.5 ${
+              match.final_label === 'Ajuste alto' ? 'bg-emerald-100 text-emerald-800' :
+              match.final_label === 'Avanza a entrevista' ? 'bg-blue-100 text-blue-800' :
+              match.final_label === 'Revisión manual' ? 'bg-amber-100 text-amber-800' :
+              'bg-red-100 text-red-800'
+            }`}>
+              {match.final_label}
+            </Badge>
+          )}
+          {match.alerts && match.alerts.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {match.alerts.map(alert => (
+                <span key={alert} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700">
+                  <AlertTriangle className="h-2.5 w-2.5" />{alert}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-zinc-500">No Stage 2 submitted yet</p>
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={handleCopyLink}>
+            {copied ? <><Check className="h-3.5 w-3.5 text-emerald-500" />Copied!</> : <><Copy className="h-3.5 w-3.5" />Share Link</>}
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }
 
