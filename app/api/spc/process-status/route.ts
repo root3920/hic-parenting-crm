@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllHotmartSubscribers } from '@/lib/hotmart'
+import { getAllHotmartSubscribers, getAllClubMembers } from '@/lib/hotmart'
 
 export async function POST(req: NextRequest) {
   // Verify cron authorization
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     hotmart_synced: 0,
     hotmart_created: 0,
     hotmart_updated: 0,
+    club_synced: 0,
     errors: [] as string[],
   }
 
@@ -200,6 +201,46 @@ export async function POST(req: NextRequest) {
     }
   } catch (err: any) {
     results.errors.push(`Hotmart sync: ${err.message}`)
+  }
+
+  // ── d) Hotmart Club sync ─────────────────────────────────────────────────
+  try {
+    const clubMembers = await getAllClubMembers()
+    const syncedAt = now.toISOString()
+
+    for (const m of clubMembers) {
+      try {
+        const userId = String(m.user_id)
+        const email = m.email?.toLowerCase()
+        if (!email) continue
+
+        await supabase.from('hotmart_club_members').upsert(
+          {
+            user_id: userId,
+            email,
+            name: m.name || null,
+            status: m.status || null,
+            engagement: m.engagement || null,
+            role: m.role || null,
+            type: m.type || null,
+            access_count: m.access_count ?? 0,
+            last_access_date: m.last_access_date ? new Date(m.last_access_date).toISOString() : null,
+            first_access_date: m.first_access_date ? new Date(m.first_access_date).toISOString() : null,
+            purchase_date: m.purchase_date ? new Date(m.purchase_date).toISOString() : null,
+            progress_completed: m.progress?.completed ?? 0,
+            progress_percentage: m.progress?.completed_percentage ?? 0,
+            progress_total: m.progress?.total ?? 0,
+            synced_at: syncedAt,
+          },
+          { onConflict: 'user_id' }
+        )
+        results.club_synced++
+      } catch {
+        // skip individual failures
+      }
+    }
+  } catch (err: any) {
+    results.errors.push(`Club sync: ${err.message}`)
   }
 
   console.log('[SPC Process Status]', JSON.stringify(results))

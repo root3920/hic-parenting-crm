@@ -90,7 +90,7 @@ type SelectedMember =
   | { kind: 'member'; data: SpcMember }
   | { kind: 'cancellation'; data: SpcCancellation }
 
-type Tab = 'overview' | 'active' | 'trials' | 'expired' | 'cancellations'
+type Tab = 'overview' | 'active' | 'club' | 'trials' | 'expired' | 'cancellations'
 
 type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'next_payment_desc' | 'next_payment_asc' | 'score_desc' | 'last_note_desc'
 type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
@@ -1794,6 +1794,79 @@ export default function SpcPage() {
     return `${days}d ago`
   }
 
+  // ── Club Engagement state ──────────────────────────────────────────────────
+  interface ClubMember {
+    id: string; user_id: string; email: string; name: string | null; status: string | null
+    engagement: string | null; role: string | null; type: string | null
+    access_count: number; last_access_date: string | null; first_access_date: string | null
+    purchase_date: string | null
+    progress_completed: number; progress_percentage: number; progress_total: number
+    synced_at: string | null
+  }
+  const [clubMembers, setClubMembers] = useState<ClubMember[]>([])
+  const [clubLoading, setClubLoading] = useState(false)
+  const [syncingClub, setSyncingClub] = useState(false)
+  const [clubSearch, setClubSearch] = useState('')
+  const [clubEngFilter, setClubEngFilter] = useState<'all' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE'>('all')
+  const [clubStatusFilter, setClubStatusFilter] = useState<'all' | 'ACTIVE' | 'BLOCKED' | 'OVERDUE'>('all')
+
+  const fetchClubData = useCallback(async () => {
+    setClubLoading(true)
+    try {
+      const res = await supabase.from('hotmart_club_members').select('*').order('engagement', { ascending: true })
+      if (res.data) setClubMembers(res.data as ClubMember[])
+    } catch { /* non-critical */ }
+    setClubLoading(false)
+  }, [supabase])
+
+  useEffect(() => {
+    if (activeTab === 'club') fetchClubData()
+  }, [activeTab, fetchClubData])
+
+  // Build club engagement lookup for Active Members tab
+  const clubByEmail = useMemo(() => {
+    const map: Record<string, ClubMember> = {}
+    for (const c of clubMembers) {
+      if (c.email) map[c.email.toLowerCase()] = c
+    }
+    return map
+  }, [clubMembers])
+
+  // Load club data on mount for Active Members column
+  useEffect(() => {
+    supabase.from('hotmart_club_members').select('*').then(res => {
+      if (res.data) setClubMembers(res.data as ClubMember[])
+    })
+  }, [supabase])
+
+  async function handleSyncClub() {
+    setSyncingClub(true)
+    try {
+      const res = await fetch('/api/hotmart/sync-club', { method: 'POST' })
+      const data = await res.json()
+      if (data.error) { toast.error(`Club sync failed: ${data.error}`); return }
+      toast.success(`Synced ${data.synced} members from Hotmart Club`)
+      fetchClubData()
+    } catch {
+      toast.error('Club sync failed')
+    } finally {
+      setSyncingClub(false)
+    }
+  }
+
+  const ENGAGEMENT_ORDER: Record<string, number> = { NONE: 0, LOW: 1, MEDIUM: 2, HIGH: 3 }
+
+  const filteredClubMembers = useMemo(() => {
+    let list = clubMembers
+    if (clubSearch) {
+      const q = clubSearch.toLowerCase()
+      list = list.filter(c => (c.name ?? '').toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
+    }
+    if (clubEngFilter !== 'all') list = list.filter(c => c.engagement === clubEngFilter)
+    if (clubStatusFilter !== 'all') list = list.filter(c => c.status === clubStatusFilter)
+    return list.sort((a, b) => (ENGAGEMENT_ORDER[a.engagement ?? 'NONE'] ?? 0) - (ENGAGEMENT_ORDER[b.engagement ?? 'NONE'] ?? 0))
+  }, [clubMembers, clubSearch, clubEngFilter, clubStatusFilter])
+
   // ── Zoom CSV upload state ─────────────────────────────────────────────────
   const [zoomModalOpen, setZoomModalOpen] = useState(false)
   const [zoomCsvContent, setZoomCsvContent] = useState('')
@@ -2703,6 +2776,7 @@ export default function SpcPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
+    { key: 'club', label: `Club Engagement${clubMembers.length ? ` (${clubMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
     { key: 'expired', label: `Expired${!loading ? ` (${expiredMembers.length})` : ''}` },
     { key: 'cancellations', label: `Cancellations${!loading ? ` (${cancellations.length})` : ''}` },
@@ -3697,6 +3771,7 @@ export default function SpcPage() {
                       <col className="hidden lg:table-column" style={{ width: 60 }} />
                       <col className="hidden lg:table-column" style={{ width: 90 }} />
                       <col className="hidden lg:table-column" style={{ width: 80 }} />
+                      <col className="hidden lg:table-column" style={{ width: 80 }} />
                     </colgroup>
                     <TableHeader>
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
@@ -3711,6 +3786,7 @@ export default function SpcPage() {
                         <TableHead className="text-xs hidden md:table-cell">Next Pay</TableHead>
                         <TableHead className="text-xs hidden lg:table-cell">Score</TableHead>
                         <TableHead className="text-xs hidden lg:table-cell">Engagement</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell">Club</TableHead>
                         <TableHead className="text-xs hidden lg:table-cell">Last Note</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
@@ -3789,6 +3865,26 @@ export default function SpcPage() {
                               )
                             })()}
                           </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {(() => {
+                              const club = clubByEmail[(m.email ?? '').toLowerCase()]
+                              if (!club) return <span className="text-xs text-zinc-400">—</span>
+                              const engColor: Record<string, string> = {
+                                HIGH: 'bg-[#b9d496]/30 text-[#3B6D11] dark:text-[#b9d496]',
+                                MEDIUM: 'bg-[#89bcef]/20 text-[#3a7bd5] dark:text-[#89bcef]',
+                                LOW: 'bg-[#ffbd59]/20 text-[#b8860b] dark:text-[#ffbd59]',
+                                NONE: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                              }
+                              return (
+                                <div className="flex flex-col items-start gap-0.5">
+                                  <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-tight', engColor[club.engagement ?? 'NONE'] ?? engColor.NONE)}>
+                                    {club.engagement || 'NONE'}
+                                  </span>
+                                  <span className="text-[10px] text-zinc-400">{club.progress_percentage}%</span>
+                                </div>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell className="hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
                             <LastNoteCell
                               lastNoteAt={lastNoteByEmail[(m.email ?? '').toLowerCase()]}
@@ -3803,6 +3899,194 @@ export default function SpcPage() {
               )}
             </CardContent>
           </Card>
+          </div>
+        )}
+
+        {/* ── CLUB ENGAGEMENT ────────────────────────────────────────── */}
+        {activeTab === 'club' && (
+          <div className="space-y-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Club Engagement — Hotmart</h3>
+                {clubMembers.length > 0 && clubMembers[0].synced_at && (
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Last synced: {relativeTime(clubMembers[0].synced_at)}</p>
+                )}
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={handleSyncClub}
+                  disabled={syncingClub}
+                  className="sm:ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#F04E23] hover:bg-[#d9431d] disabled:opacity-50 transition-colors"
+                >
+                  {syncingClub ? 'Syncing…' : '🔄 Sync Club Data'}
+                </button>
+              )}
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {(() => {
+                const total = clubMembers.length
+                const high = clubMembers.filter(c => c.engagement === 'HIGH').length
+                const low = clubMembers.filter(c => c.engagement === 'LOW').length
+                const none = clubMembers.filter(c => c.engagement === 'NONE' || !c.engagement).length
+                const avgProgress = total > 0 ? Math.round(clubMembers.reduce((s, c) => s + c.progress_percentage, 0) / total) : 0
+                const neverAccessed = clubMembers.filter(c => c.access_count === 0).length
+                return [
+                  { label: 'Total in Club', value: total, color: 'text-zinc-900 dark:text-zinc-100' },
+                  { label: 'HIGH Engagement', value: high, color: 'text-[#3B6D11]' },
+                  { label: 'LOW Engagement', value: low, color: 'text-[#ffbd59]' },
+                  { label: 'NONE', value: none, color: 'text-red-600 dark:text-red-400' },
+                  { label: 'Avg Progress', value: `${avgProgress}%`, color: 'text-[#89bcef]' },
+                  { label: 'Never Accessed', value: neverAccessed, color: 'text-zinc-500' },
+                ]
+              })().map(({ label, value, color }) => (
+                <Card key={label}>
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1.5 font-medium uppercase tracking-wide">{label}</p>
+                    {clubLoading ? (
+                      <div className="h-8 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <p className={`text-xl font-semibold ${color}`}>{value}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Members table */}
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <CardTitle className="text-sm font-semibold">{filteredClubMembers.length} Members</CardTitle>
+                  <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                      <input
+                        type="text"
+                        value={clubSearch}
+                        onChange={(e) => setClubSearch(e.target.value)}
+                        placeholder="Search..."
+                        className="w-44 text-xs border border-zinc-200 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30"
+                      />
+                    </div>
+                    <select
+                      value={clubEngFilter}
+                      onChange={(e) => setClubEngFilter(e.target.value as typeof clubEngFilter)}
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    >
+                      <option value="all">All Engagement</option>
+                      <option value="HIGH">HIGH</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="LOW">LOW</option>
+                      <option value="NONE">NONE</option>
+                    </select>
+                    <select
+                      value={clubStatusFilter}
+                      onChange={(e) => setClubStatusFilter(e.target.value as typeof clubStatusFilter)}
+                      className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="BLOCKED">BLOCKED</option>
+                      <option value="OVERDUE">OVERDUE</option>
+                    </select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {clubLoading ? (
+                  <div className="p-6 space-y-2">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ))}
+                  </div>
+                ) : filteredClubMembers.length === 0 ? (
+                  <EmptyState
+                    title={clubSearch || clubEngFilter !== 'all' ? 'No matching members' : 'No Club data'}
+                    description={clubMembers.length === 0 ? 'Sync Club data to see engagement metrics.' : 'Try different filters.'}
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead className="text-xs">Name</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
+                          <TableHead className="text-xs">Engagement</TableHead>
+                          <TableHead className="text-xs">Progress</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell">Lessons</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell">Accesses</TableHead>
+                          <TableHead className="text-xs hidden lg:table-cell">Last Access</TableHead>
+                          <TableHead className="text-xs hidden lg:table-cell">First Access</TableHead>
+                        </AnimatedTableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredClubMembers.map((c, i) => {
+                          const engBadge: Record<string, string> = {
+                            HIGH: 'bg-[#b9d496]/30 text-[#3B6D11] dark:bg-[#b9d496]/20 dark:text-[#b9d496]',
+                            MEDIUM: 'bg-[#89bcef]/20 text-[#3a7bd5] dark:bg-[#89bcef]/20 dark:text-[#89bcef]',
+                            LOW: 'bg-[#ffbd59]/20 text-[#b8860b] dark:bg-[#ffbd59]/20 dark:text-[#ffbd59]',
+                            NONE: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                          }
+                          const statusBadge: Record<string, string> = {
+                            ACTIVE: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                            BLOCKED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                            OVERDUE: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+                          }
+                          return (
+                            <AnimatedTableRow
+                              key={c.id}
+                              variants={rowVariants}
+                              initial="hidden"
+                              animate="visible"
+                              custom={i}
+                              className={cn(
+                                i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
+                              )}
+                            >
+                              <TableCell className="text-xs font-medium truncate max-w-[140px]">{c.name || '—'}</TableCell>
+                              <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate max-w-[160px]">{c.email}</TableCell>
+                              <TableCell>
+                                <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', statusBadge[c.status ?? ''] ?? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400')}>
+                                  {c.status || '—'}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', engBadge[c.engagement ?? 'NONE'] ?? engBadge.NONE)}>
+                                  {c.engagement || 'NONE'}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1.5 min-w-[80px]">
+                                  <div className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                    <div
+                                      className={cn('h-full rounded-full', c.progress_percentage >= 75 ? 'bg-[#3B6D11]' : c.progress_percentage >= 40 ? 'bg-[#89bcef]' : c.progress_percentage > 0 ? 'bg-[#ffbd59]' : 'bg-zinc-300')}
+                                      style={{ width: `${c.progress_percentage}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-[10px] text-zinc-500 whitespace-nowrap">{c.progress_percentage}%</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-xs text-zinc-500 hidden md:table-cell whitespace-nowrap">{c.progress_completed}/{c.progress_total}</TableCell>
+                              <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.access_count}</TableCell>
+                              <TableCell className="text-xs text-zinc-500 hidden lg:table-cell whitespace-nowrap">
+                                {c.last_access_date ? relativeTime(c.last_access_date) : 'Never'}
+                              </TableCell>
+                              <TableCell className="text-xs text-zinc-500 hidden lg:table-cell whitespace-nowrap">
+                                {c.first_access_date ? formatDate(c.first_access_date) : '—'}
+                              </TableCell>
+                            </AnimatedTableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 

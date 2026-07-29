@@ -92,3 +92,96 @@ export async function getAllHotmartSubscribers(): Promise<HotmartSubscriber[]> {
 
   return all
 }
+
+// ── Club API ────────────────────────────────────────────────────────────────
+
+export interface HotmartClubMember {
+  user_id: number
+  name: string
+  email: string
+  status: string
+  engagement: string
+  role: string
+  type: string
+  access_count: number
+  last_access_date: number | null
+  first_access_date: number | null
+  purchase_date: number | null
+  progress: {
+    completed: number
+    completed_percentage: number
+    total: number
+  }
+}
+
+interface ClubPage {
+  items: HotmartClubMember[]
+  page_info: {
+    total_results: number
+    next_page_token?: string
+    items_per_page: number
+  }
+}
+
+export interface HotmartClubLesson {
+  is_completed: boolean
+  completed_date: number | null
+  module_name: string
+  page_name: string
+}
+
+export async function getClubMembers(pageToken?: string): Promise<ClubPage> {
+  const token = await getHotmartToken()
+
+  let url = 'https://developers.hotmart.com/club/api/v1/users?subdomain=secureparentcollective&max_results=50'
+  if (pageToken) url += `&page_token=${pageToken}`
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Hotmart Club API failed (${res.status}): ${text}`)
+  }
+
+  return res.json()
+}
+
+export async function getAllClubMembers(): Promise<HotmartClubMember[]> {
+  const all: HotmartClubMember[] = []
+  let pageToken: string | undefined
+
+  do {
+    const page = await getClubMembers(pageToken)
+    all.push(...(page.items ?? []))
+    pageToken = page.page_info?.next_page_token
+  } while (pageToken)
+
+  return all
+}
+
+export async function getMemberLessons(userId: string): Promise<HotmartClubLesson[]> {
+  const token = await getHotmartToken()
+
+  const res = await fetch(
+    `https://developers.hotmart.com/club/api/v1/users/${userId}/lessons?subdomain=secureparentcollective`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  )
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Hotmart Club lessons API failed (${res.status}): ${text}`)
+  }
+
+  const data = await res.json()
+  return data.items ?? data ?? []
+}
