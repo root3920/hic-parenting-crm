@@ -12,19 +12,41 @@ export async function getHotmartToken(): Promise<string> {
   const clientSecret = process.env.HOTMART_CLIENT_SECRET!
   const basic = process.env.HOTMART_BASIC!
 
-  const url = `https://api-sec-vlc.hotmart.com/security/oauth/token?grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
+  const tokenUrl = `https://api-sec-vlc.hotmart.com/security/oauth/token?grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
+  console.log('[Hotmart Auth] Requesting token from:', tokenUrl.split('?')[0])
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: basic },
-  })
-
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Hotmart auth failed (${res.status}): ${text}`)
+  let res: Response
+  try {
+    res = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { Authorization: basic },
+    })
+  } catch (err: any) {
+    console.error('[Hotmart Auth] Fetch failed:', err.message)
+    throw new Error(`Hotmart auth fetch failed: ${err.message}`)
   }
 
-  const data = await res.json()
+  console.log('[Hotmart Auth] Response status:', res.status)
+  const text = await res.text()
+  console.log('[Hotmart Auth] Response body:', text.substring(0, 300))
+
+  if (!res.ok) {
+    throw new Error(`Hotmart auth failed (${res.status}): ${text.substring(0, 200)}`)
+  }
+
+  let data: any
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(`Hotmart auth: invalid JSON response: ${text.substring(0, 200)}`)
+  }
+
+  console.log('[Hotmart Auth] Token data keys:', Object.keys(data))
+
+  if (!data.access_token) {
+    throw new Error(`Hotmart auth: no access_token in response. Keys: ${Object.keys(data).join(', ')}`)
+  }
+
   cachedToken = {
     token: data.access_token,
     expiresAt: Date.now() + (data.expires_in ?? 172799) * 1000,
@@ -62,22 +84,35 @@ export async function getHotmartSubscribers(pageToken?: string): Promise<Hotmart
   const token = await getHotmartToken()
   const productId = process.env.HOTMART_PRODUCT_ID!
 
-  let url = `https://developers.hotmart.com/payments/api/v1/subscriptions?product_id=${productId}&max_results=50`
-  if (pageToken) url += `&page_token=${pageToken}`
+  const url = `https://developers.hotmart.com/payments/api/v1/subscriptions?product_id=${productId}&max_results=50${pageToken ? `&page_token=${pageToken}` : ''}`
+  console.log('[Hotmart Subscribers] Fetching:', url.split('?')[0])
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  })
-
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Hotmart subscribers API failed (${res.status}): ${text}`)
+  let res: Response
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+  } catch (err: any) {
+    console.error('[Hotmart Subscribers] Fetch failed:', err.message)
+    throw new Error(`Hotmart subscribers fetch failed: ${err.message}`)
   }
 
-  return res.json()
+  console.log('[Hotmart Subscribers] Response status:', res.status)
+  const text = await res.text()
+  console.log('[Hotmart Subscribers] Response body preview:', text.substring(0, 200))
+
+  if (!res.ok) {
+    throw new Error(`Hotmart subscribers API failed (${res.status}): ${text.substring(0, 200)}`)
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`Hotmart subscribers: invalid JSON: ${text.substring(0, 200)}`)
+  }
 }
 
 export async function getAllHotmartSubscribers(): Promise<HotmartSubscriber[]> {
@@ -133,22 +168,43 @@ export interface HotmartClubLesson {
 export async function getClubMembers(pageToken?: string): Promise<ClubPage> {
   const token = await getHotmartToken()
 
-  let url = 'https://developers.hotmart.com/club/api/v1/users?subdomain=secureparentcollective&max_results=50'
-  if (pageToken) url += `&page_token=${pageToken}`
+  const url = `https://developers.hotmart.com/club/api/v1/users?subdomain=secureparentcollective&max_results=50${pageToken ? `&page_token=${pageToken}` : ''}`
+  console.log('[Hotmart Club] Fetching:', url.split('?')[0])
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  })
-
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Hotmart Club API failed (${res.status}): ${text}`)
+  let res: Response
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+  } catch (err: any) {
+    console.error('[Hotmart Club] Fetch failed:', err.message)
+    throw new Error(`Hotmart Club fetch failed: ${err.message}`)
   }
 
-  return res.json()
+  console.log('[Hotmart Club] Response status:', res.status)
+  const text = await res.text()
+  console.log('[Hotmart Club] Response body preview:', text.substring(0, 200))
+
+  if (!res.ok) {
+    throw new Error(`Hotmart Club API failed (${res.status}): ${text.substring(0, 200)}`)
+  }
+
+  let data: any
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(`Hotmart Club: invalid JSON: ${text.substring(0, 200)}`)
+  }
+
+  if (!data.items) {
+    console.log('[Hotmart Club] No items array in response. Keys:', Object.keys(data))
+    return { items: [], page_info: { total_results: 0, items_per_page: 0 } }
+  }
+
+  return data
 }
 
 export async function getAllClubMembers(): Promise<HotmartClubMember[]> {
@@ -157,7 +213,8 @@ export async function getAllClubMembers(): Promise<HotmartClubMember[]> {
 
   do {
     const page = await getClubMembers(pageToken)
-    all.push(...(page.items ?? []))
+    if (!page.items || page.items.length === 0) break
+    all.push(...page.items)
     pageToken = page.page_info?.next_page_token
   } while (pageToken)
 
@@ -167,19 +224,27 @@ export async function getAllClubMembers(): Promise<HotmartClubMember[]> {
 export async function getMemberLessons(userId: string): Promise<HotmartClubLesson[]> {
   const token = await getHotmartToken()
 
-  const res = await fetch(
-    `https://developers.hotmart.com/club/api/v1/users/${userId}/lessons?subdomain=secureparentcollective`,
-    {
+  const url = `https://developers.hotmart.com/club/api/v1/users/${userId}/lessons?subdomain=secureparentcollective`
+  console.log('[Hotmart Lessons] Fetching for user:', userId)
+
+  let res: Response
+  try {
+    res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-    }
-  )
+    })
+  } catch (err: any) {
+    console.error('[Hotmart Lessons] Fetch failed:', err.message)
+    throw new Error(`Hotmart lessons fetch failed: ${err.message}`)
+  }
+
+  console.log('[Hotmart Lessons] Response status:', res.status)
 
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`Hotmart Club lessons API failed (${res.status}): ${text}`)
+    throw new Error(`Hotmart Club lessons API failed (${res.status}): ${text.substring(0, 200)}`)
   }
 
   const data = await res.json()

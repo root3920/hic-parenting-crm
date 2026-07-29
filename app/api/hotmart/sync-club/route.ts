@@ -11,8 +11,15 @@ export async function POST(req: NextRequest) {
   const results = { synced: 0, total: 0, errors: [] as string[] }
 
   try {
+    console.log('[Hotmart Club Sync] Starting sync...')
     const members = await getAllClubMembers()
     results.total = members.length
+    console.log(`[Hotmart Club Sync] Fetched ${members.length} members from API`)
+
+    if (!members || members.length === 0) {
+      console.log('[Hotmart Club Sync] No members returned from Hotmart Club API')
+      return NextResponse.json({ synced: 0, total: 0, message: 'No members returned from Hotmart Club API' })
+    }
 
     const now = new Date().toISOString()
 
@@ -20,7 +27,10 @@ export async function POST(req: NextRequest) {
       try {
         const userId = String(m.user_id)
         const email = m.email?.toLowerCase()
-        if (!email) continue
+        if (!email) {
+          console.log('[Hotmart Club Sync] Skipping member with no email, user_id:', userId)
+          continue
+        }
 
         const { error } = await supabase.from('hotmart_club_members').upsert(
           {
@@ -44,18 +54,21 @@ export async function POST(req: NextRequest) {
         )
 
         if (error) {
+          console.error(`[Hotmart Club Sync] Upsert error for ${email}:`, error.message)
           results.errors.push(`${email}: ${error.message}`)
         } else {
           results.synced++
         }
       } catch (err: any) {
+        console.error('[Hotmart Club Sync] Member error:', err.message)
         results.errors.push(`Member error: ${err.message}`)
       }
     }
   } catch (err: any) {
+    console.error('[Hotmart Club Sync] Fatal error:', err.message)
     return NextResponse.json({ error: err.message, ...results }, { status: 500 })
   }
 
-  console.log('[Hotmart Club Sync]', JSON.stringify(results))
+  console.log('[Hotmart Club Sync] Complete:', JSON.stringify(results))
   return NextResponse.json(results)
 }
