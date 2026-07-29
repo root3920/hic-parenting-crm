@@ -2787,93 +2787,95 @@ export default function SpcPage() {
 
   return (
     <PageTransition>
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full max-w-full overflow-x-hidden">
         <PageHeader title="Secure Parent Collective" description="Subscription members and free trials" />
 
         {/* Tab bar */}
         <div className="border-b border-zinc-200 dark:border-zinc-800 mb-6">
-          <div className="flex items-end justify-between">
-          <nav className="flex items-end gap-0 -mb-px">
-            {tabs.map(({ key, label }) => {
-              const isActive = activeTab === key
-              return (
-                <button
-                  key={key}
-                  onClick={() => setActiveTab(key)}
-                  className={cn(
-                    'relative px-4 h-10 text-sm font-medium whitespace-nowrap',
-                    isActive
-                      ? 'text-[#ffbd59] font-semibold'
-                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-                  )}
-                >
-                  {label}
-                  {isActive && (
-                    <motion.span
-                      layoutId="spc-tab-underline"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ffbd59]"
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                </button>
-              )
-            })}
-          </nav>
-          <div className="pb-2 shrink-0 flex items-center gap-2">
+          {/* Tabs row — scrollable */}
+          <div className="overflow-x-auto -mb-px">
+            <nav className="flex items-end gap-0 min-w-0">
+              {tabs.map(({ key, label }) => {
+                const isActive = activeTab === key
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={cn(
+                      'relative px-3 h-10 text-xs sm:text-sm font-medium whitespace-nowrap shrink-0',
+                      isActive
+                        ? 'text-[#ffbd59] font-semibold'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    )}
+                  >
+                    {label}
+                    {isActive && (
+                      <motion.span
+                        layoutId="spc-tab-underline"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ffbd59]"
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+          {/* Action buttons — wrap on smaller screens */}
+          <div className="py-2 flex items-center gap-1.5 flex-wrap">
             {isAdmin && (
               <button
                 onClick={handleRecalculateScores}
                 disabled={recalculating}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
               >
-                {recalculating ? 'Recalculating…' : '↻ Recalculate Scores'}
+                {recalculating ? 'Recalculating…' : '↻ Scores'}
               </button>
             )}
             {isAdmin && (
               <button
                 onClick={handleBackfillNextPayment}
                 disabled={backfillingPayments}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
               >
-                {backfillingPayments ? 'Backfilling…' : '↻ Backfill Payments'}
+                {backfillingPayments ? 'Backfilling…' : '↻ Payments'}
               </button>
             )}
             {isAdmin && (
               <button
                 onClick={handleBackfillConversions}
                 disabled={backfillingConversions}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
               >
-                {backfillingConversions ? 'Backfilling…' : '↻ Backfill Conversions'}
+                {backfillingConversions ? 'Backfilling…' : '↻ Conversions'}
               </button>
             )}
             {isAdmin && (
               <button
                 onClick={handleSyncHotmart}
                 disabled={syncingHotmart}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#F04E23] hover:bg-[#d9431d] disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-white bg-[#F04E23] hover:bg-[#d9431d] disabled:opacity-50 transition-colors"
               >
-                {syncingHotmart ? 'Syncing…' : '🔄 Sync Hotmart'}
+                {syncingHotmart ? 'Syncing…' : '🔄 Hotmart'}
               </button>
             )}
             <button
               onClick={() => { setZoomModalOpen(true); setZoomCsvContent(''); setZoomFileName(''); setZoomResult(null) }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90 bg-violet-600"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-white transition-opacity hover:opacity-90 bg-violet-600"
             >
-              <Upload className="h-3.5 w-3.5" />
-              Upload Zoom Class
+              <Upload className="h-3 w-3" />
+              Zoom
             </button>
             {isAdmin && (
               <button
                 onClick={() => setCsvModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
                 style={{ backgroundColor: '#ffbd59' }}
               >
-                <Upload className="h-3.5 w-3.5" />
-                Upload CSV
+                <Upload className="h-3 w-3" />
+                CSV
               </button>
             )}
-          </div>
           </div>
         </div>
 
@@ -3759,10 +3761,10 @@ export default function SpcPage() {
               ) : filteredActiveMembers.length === 0 ? (
                 <EmptyState title={activeSearch ? 'No matching members' : 'No active members'} description={activeSearch ? 'Try a different search term.' : 'Active subscribers will appear here.'} />
               ) : (
-                <div>
+                <div className="overflow-x-auto">
                   <Table className="table-fixed w-full">
                     <colgroup>
-                      <col style={{ width: 160 }} />
+                      <col style={{ width: 140 }} />
                       <col className="hidden md:table-column" style={{ width: 180 }} />
                       <col style={{ width: 80 }} />
                       <col style={{ width: 70 }} />
