@@ -3928,7 +3928,7 @@ export default function SpcPage() {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
               {(() => {
                 const total = clubMembers.length
                 const high = clubMembers.filter(c => c.engagement === 'HIGH').length
@@ -3938,8 +3938,8 @@ export default function SpcPage() {
                 const neverAccessed = clubMembers.filter(c => c.access_count === 0).length
                 return [
                   { label: 'Total in Club', value: total, color: 'text-zinc-900 dark:text-zinc-100' },
-                  { label: 'HIGH Engagement', value: high, color: 'text-[#3B6D11]' },
-                  { label: 'LOW Engagement', value: low, color: 'text-[#ffbd59]' },
+                  { label: 'HIGH', value: high, color: 'text-[#3B6D11]' },
+                  { label: 'LOW', value: low, color: 'text-[#ffbd59]' },
                   { label: 'NONE', value: none, color: 'text-red-600 dark:text-red-400' },
                   { label: 'Avg Progress', value: `${avgProgress}%`, color: 'text-[#89bcef]' },
                   { label: 'Never Accessed', value: neverAccessed, color: 'text-zinc-500' },
@@ -4012,7 +4012,18 @@ export default function SpcPage() {
                   />
                 ) : (
                   <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="table-fixed w-full">
+                      <colgroup>
+                        <col style={{ width: 140 }} />
+                        <col className="hidden md:table-column" style={{ width: 180 }} />
+                        <col style={{ width: 80 }} />
+                        <col style={{ width: 90 }} />
+                        <col style={{ width: 120 }} />
+                        <col className="hidden md:table-column" style={{ width: 70 }} />
+                        <col className="hidden md:table-column" style={{ width: 70 }} />
+                        <col className="hidden lg:table-column" style={{ width: 90 }} />
+                        <col className="hidden lg:table-column" style={{ width: 90 }} />
+                      </colgroup>
                       <TableHeader>
                         <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
                           <TableHead className="text-xs">Name</TableHead>
@@ -4050,20 +4061,20 @@ export default function SpcPage() {
                                 i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
                               )}
                             >
-                              <TableCell className="text-xs font-medium truncate max-w-[140px]">{c.name || '—'}</TableCell>
-                              <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate max-w-[160px]">{c.email}</TableCell>
+                              <TableCell className="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap">{c.name || '—'}</TableCell>
+                              <TableCell className="text-xs text-zinc-500 hidden md:table-cell overflow-hidden text-ellipsis whitespace-nowrap">{c.email}</TableCell>
                               <TableCell>
-                                <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', statusBadge[c.status ?? ''] ?? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400')}>
+                                <span className={cn('inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap', statusBadge[c.status ?? ''] ?? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400')}>
                                   {c.status || '—'}
                                 </span>
                               </TableCell>
                               <TableCell>
-                                <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', engBadge[c.engagement ?? 'NONE'] ?? engBadge.NONE)}>
+                                <span className={cn('inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap', engBadge[c.engagement ?? 'NONE'] ?? engBadge.NONE)}>
                                   {c.engagement || 'NONE'}
                                 </span>
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-1.5 min-w-[80px]">
+                                <div className="flex items-center gap-1.5">
                                   <div className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
                                     <div
                                       className={cn('h-full rounded-full', c.progress_percentage >= 75 ? 'bg-[#3B6D11]' : c.progress_percentage >= 40 ? 'bg-[#89bcef]' : c.progress_percentage > 0 ? 'bg-[#ffbd59]' : 'bg-zinc-300')}
