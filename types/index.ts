@@ -59,7 +59,7 @@ export interface SpcMember {
   plan: 'monthly' | 'annual'
   amount: number
   status: 'active' | 'trial' | 'cancelled' | 'expired'
-  provider: 'Kajabi' | 'Stripe' | 'PayPal'
+  provider: 'Kajabi' | 'Stripe' | 'PayPal' | 'Hotmart'
   joined_at: string
   next_payment_date: string | null
   trial_end_date: string | null

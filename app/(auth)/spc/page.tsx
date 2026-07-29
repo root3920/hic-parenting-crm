@@ -90,7 +90,7 @@ type SelectedMember =
   | { kind: 'member'; data: SpcMember }
   | { kind: 'cancellation'; data: SpcCancellation }
 
-type Tab = 'overview' | 'active' | 'trials' | 'expired' | 'cancellations'
+type Tab = 'overview' | 'active' | 'hotmart' | 'trials' | 'expired' | 'cancellations'
 
 type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'next_payment_desc' | 'next_payment_asc' | 'score_desc' | 'last_note_desc'
 type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
@@ -243,7 +243,7 @@ interface MemberEditForm {
   email: string
   phone: string
   plan: 'monthly' | 'annual'
-  provider: 'Kajabi' | 'Stripe' | 'PayPal'
+  provider: 'Kajabi' | 'Stripe' | 'PayPal' | 'Hotmart'
   joined_at: string
   status: MemberStatus
   next_payment_date: string
@@ -584,7 +584,7 @@ function MemberProfileModal({
               phone: cancelForm.customer_phone || null,
               plan: (selected.data.plan as 'monthly' | 'annual') ?? 'monthly',
               amount: parseFloat(cancelForm.amount) || 0,
-              provider: (cancelForm.provider || 'Stripe') as 'Kajabi' | 'Stripe' | 'PayPal',
+              provider: (cancelForm.provider || 'Stripe') as 'Kajabi' | 'Stripe' | 'PayPal' | 'Hotmart',
               status: newStatus,
               joined_at: new Date().toISOString().split('T')[0],
             })
@@ -1266,6 +1266,7 @@ function MemberProfileModal({
                       <option value="Stripe">Stripe</option>
                       <option value="PayPal">PayPal</option>
                       <option value="Kajabi">Kajabi Payments</option>
+                      <option value="Hotmart">Hotmart</option>
                     </select>
                   </div>
                 </div>
@@ -1736,6 +1737,72 @@ export default function SpcPage() {
     }
   }
 
+  // ── Hotmart Activity state ─────────────────────────────────────────────────
+  interface HotmartKpis { active_hotmart: number; trials_hotmart: number; trials_expiring_7d: number; failed_payments: number; cancelled_this_month: number }
+  interface WebhookLog { id: string; event: string; email: string | null; payload: any; status: string; error_message: string | null; processed_at: string }
+  interface PaymentFailure { id: string; email: string; name: string | null; transaction_id: string | null; amount: number | null; failed_at: string; retry_count: number; resolved: boolean }
+  interface CartAbandoned { id: string; email: string; name: string | null; phone: string | null; product: string | null; offer_code: string | null; abandoned_at: string; recovered: boolean; recovered_at: string | null }
+  const [hotmartKpis, setHotmartKpis] = useState<HotmartKpis>({ active_hotmart: 0, trials_hotmart: 0, trials_expiring_7d: 0, failed_payments: 0, cancelled_this_month: 0 })
+  const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>([])
+  const [paymentFailures, setPaymentFailures] = useState<PaymentFailure[]>([])
+  const [cartAbandoned, setCartAbandoned] = useState<CartAbandoned[]>([])
+  const [hotmartLoading, setHotmartLoading] = useState(false)
+
+  const fetchHotmartData = useCallback(async () => {
+    setHotmartLoading(true)
+    try {
+      const res = await fetch('/api/spc/hotmart-activity')
+      if (res.ok) {
+        const data = await res.json()
+        setHotmartKpis(data.kpis)
+        setWebhookLogs(data.webhook_logs)
+        setPaymentFailures(data.payment_failures)
+        setCartAbandoned(data.cart_abandoned)
+      }
+    } catch { /* non-critical */ }
+    setHotmartLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'hotmart') fetchHotmartData()
+  }, [activeTab, fetchHotmartData])
+
+  async function handleResolveFailure(id: string) {
+    const res = await fetch('/api/spc/hotmart-activity', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'resolve_failure', id }),
+    })
+    if (res.ok) {
+      setPaymentFailures(prev => prev.filter(f => f.id !== id))
+      setHotmartKpis(prev => ({ ...prev, failed_payments: prev.failed_payments - 1 }))
+      toast.success('Payment failure resolved')
+    }
+  }
+
+  async function handleRecoverCart(id: string) {
+    const res = await fetch('/api/spc/hotmart-activity', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'recover_cart', id }),
+    })
+    if (res.ok) {
+      setCartAbandoned(prev => prev.filter(c => c.id !== id))
+      toast.success('Cart marked as recovered')
+    }
+  }
+
+  function relativeTime(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    const days = Math.floor(hrs / 24)
+    return `${days}d ago`
+  }
+
   // ── Zoom CSV upload state ─────────────────────────────────────────────────
   const [zoomModalOpen, setZoomModalOpen] = useState(false)
   const [zoomCsvContent, setZoomCsvContent] = useState('')
@@ -2053,7 +2120,7 @@ export default function SpcPage() {
     .map(([date, revenue]) => ({ label: date, revenue }))
 
   const urgentTrials = trialMembers
-    .filter((m) => m.trial_end_date && daysUntil(m.trial_end_date) <= 14)
+    .filter((m) => m.trial_end_date && daysUntil(m.trial_end_date) <= 30)
     .sort((a, b) => daysUntil(a.trial_end_date!) - daysUntil(b.trial_end_date!))
 
   const sortedTrials = [...trialMembers].sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0))
@@ -2448,13 +2515,19 @@ export default function SpcPage() {
   // ────────────────────────────────────────────────────────────────────────
 
   function trialUrgencyPill(m: SpcMember) {
-    if (!m.trial_end_date) return <span className="text-xs text-zinc-400">—</span>
-    const days = daysUntil(m.trial_end_date)
+    // Use trial_end_date if available, otherwise compute from joined_at + 14 days
+    let endDate = m.trial_end_date
+    if (!endDate && m.joined_at && m.status === 'trial') {
+      const computed = new Date(m.joined_at)
+      computed.setDate(computed.getDate() + (m.trial_days ?? 30))
+      endDate = computed.toISOString().slice(0, 10)
+    }
+    if (!endDate) return <span className="text-xs text-zinc-400">—</span>
+    const days = daysUntil(endDate)
     if (days < 0) return <StatusPill label="Expired" variant="danger" />
     if (days <= 3) return <span className="text-xs font-semibold text-red-600 dark:text-red-400">{days}d left</span>
     if (days <= 7) return <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{days}d left</span>
-    if (days <= 14) return <span className="text-xs font-semibold text-green-600 dark:text-green-400">{days}d left</span>
-    return <span className="text-xs text-zinc-500 dark:text-zinc-400">{days}d left</span>
+    return <span className="text-xs font-semibold text-green-600 dark:text-green-400">{days}d left</span>
   }
 
   // ── Export CSV ──────────────────────────────────────────────────────────
@@ -2618,6 +2691,7 @@ export default function SpcPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
+    { key: 'hotmart', label: 'Hotmart Activity' },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
     { key: 'expired', label: `Expired${!loading ? ` (${expiredMembers.length})` : ''}` },
     { key: 'cancellations', label: `Cancellations${!loading ? ` (${cancellations.length})` : ''}` },
@@ -3180,7 +3254,7 @@ export default function SpcPage() {
                 <Alert className="mb-6 border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700">
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   <AlertDescription className="text-amber-800 dark:text-amber-300 text-xs">
-                    <span className="font-semibold">{urgentTrials.length} trial{urgentTrials.length > 1 ? 's' : ''} expiring within 14 days: </span>
+                    <span className="font-semibold">{urgentTrials.length} trial{urgentTrials.length > 1 ? 's' : ''} expiring within 30 days: </span>
                     {urgentTrials.map((m, i) => (
                       <span key={m.id}>
                         {m.name} ({m.trial_end_date ? `${daysUntil(m.trial_end_date)}d` : '—'}){i < urgentTrials.length - 1 ? ', ' : ''}
@@ -3468,6 +3542,214 @@ export default function SpcPage() {
           </div>
         )}
 
+        {/* ── HOTMART ACTIVITY ─────────────────────────────────────────── */}
+        {activeTab === 'hotmart' && (
+          <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { label: 'Active from Hotmart', value: hotmartKpis.active_hotmart, color: 'text-green-600 dark:text-green-400' },
+                { label: 'Trials from Hotmart', value: hotmartKpis.trials_hotmart, color: 'text-blue-600 dark:text-blue-400' },
+                { label: 'Trials expiring in 7d', value: hotmartKpis.trials_expiring_7d, color: 'text-amber-600 dark:text-amber-400' },
+                { label: 'Failed payments', value: hotmartKpis.failed_payments, color: 'text-red-600 dark:text-red-400' },
+                { label: 'Cancelled this month', value: hotmartKpis.cancelled_this_month, color: 'text-red-600 dark:text-red-400' },
+              ].map(({ label, value, color }) => (
+                <Card key={label}>
+                  <CardContent className="pt-5 pb-4">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">{label}</p>
+                    {hotmartLoading ? (
+                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <p className={`text-2xl font-semibold ${color}`}>{value}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Recent webhook activity feed */}
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold">Recent Webhook Activity</CardTitle>
+                  <button
+                    onClick={fetchHotmartData}
+                    className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                  >
+                    ↻ Refresh
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {hotmartLoading ? (
+                  <div className="p-6 space-y-2">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ))}
+                  </div>
+                ) : webhookLogs.length === 0 ? (
+                  <EmptyState title="No webhook activity" description="Webhook events from Hotmart will appear here." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead>Event</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Time</TableHead>
+                          <TableHead>Status</TableHead>
+                        </AnimatedTableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {webhookLogs.map((log, i) => {
+                          const eventColors: Record<string, string> = {
+                            PURCHASE_APPROVED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                            PURCHASE_CANCELED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                            SUBSCRIPTION_CANCELLATION: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                            PURCHASE_REFUNDED: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+                            PURCHASE_DELAYED: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+                            CART_ABANDONMENT: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
+                            SWITCH_PLAN: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                          }
+                          const badgeClass = eventColors[log.event] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                          return (
+                            <AnimatedTableRow
+                              key={log.id}
+                              variants={rowVariants}
+                              initial="hidden"
+                              animate="visible"
+                              custom={i}
+                              className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                            >
+                              <TableCell>
+                                <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold', badgeClass)}>
+                                  {log.event}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-xs text-zinc-600 dark:text-zinc-400">{log.email || '—'}</TableCell>
+                              <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{relativeTime(log.processed_at)}</TableCell>
+                              <TableCell>
+                                <span className={cn(
+                                  'inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold',
+                                  log.status === 'success'
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                )}>
+                                  {log.status}
+                                </span>
+                              </TableCell>
+                            </AnimatedTableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Failed payments table */}
+            {paymentFailures.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Failed Payments ({paymentFailures.length} unresolved)</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Failed</TableHead>
+                          <TableHead>Retries</TableHead>
+                          <TableHead></TableHead>
+                        </AnimatedTableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paymentFailures.map((f, i) => (
+                          <AnimatedTableRow
+                            key={f.id}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="visible"
+                            custom={i}
+                            className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                          >
+                            <TableCell className="text-sm font-medium">{f.name || '—'}</TableCell>
+                            <TableCell className="text-xs text-zinc-500">{f.email}</TableCell>
+                            <TableCell className="text-xs font-semibold">{f.amount != null ? `$${f.amount}` : '—'}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{relativeTime(f.failed_at)}</TableCell>
+                            <TableCell className="text-xs text-zinc-500">{f.retry_count}</TableCell>
+                            <TableCell>
+                              <button
+                                onClick={() => handleResolveFailure(f.id)}
+                                className="text-xs px-2.5 py-1 rounded-md bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 font-medium transition-colors"
+                              >
+                                Mark Resolved
+                              </button>
+                            </TableCell>
+                          </AnimatedTableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Cart abandoned table */}
+            {cartAbandoned.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Cart Abandoned ({cartAbandoned.length} unrecovered)</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead className="hidden md:table-cell">Phone</TableHead>
+                          <TableHead>Abandoned</TableHead>
+                          <TableHead></TableHead>
+                        </AnimatedTableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cartAbandoned.map((c, i) => (
+                          <AnimatedTableRow
+                            key={c.id}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="visible"
+                            custom={i}
+                            className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                          >
+                            <TableCell className="text-sm font-medium">{c.name || '—'}</TableCell>
+                            <TableCell className="text-xs text-zinc-500">{c.email}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.phone || '—'}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{relativeTime(c.abandoned_at)}</TableCell>
+                            <TableCell>
+                              <button
+                                onClick={() => handleRecoverCart(c.id)}
+                                className="text-xs px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 font-medium transition-colors"
+                              >
+                                Mark Recovered
+                              </button>
+                            </TableCell>
+                          </AnimatedTableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         {/* FREE TRIALS */}
         {activeTab === 'trials' && (
           <div>
@@ -3481,7 +3763,7 @@ export default function SpcPage() {
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   <AlertDescription className="text-amber-800 dark:text-amber-300 text-xs">
                     <span className="font-semibold">
-                      {urgentTrials.length} trial{urgentTrials.length > 1 ? 's' : ''} expiring within 14 days.
+                      {urgentTrials.length} trial{urgentTrials.length > 1 ? 's' : ''} expiring within 30 days.
                     </span>{' '}
                     Follow up to convert them!
                   </AlertDescription>
@@ -3569,7 +3851,15 @@ export default function SpcPage() {
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{formatDate(m.joined_at)}</TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap">
-                              {m.trial_end_date ? formatDate(m.trial_end_date) : '—'}
+                              {(() => {
+                                let end = m.trial_end_date
+                                if (!end && m.joined_at && m.status === 'trial') {
+                                  const d = new Date(m.joined_at)
+                                  d.setDate(d.getDate() + (m.trial_days ?? 14))
+                                  end = d.toISOString().slice(0, 10)
+                                }
+                                return end ? formatDate(end) : '—'
+                              })()}
                             </TableCell>
                             <TableCell>{trialUrgencyPill(m)}</TableCell>
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
@@ -4470,6 +4760,7 @@ export default function SpcPage() {
                     <option value="Stripe">Stripe</option>
                     <option value="PayPal">PayPal</option>
                     <option value="Kajabi">Kajabi Payments</option>
+                    <option value="Hotmart">Hotmart</option>
                     <option value="GoHighLevel">GoHighLevel</option>
                     <option value="Other">Other</option>
                   </select>

@@ -13,18 +13,19 @@ export async function POST(req: NextRequest) {
   let email: string | undefined
 
   try {
-    // ── Auth ──────────────────────────────────────────────────────────────
-    const token = req.headers.get('x-hotmart-hottok')
+    body = await req.json()
+
+    // ── Auth — accept hottok from header OR body ─────────────────────────
+    const token = req.headers.get('x-hotmart-hottok') || body?.hottok
     if (!token || token !== process.env.HOTMART_WEBHOOK_TOKEN) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    body = await req.json()
     const event = body.event as string | undefined
     const buyer = body.data?.buyer
     const purchase = body.data?.purchase
     const product = body.data?.product
-    const subscriptions = body.data?.subscriptions as any[] | undefined
+    const subscription = body.data?.subscription // singular, not array
 
     email = buyer?.email
     const name = buyer?.name
@@ -34,23 +35,43 @@ export async function POST(req: NextRequest) {
     const currency = purchase?.price?.currency_value ?? 'USD'
     const paymentType = purchase?.payment?.type
     const offerCode = purchase?.offer?.code
-    const recurrencyNumber = purchase?.recurrency_number ?? 1
-    const isSubscription = purchase?.is_subscription
-    const planName = subscriptions?.[0]?.plan?.name // 'Monthly' or 'Annual'
-    const subscriberCode = subscriptions?.[0]?.subscriber?.code
 
+    // Subscription fields (singular object)
+    const planName = subscription?.plan?.name // 'Monthly' or 'Annual'
     const plan = planName?.toLowerCase() === 'annual' ? 'annual' : 'monthly'
+
+    // Convert approved_date from ms timestamp to Date
+    const approvedDateMs = purchase?.approved_date
+    const approvedDate = approvedDateMs ? new Date(approvedDateMs) : null
+
     const now = new Date()
+
+    // Detect new vs renewal: approved_date within 24h = new purchase
+    const isNewPurchase = approvedDate
+      ? (now.getTime() - approvedDate.getTime()) < 24 * 60 * 60 * 1000
+      : true // default to new if no approved_date
+
+    // Build offer_title based on plan
+    const getOfferTitle = (isTrial: boolean): string => {
+      if (isTrial) return 'Secure Parent Collective (Trial)'
+      if (plan === 'annual') return 'Secure Parent Collective (Annual)'
+      return 'Secure Parent Collective (Monthly)'
+    }
 
     // ── Event handlers ────────────────────────────────────────────────────
     switch (event) {
       case 'PURCHASE_APPROVED': {
         if (!email) break
 
-        if (recurrencyNumber === 1 && priceValue === 0) {
+        const dateStr = approvedDate
+          ? approvedDate.toISOString().slice(0, 10)
+          : now.toISOString().slice(0, 10)
+
+        if (priceValue === 0) {
           // ── FREE TRIAL ──────────────────────────────────────────────
-          const trialEnd = new Date(now)
-          trialEnd.setDate(trialEnd.getDate() + 14)
+          const joinedAt = approvedDate ?? now
+          const trialEnd = new Date(joinedAt)
+          trialEnd.setDate(trialEnd.getDate() + 30)
 
           await supabase.from('spc_members').upsert(
             {
@@ -61,8 +82,8 @@ export async function POST(req: NextRequest) {
               amount: 0,
               status: 'trial',
               provider: 'Hotmart',
-              joined_at: now.toISOString(),
-              trial_days: 14,
+              joined_at: joinedAt.toISOString(),
+              trial_days: 30,
               trial_end_date: trialEnd.toISOString().slice(0, 10),
               next_payment_date: trialEnd.toISOString().slice(0, 10),
             },
@@ -70,8 +91,8 @@ export async function POST(req: NextRequest) {
           )
 
           await supabase.from('transactions').insert({
-            date: now.toISOString().slice(0, 10),
-            offer_title: 'Secure Parent Collective (Trial)',
+            date: dateStr,
+            offer_title: getOfferTitle(true),
             cost: 0,
             buyer_name: name,
             buyer_email: email,
@@ -82,7 +103,7 @@ export async function POST(req: NextRequest) {
             payment_source: paymentType,
             status: 'completed',
           })
-        } else if (recurrencyNumber === 1 && priceValue > 0) {
+        } else if (isNewPurchase && priceValue > 0) {
           // ── NEW PAID MEMBER ─────────────────────────────────────────
           const nextPayment = new Date(now)
           if (plan === 'annual') nextPayment.setFullYear(nextPayment.getFullYear() + 1)
@@ -116,8 +137,8 @@ export async function POST(req: NextRequest) {
           )
 
           await supabase.from('transactions').insert({
-            date: now.toISOString().slice(0, 10),
-            offer_title: 'Secure Parent Collective',
+            date: dateStr,
+            offer_title: getOfferTitle(false),
             cost: priceValue,
             buyer_name: name,
             buyer_email: email,
@@ -128,7 +149,7 @@ export async function POST(req: NextRequest) {
             payment_source: paymentType,
             status: 'completed',
           })
-        } else if (recurrencyNumber > 1) {
+        } else if (!isNewPurchase && priceValue > 0) {
           // ── RENEWAL PAYMENT ─────────────────────────────────────────
           const nextPayment = new Date(now)
           nextPayment.setDate(nextPayment.getDate() + 30)
@@ -142,8 +163,8 @@ export async function POST(req: NextRequest) {
             .eq('email', email)
 
           await supabase.from('transactions').insert({
-            date: now.toISOString().slice(0, 10),
-            offer_title: 'Secure Parent Collective',
+            date: dateStr,
+            offer_title: getOfferTitle(false),
             cost: priceValue,
             buyer_name: name,
             buyer_email: email,
@@ -250,7 +271,7 @@ export async function POST(req: NextRequest) {
         console.log(`[Hotmart Webhook] Unhandled event: ${event}`)
     }
 
-    // ── Log success ───────────────────────────────────────────────────────
+    // ── Log every event ───────────────────────────────────────────────────
     await supabase.from('hotmart_webhook_logs').insert({
       event: event || 'unknown',
       email: email || null,
@@ -262,7 +283,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('[Hotmart Webhook] Error:', err?.message, err?.stack)
 
-    // Log error — wrap in try/catch so log failures don't mask the original error
+    // Log error
     try {
       await supabase.from('hotmart_webhook_logs').insert({
         event: body?.event || 'unknown',
