@@ -1813,11 +1813,14 @@ export default function SpcPage() {
   const fetchClubData = useCallback(async () => {
     setClubLoading(true)
     try {
-      const res = await supabase.from('hotmart_club_members').select('*').order('engagement', { ascending: true })
-      if (res.data) setClubMembers(res.data as ClubMember[])
+      const res = await fetch('/api/spc/club-engagement')
+      if (res.ok) {
+        const json = await res.json()
+        setClubMembers(json.members ?? [])
+      }
     } catch { /* non-critical */ }
     setClubLoading(false)
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     if (activeTab === 'club') fetchClubData()
@@ -1834,10 +1837,10 @@ export default function SpcPage() {
 
   // Load club data on mount for Active Members column
   useEffect(() => {
-    supabase.from('hotmart_club_members').select('*').then(res => {
-      if (res.data) setClubMembers(res.data as ClubMember[])
-    })
-  }, [supabase])
+    fetch('/api/spc/club-engagement').then(res => res.ok ? res.json() : null).then(json => {
+      if (json?.members) setClubMembers(json.members)
+    }).catch(() => {})
+  }, [])
 
   async function handleSyncClub() {
     setSyncingClub(true)
