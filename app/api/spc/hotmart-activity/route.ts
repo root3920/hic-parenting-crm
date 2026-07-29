@@ -7,85 +7,138 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10)
-  const todayStr = now.toISOString().slice(0, 10)
-
   const [
-    activeRes,
     trialsRes,
-    expiringRes,
-    failedRes,
-    cancelledRes,
-    logsRes,
+    cancellationsRes,
+    refundsRes,
+    cartAllRes,
     failuresRes,
-    cartRes,
+    convertedTrialsRes,
+    recoveredCartsRes,
+    activeHotmartEmails,
+    allTransactions,
   ] = await Promise.all([
-    // Active from Hotmart
-    supabase
-      .from('spc_members')
-      .select('id', { count: 'exact', head: true })
-      .eq('provider', 'Hotmart')
-      .eq('status', 'active'),
-    // Trials from Hotmart
+    // Hotmart trials
     supabase
       .from('spc_members')
       .select('id', { count: 'exact', head: true })
       .eq('provider', 'Hotmart')
       .eq('status', 'trial'),
-    // Trials expiring in 7 days
+    // All Hotmart cancellations (with details)
     supabase
-      .from('spc_members')
-      .select('id', { count: 'exact', head: true })
+      .from('spc_cancellations')
+      .select('*')
       .eq('provider', 'Hotmart')
-      .eq('status', 'trial')
-      .lte('trial_end_date', sevenDaysFromNow)
-      .gte('trial_end_date', todayStr),
-    // Failed payments (unresolved)
-    supabase
-      .from('hotmart_payment_failures')
-      .select('id', { count: 'exact', head: true })
-      .eq('resolved', false),
-    // Cancelled this month
+      .order('cancelled_at', { ascending: false })
+      .limit(50),
+    // Hotmart refunds count (all time, for reference)
     supabase
       .from('spc_cancellations')
       .select('id', { count: 'exact', head: true })
       .eq('provider', 'Hotmart')
-      .gte('cancelled_at', firstOfMonth),
-    // Last 20 webhook logs
+      .eq('cancel_type', 'refund'),
+    // All cart abandoned (both recovered and not)
     supabase
-      .from('hotmart_webhook_logs')
+      .from('hotmart_cart_abandoned')
       .select('*')
-      .order('processed_at', { ascending: false })
-      .limit(20),
+      .order('abandoned_at', { ascending: false })
+      .limit(50),
     // Unresolved payment failures
     supabase
       .from('hotmart_payment_failures')
       .select('*')
       .eq('resolved', false)
       .order('failed_at', { ascending: false }),
-    // Unrecovered cart abandonments
+    // Converted trials count
+    supabase
+      .from('spc_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('provider', 'Hotmart')
+      .eq('converted_from_trial', true),
+    // Recovered carts count
     supabase
       .from('hotmart_cart_abandoned')
-      .select('*')
-      .eq('recovered', false)
-      .order('abandoned_at', { ascending: false }),
+      .select('id', { count: 'exact', head: true })
+      .eq('recovered', true),
+    // Active Hotmart member emails (for "converted after" checks)
+    supabase
+      .from('spc_members')
+      .select('email, joined_at, status')
+      .eq('provider', 'Hotmart')
+      .in('status', ['active', 'trial']),
+    // Transactions for "purchased after" checks
+    supabase
+      .from('transactions')
+      .select('buyer_email, date')
+      .eq('source', 'Hotmart')
+      .eq('status', 'completed')
+      .gt('cost', 0)
+      .order('date', { ascending: false }),
   ])
 
+  // Build lookup maps for conversion checks
+  const activeByEmail: Record<string, string> = {}
+  for (const m of activeHotmartEmails.data ?? []) {
+    if (m.email) activeByEmail[m.email.toLowerCase()] = m.joined_at
+  }
+
+  const txByEmail: Record<string, string> = {}
+  for (const tx of allTransactions.data ?? []) {
+    const e = (tx.buyer_email ?? '').toLowerCase()
+    if (e && !txByEmail[e]) txByEmail[e] = tx.date // latest first
+  }
+
+  // Enrich cancellations with "converted after" flag
+  const enrichedCancellations = (cancellationsRes.data ?? []).map((c: any) => {
+    const email = (c.email ?? '').toLowerCase()
+    const joinedAt = activeByEmail[email]
+    const convertedAfter = joinedAt && c.cancelled_at ? joinedAt > c.cancelled_at.slice(0, 10) : false
+    return { ...c, converted_after: convertedAfter }
+  })
+
+  // Merge payment failures into cancellations list with type='failed'
+  const failureEntries = (failuresRes.data ?? []).map((f: any) => ({
+    id: f.id,
+    name: f.name,
+    email: f.email,
+    cancelled_at: f.failed_at,
+    amount: f.amount,
+    cancel_type: 'payment_failed',
+    paid_cancel: true,
+    trial_cancel: false,
+    provider: 'Hotmart',
+    converted_after: !!activeByEmail[(f.email ?? '').toLowerCase()],
+    _is_failure: true,
+    _failure_id: f.id,
+  }))
+
+  // Enrich cart abandoned with "purchased after" flag
+  const enrichedCart = (cartAllRes.data ?? []).map((c: any) => {
+    const email = (c.email ?? '').toLowerCase()
+    const txDate = txByEmail[email]
+    const purchasedAfter = txDate && c.abandoned_at ? txDate > c.abandoned_at.slice(0, 10) : false
+    return { ...c, purchased_after: purchasedAfter }
+  })
+
+  // Recovery rate
+  const totalCancellations = (cancellationsRes.data ?? []).length
+  const totalAbandoned = (cartAllRes.data ?? []).length
+  const denominator = totalCancellations + totalAbandoned
+  const convertedTrials = convertedTrialsRes.count ?? 0
+  const recoveredCarts = recoveredCartsRes.count ?? 0
+  const numerator = convertedTrials + recoveredCarts
+  const recoveryRate = denominator > 0 ? Math.round((numerator / denominator) * 100) : 0
+
   return NextResponse.json({
-    kpis: {
-      active_hotmart: activeRes.count ?? 0,
-      trials_hotmart: trialsRes.count ?? 0,
-      trials_expiring_7d: expiringRes.count ?? 0,
-      failed_payments: failedRes.count ?? 0,
-      cancelled_this_month: cancelledRes.count ?? 0,
+    trials_hotmart: trialsRes.count ?? 0,
+    cancellations: enrichedCancellations,
+    failures: failureEntries,
+    cart_abandoned: enrichedCart,
+    recovery: {
+      rate: recoveryRate,
+      converted: numerator,
+      total: denominator,
     },
-    webhook_logs: logsRes.data ?? [],
-    payment_failures: failuresRes.data ?? [],
-    cart_abandoned: cartRes.data ?? [],
   })
 }
 

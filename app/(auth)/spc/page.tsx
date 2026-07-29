@@ -90,7 +90,7 @@ type SelectedMember =
   | { kind: 'member'; data: SpcMember }
   | { kind: 'cancellation'; data: SpcCancellation }
 
-type Tab = 'overview' | 'active' | 'hotmart' | 'trials' | 'expired' | 'cancellations'
+type Tab = 'overview' | 'active' | 'trials' | 'expired' | 'cancellations'
 
 type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'next_payment_desc' | 'next_payment_asc' | 'score_desc' | 'last_note_desc'
 type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
@@ -1738,15 +1738,18 @@ export default function SpcPage() {
   }
 
   // ── Hotmart Activity state ─────────────────────────────────────────────────
-  interface HotmartKpis { active_hotmart: number; trials_hotmart: number; trials_expiring_7d: number; failed_payments: number; cancelled_this_month: number }
-  interface WebhookLog { id: string; event: string; email: string | null; payload: any; status: string; error_message: string | null; processed_at: string }
-  interface PaymentFailure { id: string; email: string; name: string | null; transaction_id: string | null; amount: number | null; failed_at: string; retry_count: number; resolved: boolean }
-  interface CartAbandoned { id: string; email: string; name: string | null; phone: string | null; product: string | null; offer_code: string | null; abandoned_at: string; recovered: boolean; recovered_at: string | null }
-  const [hotmartKpis, setHotmartKpis] = useState<HotmartKpis>({ active_hotmart: 0, trials_hotmart: 0, trials_expiring_7d: 0, failed_payments: 0, cancelled_this_month: 0 })
-  const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>([])
-  const [paymentFailures, setPaymentFailures] = useState<PaymentFailure[]>([])
-  const [cartAbandoned, setCartAbandoned] = useState<CartAbandoned[]>([])
+  interface HotmartCancellation { id: string; name: string | null; email: string | null; cancelled_at: string | null; amount: number; cancel_type: string | null; paid_cancel: boolean | null; trial_cancel: boolean | null; converted_after: boolean; _is_failure?: boolean; _failure_id?: string }
+  interface HotmartCart { id: string; email: string; name: string | null; phone: string | null; product: string | null; abandoned_at: string; recovered: boolean; purchased_after: boolean }
+  interface HotmartRecovery { rate: number; converted: number; total: number }
+  const [hotmartTrials, setHotmartTrials] = useState(0)
+  const [hotmartCancellations, setHotmartCancellations] = useState<HotmartCancellation[]>([])
+  const [hotmartFailures, setHotmartFailures] = useState<HotmartCancellation[]>([])
+  const [hotmartCart, setHotmartCart] = useState<HotmartCart[]>([])
+  const [hotmartRecovery, setHotmartRecovery] = useState<HotmartRecovery>({ rate: 0, converted: 0, total: 0 })
   const [hotmartLoading, setHotmartLoading] = useState(false)
+  const [hotmartCancelPage, setHotmartCancelPage] = useState(0)
+  const [hotmartCartPage, setHotmartCartPage] = useState(0)
+  const HOTMART_PAGE_SIZE = 20
 
   const fetchHotmartData = useCallback(async () => {
     setHotmartLoading(true)
@@ -1754,31 +1757,19 @@ export default function SpcPage() {
       const res = await fetch('/api/spc/hotmart-activity')
       if (res.ok) {
         const data = await res.json()
-        setHotmartKpis(data.kpis)
-        setWebhookLogs(data.webhook_logs)
-        setPaymentFailures(data.payment_failures)
-        setCartAbandoned(data.cart_abandoned)
+        setHotmartTrials(data.trials_hotmart)
+        setHotmartCancellations(data.cancellations)
+        setHotmartFailures(data.failures)
+        setHotmartCart(data.cart_abandoned)
+        setHotmartRecovery(data.recovery)
       }
     } catch { /* non-critical */ }
     setHotmartLoading(false)
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'hotmart') fetchHotmartData()
+    if (activeTab === 'overview') fetchHotmartData()
   }, [activeTab, fetchHotmartData])
-
-  async function handleResolveFailure(id: string) {
-    const res = await fetch('/api/spc/hotmart-activity', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'resolve_failure', id }),
-    })
-    if (res.ok) {
-      setPaymentFailures(prev => prev.filter(f => f.id !== id))
-      setHotmartKpis(prev => ({ ...prev, failed_payments: prev.failed_payments - 1 }))
-      toast.success('Payment failure resolved')
-    }
-  }
 
   async function handleRecoverCart(id: string) {
     const res = await fetch('/api/spc/hotmart-activity', {
@@ -1787,8 +1778,8 @@ export default function SpcPage() {
       body: JSON.stringify({ type: 'recover_cart', id }),
     })
     if (res.ok) {
-      setCartAbandoned(prev => prev.filter(c => c.id !== id))
-      toast.success('Cart marked as recovered')
+      setHotmartCart(prev => prev.map(c => c.id === id ? { ...c, recovered: true } : c))
+      toast.success('Carrito marcado como recuperado')
     }
   }
 
@@ -2691,7 +2682,6 @@ export default function SpcPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
-    { key: 'hotmart', label: 'Hotmart Activity' },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
     { key: 'expired', label: `Expired${!loading ? ` (${expiredMembers.length})` : ''}` },
     { key: 'cancellations', label: `Cancellations${!loading ? ` (${cancellations.length})` : ''}` },
@@ -3320,6 +3310,250 @@ export default function SpcPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* ── HOTMART ACTIVITY SECTION ───────────────────────────────── */}
+            <div className="relative pt-2">
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#ffbd59]/40 to-transparent" />
+              <div className="flex items-center gap-2 mb-4 pt-4">
+                <span className="text-lg">🔥</span>
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Hotmart Activity</h3>
+              </div>
+
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                {(() => {
+                  const hotmartPaidCancels = hotmartCancellations.filter(c => c.paid_cancel && inGrowthPeriod(c.cancelled_at)).length
+                  const hotmartRefunds = hotmartCancellations.filter(c => c.cancel_type === 'refund' && inGrowthPeriod(c.cancelled_at)).length
+                  const hotmartAbandonedUnrecovered = hotmartCart.filter(c => !c.recovered).length
+                  return [
+                    { label: 'Trials Activos', value: hotmartTrials, color: 'text-[#89bcef]' },
+                    { label: 'Compras Canceladas', value: hotmartPaidCancels, color: 'text-red-600 dark:text-red-400' },
+                    { label: 'Carritos Abandonados', value: hotmartAbandonedUnrecovered, color: 'text-[#ffbd59]' },
+                    { label: 'Reembolsos', value: hotmartRefunds, color: 'text-orange-500 dark:text-orange-400' },
+                  ]
+                })().map(({ label, value, color }) => (
+                  <Card key={label}>
+                    <CardContent className="pt-5 pb-4">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">{label}</p>
+                      {hotmartLoading ? (
+                        <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                      ) : (
+                        <p className={`text-2xl font-semibold ${color}`}>{value}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Recovery Rate */}
+              <Card className="mb-4 border-[#b9d496]/30">
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">Tasa de Recuperación</p>
+                  {hotmartLoading ? (
+                    <div className="h-12 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ) : (
+                    <div className="flex items-baseline gap-3">
+                      <p className="text-3xl font-bold text-[#3B6D11]">{hotmartRecovery.rate}%</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {hotmartRecovery.total} cancelados/abandonados → {hotmartRecovery.converted} convirtieron después
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Two side-by-side tables */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* LEFT — Compras Canceladas & Fallidas */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Compras Canceladas & Fallidas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {hotmartLoading ? (
+                      <div className="p-6 space-y-2">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="h-8 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                        ))}
+                      </div>
+                    ) : (() => {
+                      const combined = [...hotmartCancellations, ...hotmartFailures]
+                        .sort((a, b) => (b.cancelled_at ?? '').localeCompare(a.cancelled_at ?? ''))
+                      const totalPages = Math.ceil(combined.length / HOTMART_PAGE_SIZE)
+                      const paged = combined.slice(hotmartCancelPage * HOTMART_PAGE_SIZE, (hotmartCancelPage + 1) * HOTMART_PAGE_SIZE)
+                      return combined.length === 0 ? (
+                        <EmptyState title="Sin cancelaciones" description="Las cancelaciones de Hotmart aparecerán aquí." />
+                      ) : (
+                        <>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Email</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead className="hidden md:table-cell">Amount</TableHead>
+                                  <TableHead>¿Convirtió?</TableHead>
+                                </AnimatedTableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {paged.map((c, i) => {
+                                  const typeLabel = c.cancel_type === 'refund' ? 'Refund' : c.cancel_type === 'payment_failed' ? 'Failed' : 'Cancelled'
+                                  const typeColor = c.cancel_type === 'refund'
+                                    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                                    : c.cancel_type === 'payment_failed'
+                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                  return (
+                                    <AnimatedTableRow
+                                      key={c.id}
+                                      variants={rowVariants}
+                                      initial="hidden"
+                                      animate="visible"
+                                      custom={i}
+                                      className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                                    >
+                                      <TableCell className="text-xs font-medium">{c.name || '—'}</TableCell>
+                                      <TableCell className="text-xs text-zinc-500 max-w-[140px] truncate">{c.email || '—'}</TableCell>
+                                      <TableCell>
+                                        <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold', typeColor)}>{typeLabel}</span>
+                                      </TableCell>
+                                      <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{c.cancelled_at ? relativeTime(c.cancelled_at) : '—'}</TableCell>
+                                      <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.amount ? `$${c.amount}` : '—'}</TableCell>
+                                      <TableCell>
+                                        {c.converted_after
+                                          ? <span className="text-xs font-semibold text-green-600 dark:text-green-400">✓ Sí</span>
+                                          : <span className="text-xs text-zinc-400">No</span>}
+                                      </TableCell>
+                                    </AnimatedTableRow>
+                                  )
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-between px-4 py-2 border-t border-zinc-100 dark:border-zinc-800">
+                              <button
+                                onClick={() => setHotmartCancelPage(p => Math.max(0, p - 1))}
+                                disabled={hotmartCancelPage === 0}
+                                className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 disabled:opacity-30 transition-colors"
+                              >
+                                ← Prev
+                              </button>
+                              <span className="text-[10px] text-zinc-400">{hotmartCancelPage + 1} / {totalPages}</span>
+                              <button
+                                onClick={() => setHotmartCancelPage(p => Math.min(totalPages - 1, p + 1))}
+                                disabled={hotmartCancelPage >= totalPages - 1}
+                                className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 disabled:opacity-30 transition-colors"
+                              >
+                                Next →
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* RIGHT — Carritos Abandonados */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Carritos Abandonados</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {hotmartLoading ? (
+                      <div className="p-6 space-y-2">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="h-8 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                        ))}
+                      </div>
+                    ) : (() => {
+                      const sorted = [...hotmartCart].sort((a, b) => (b.abandoned_at ?? '').localeCompare(a.abandoned_at ?? ''))
+                      const totalPages = Math.ceil(sorted.length / HOTMART_PAGE_SIZE)
+                      const paged = sorted.slice(hotmartCartPage * HOTMART_PAGE_SIZE, (hotmartCartPage + 1) * HOTMART_PAGE_SIZE)
+                      return sorted.length === 0 ? (
+                        <EmptyState title="Sin carritos abandonados" description="Los carritos abandonados de Hotmart aparecerán aquí." />
+                      ) : (
+                        <>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Email</TableHead>
+                                  <TableHead className="hidden md:table-cell">Phone</TableHead>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead>¿Compró?</TableHead>
+                                  {isAdmin && <TableHead></TableHead>}
+                                </AnimatedTableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {paged.map((c, i) => (
+                                  <AnimatedTableRow
+                                    key={c.id}
+                                    variants={rowVariants}
+                                    initial="hidden"
+                                    animate="visible"
+                                    custom={i}
+                                    className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
+                                  >
+                                    <TableCell className="text-xs font-medium">{c.name || '—'}</TableCell>
+                                    <TableCell className="text-xs text-zinc-500 max-w-[140px] truncate">{c.email}</TableCell>
+                                    <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.phone || '—'}</TableCell>
+                                    <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{relativeTime(c.abandoned_at)}</TableCell>
+                                    <TableCell>
+                                      {c.purchased_after
+                                        ? <span className="text-xs font-semibold text-green-600 dark:text-green-400">✓ Sí</span>
+                                        : <span className="text-xs text-zinc-400">No</span>}
+                                    </TableCell>
+                                    {isAdmin && (
+                                      <TableCell>
+                                        {!c.recovered && (
+                                          <button
+                                            onClick={() => handleRecoverCart(c.id)}
+                                            className="text-[10px] px-2 py-0.5 rounded bg-[#89bcef]/20 text-[#89bcef] hover:bg-[#89bcef]/30 font-medium transition-colors whitespace-nowrap"
+                                          >
+                                            Recuperado
+                                          </button>
+                                        )}
+                                        {c.recovered && (
+                                          <span className="text-[10px] text-green-500 font-medium">✓</span>
+                                        )}
+                                      </TableCell>
+                                    )}
+                                  </AnimatedTableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-between px-4 py-2 border-t border-zinc-100 dark:border-zinc-800">
+                              <button
+                                onClick={() => setHotmartCartPage(p => Math.max(0, p - 1))}
+                                disabled={hotmartCartPage === 0}
+                                className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 disabled:opacity-30 transition-colors"
+                              >
+                                ← Prev
+                              </button>
+                              <span className="text-[10px] text-zinc-400">{hotmartCartPage + 1} / {totalPages}</span>
+                              <button
+                                onClick={() => setHotmartCartPage(p => Math.min(totalPages - 1, p + 1))}
+                                disabled={hotmartCartPage >= totalPages - 1}
+                                className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 disabled:opacity-30 transition-colors"
+                              >
+                                Next →
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         )}
 
@@ -3539,214 +3773,6 @@ export default function SpcPage() {
               )}
             </CardContent>
           </Card>
-          </div>
-        )}
-
-        {/* ── HOTMART ACTIVITY ─────────────────────────────────────────── */}
-        {activeTab === 'hotmart' && (
-          <div className="space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              {[
-                { label: 'Active from Hotmart', value: hotmartKpis.active_hotmart, color: 'text-green-600 dark:text-green-400' },
-                { label: 'Trials from Hotmart', value: hotmartKpis.trials_hotmart, color: 'text-blue-600 dark:text-blue-400' },
-                { label: 'Trials expiring in 7d', value: hotmartKpis.trials_expiring_7d, color: 'text-amber-600 dark:text-amber-400' },
-                { label: 'Failed payments', value: hotmartKpis.failed_payments, color: 'text-red-600 dark:text-red-400' },
-                { label: 'Cancelled this month', value: hotmartKpis.cancelled_this_month, color: 'text-red-600 dark:text-red-400' },
-              ].map(({ label, value, color }) => (
-                <Card key={label}>
-                  <CardContent className="pt-5 pb-4">
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium uppercase tracking-wide">{label}</p>
-                    {hotmartLoading ? (
-                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
-                    ) : (
-                      <p className={`text-2xl font-semibold ${color}`}>{value}</p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Recent webhook activity feed */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold">Recent Webhook Activity</CardTitle>
-                  <button
-                    onClick={fetchHotmartData}
-                    className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
-                  >
-                    ↻ Refresh
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {hotmartLoading ? (
-                  <div className="p-6 space-y-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
-                    ))}
-                  </div>
-                ) : webhookLogs.length === 0 ? (
-                  <EmptyState title="No webhook activity" description="Webhook events from Hotmart will appear here." />
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Event</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Time</TableHead>
-                          <TableHead>Status</TableHead>
-                        </AnimatedTableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {webhookLogs.map((log, i) => {
-                          const eventColors: Record<string, string> = {
-                            PURCHASE_APPROVED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-                            PURCHASE_CANCELED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-                            SUBSCRIPTION_CANCELLATION: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-                            PURCHASE_REFUNDED: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-                            PURCHASE_DELAYED: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-                            CART_ABANDONMENT: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
-                            SWITCH_PLAN: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-                          }
-                          const badgeClass = eventColors[log.event] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                          return (
-                            <AnimatedTableRow
-                              key={log.id}
-                              variants={rowVariants}
-                              initial="hidden"
-                              animate="visible"
-                              custom={i}
-                              className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
-                            >
-                              <TableCell>
-                                <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold', badgeClass)}>
-                                  {log.event}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-xs text-zinc-600 dark:text-zinc-400">{log.email || '—'}</TableCell>
-                              <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{relativeTime(log.processed_at)}</TableCell>
-                              <TableCell>
-                                <span className={cn(
-                                  'inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold',
-                                  log.status === 'success'
-                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                                )}>
-                                  {log.status}
-                                </span>
-                              </TableCell>
-                            </AnimatedTableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Failed payments table */}
-            {paymentFailures.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Failed Payments ({paymentFailures.length} unresolved)</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Failed</TableHead>
-                          <TableHead>Retries</TableHead>
-                          <TableHead></TableHead>
-                        </AnimatedTableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paymentFailures.map((f, i) => (
-                          <AnimatedTableRow
-                            key={f.id}
-                            variants={rowVariants}
-                            initial="hidden"
-                            animate="visible"
-                            custom={i}
-                            className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
-                          >
-                            <TableCell className="text-sm font-medium">{f.name || '—'}</TableCell>
-                            <TableCell className="text-xs text-zinc-500">{f.email}</TableCell>
-                            <TableCell className="text-xs font-semibold">{f.amount != null ? `$${f.amount}` : '—'}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{relativeTime(f.failed_at)}</TableCell>
-                            <TableCell className="text-xs text-zinc-500">{f.retry_count}</TableCell>
-                            <TableCell>
-                              <button
-                                onClick={() => handleResolveFailure(f.id)}
-                                className="text-xs px-2.5 py-1 rounded-md bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 font-medium transition-colors"
-                              >
-                                Mark Resolved
-                              </button>
-                            </TableCell>
-                          </AnimatedTableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Cart abandoned table */}
-            {cartAbandoned.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Cart Abandoned ({cartAbandoned.length} unrecovered)</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead className="hidden md:table-cell">Phone</TableHead>
-                          <TableHead>Abandoned</TableHead>
-                          <TableHead></TableHead>
-                        </AnimatedTableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {cartAbandoned.map((c, i) => (
-                          <AnimatedTableRow
-                            key={c.id}
-                            variants={rowVariants}
-                            initial="hidden"
-                            animate="visible"
-                            custom={i}
-                            className={i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50'}
-                          >
-                            <TableCell className="text-sm font-medium">{c.name || '—'}</TableCell>
-                            <TableCell className="text-xs text-zinc-500">{c.email}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.phone || '—'}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{relativeTime(c.abandoned_at)}</TableCell>
-                            <TableCell>
-                              <button
-                                onClick={() => handleRecoverCart(c.id)}
-                                className="text-xs px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 font-medium transition-colors"
-                              >
-                                Mark Recovered
-                              </button>
-                            </TableCell>
-                          </AnimatedTableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         )}
 
