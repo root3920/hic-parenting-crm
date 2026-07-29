@@ -1860,6 +1860,27 @@ export default function SpcPage() {
     }
   }
 
+  const [syncingHotmart, setSyncingHotmart] = useState(false)
+
+  async function handleSyncHotmart() {
+    setSyncingHotmart(true)
+    try {
+      const res = await fetch('/api/hotmart/sync', { method: 'POST' })
+      const data = await res.json()
+      if (data.error) { toast.error(`Hotmart sync failed: ${data.error}`); return }
+      toast.success(`Hotmart synced: ${data.synced} members (${data.created} new, ${data.updated} updated)`)
+      // Refresh members
+      const membersRes = await supabase.from('spc_members').select('*').order('joined_at', { ascending: false })
+      if (membersRes.data) setMembers(membersRes.data)
+      // Refresh hotmart data if on overview
+      if (activeTab === 'overview') fetchHotmartData()
+    } catch {
+      toast.error('Hotmart sync failed')
+    } finally {
+      setSyncingHotmart(false)
+    }
+  }
+
   const [zoomResult, setZoomResult] = useState<{ class_date?: string; total?: number; matched?: number; unmatched?: number; error?: string } | null>(null)
 
   // ── Member attendance (loaded per modal open) ─────────────────────────────
@@ -2747,6 +2768,15 @@ export default function SpcPage() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
               >
                 {backfillingConversions ? 'Backfilling…' : '↻ Backfill Conversions'}
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleSyncHotmart}
+                disabled={syncingHotmart}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#F04E23] hover:bg-[#d9431d] disabled:opacity-50 transition-colors"
+              >
+                {syncingHotmart ? 'Syncing…' : '🔄 Sync Hotmart'}
               </button>
             )}
             <button
