@@ -280,15 +280,40 @@ export async function POST(req: NextRequest) {
         break
       }
 
+      case 'PURCHASE_OUT_OF_SHOPPING_CART':
       case 'CART_ABANDONMENT': {
-        if (!email) break
+        // Cart abandonment payload differs from purchase events:
+        //   buyer.phone (not buyer.checkout_phone)
+        //   data.offer.code (not data.purchase.offer.code)
+        //   creation_date at top level (unix ms)
+        const cartEmail = buyer?.email
+        if (!cartEmail) break
+
+        const cartPhone = buyer?.phone || phone || null
+        const cartOffer = body.data?.offer?.code || offerCode || null
+        const hotmartEventId = body.id || null
+        const abandonedAt = body.creation_date
+          ? new Date(body.creation_date).toISOString()
+          : now.toISOString()
+
+        // Dedupe by hotmart_event_id to handle webhook retries
+        if (hotmartEventId) {
+          const { data: existing } = await supabase
+            .from('hotmart_cart_abandoned')
+            .select('id')
+            .eq('hotmart_event_id', hotmartEventId)
+            .maybeSingle()
+          if (existing) break
+        }
 
         await supabase.from('hotmart_cart_abandoned').insert({
-          email,
+          email: cartEmail,
           name: name || null,
-          phone: phone || null,
+          phone: cartPhone,
           product: product?.name || null,
-          offer_code: offerCode || null,
+          offer_code: cartOffer,
+          abandoned_at: abandonedAt,
+          hotmart_event_id: hotmartEventId,
           recovered: false,
         })
         break
