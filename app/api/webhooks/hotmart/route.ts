@@ -15,6 +15,19 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json()
 
+    // ── Unconditional raw log — captures ALL incoming requests ───────────
+    // Logged BEFORE auth so rejected/unrecognized payloads are never lost.
+    try {
+      await supabase.from('hotmart_webhook_logs').insert({
+        event: body?.event || 'unknown',
+        email: body?.data?.buyer?.email || null,
+        payload: body,
+        status: 'received',
+      })
+    } catch {
+      // Never let logging break the webhook
+    }
+
     // ── Auth — accept hottok from header OR body ─────────────────────────
     const token = req.headers.get('x-hotmart-hottok') || body?.hottok
     if (!token || token !== process.env.HOTMART_WEBHOOK_TOKEN) {
@@ -240,13 +253,15 @@ export async function POST(req: NextRequest) {
         break
       }
 
-      case 'CART_ABANDONMENT': {
+      case 'CART_ABANDONMENT':
+      case 'PURCHASE_OUT_OF_SHOPPING_CART': {
         if (!email) break
 
         await supabase.from('hotmart_cart_abandoned').insert({
           email,
           name: name || null,
           phone: phone || null,
+          country: buyer?.address?.country || null,
           product: product?.name || null,
           offer_code: offerCode || null,
           recovered: false,
@@ -271,12 +286,12 @@ export async function POST(req: NextRequest) {
         console.log(`[Hotmart Webhook] Unhandled event: ${event}`)
     }
 
-    // ── Log every event ───────────────────────────────────────────────────
+    // ── Log processed result ────────────────────────────────────────────
     await supabase.from('hotmart_webhook_logs').insert({
       event: event || 'unknown',
       email: email || null,
       payload: body,
-      status: 'success',
+      status: 'processed',
     })
 
     return ok()
