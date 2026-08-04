@@ -9,23 +9,50 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
+  // ── Step 0: Unconditional raw capture ─────────────────────────────────
+  // Runs BEFORE json parsing, auth, or any filtering.
+  // Captures headers + raw text so nothing is ever silently lost.
+  let rawText: string | undefined
   let body: any
   let email: string | undefined
 
   try {
-    body = await req.json()
+    rawText = await req.text()
+  } catch {
+    rawText = undefined
+  }
 
-    // ── Unconditional raw log — captures ALL incoming requests ───────────
-    // Logged BEFORE auth so rejected/unrecognized payloads are never lost.
-    try {
-      await supabase.from('hotmart_webhook_logs').insert({
-        event: body?.event || 'unknown',
-        email: body?.data?.buyer?.email || null,
-        payload: body,
-        status: 'received',
-      })
-    } catch {
-      // Never let logging break the webhook
+  try {
+    body = rawText ? JSON.parse(rawText) : undefined
+  } catch {
+    body = undefined
+  }
+
+  const incomingHeaders: Record<string, string> = {}
+  req.headers.forEach((value, key) => {
+    incomingHeaders[key] = value
+  })
+
+  try {
+    await supabase.from('hotmart_webhook_logs').insert({
+      event: body?.event || 'raw_capture',
+      email: body?.data?.buyer?.email || null,
+      payload: {
+        _raw_capture: true,
+        headers: incomingHeaders,
+        body_parsed: body || null,
+        body_raw: body ? undefined : rawText?.slice(0, 4000),
+        parse_ok: body !== undefined,
+      },
+      status: 'received',
+    })
+  } catch {
+    // Never let logging break the webhook
+  }
+
+  try {
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
     }
 
     // ── Auth — accept hottok from header OR body ─────────────────────────
@@ -253,15 +280,13 @@ export async function POST(req: NextRequest) {
         break
       }
 
-      case 'CART_ABANDONMENT':
-      case 'PURCHASE_OUT_OF_SHOPPING_CART': {
+      case 'CART_ABANDONMENT': {
         if (!email) break
 
         await supabase.from('hotmart_cart_abandoned').insert({
           email,
           name: name || null,
           phone: phone || null,
-          country: buyer?.address?.country || null,
           product: product?.name || null,
           offer_code: offerCode || null,
           recovered: false,
