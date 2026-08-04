@@ -291,31 +291,42 @@ export async function POST(req: NextRequest) {
 
         const cartPhone = buyer?.phone || phone || null
         const cartOffer = body.data?.offer?.code || offerCode || null
-        const hotmartEventId = body.id || null
         const abandonedAt = body.creation_date
           ? new Date(body.creation_date).toISOString()
           : now.toISOString()
 
-        // Dedupe by hotmart_event_id to handle webhook retries
-        if (hotmartEventId) {
-          const { data: existing } = await supabase
-            .from('hotmart_cart_abandoned')
-            .select('id')
-            .eq('hotmart_event_id', hotmartEventId)
-            .maybeSingle()
-          if (existing) break
-        }
+        // Dedupe: skip if same email abandoned within the last 60 seconds
+        const dedupeWindow = new Date(new Date(abandonedAt).getTime() - 60_000).toISOString()
+        const { data: recentDup } = await supabase
+          .from('hotmart_cart_abandoned')
+          .select('id')
+          .eq('email', cartEmail)
+          .gte('abandoned_at', dedupeWindow)
+          .maybeSingle()
+        if (recentDup) break
 
-        await supabase.from('hotmart_cart_abandoned').insert({
+        const { error: cartError } = await supabase.from('hotmart_cart_abandoned').insert({
           email: cartEmail,
           name: name || null,
           phone: cartPhone,
           product: product?.name || null,
           offer_code: cartOffer,
           abandoned_at: abandonedAt,
-          hotmart_event_id: hotmartEventId,
           recovered: false,
         })
+
+        if (cartError) {
+          console.error('[Hotmart Webhook] Cart insert failed:', cartError.message)
+          // Log failure explicitly — don't let it appear as success
+          await supabase.from('hotmart_webhook_logs').insert({
+            event,
+            email: cartEmail,
+            payload: body,
+            status: 'error',
+            error_message: `Cart insert failed: ${cartError.message}`,
+          })
+          return ok()
+        }
         break
       }
 
