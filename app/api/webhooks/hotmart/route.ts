@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   try {
     await supabase.from('hotmart_webhook_logs').insert({
       event: body?.event || 'raw_capture',
-      email: body?.data?.buyer?.email || null,
+      email: body?.data?.buyer?.email || body?.data?.subscriber?.email || null,
       payload: {
         _raw_capture: true,
         headers: incomingHeaders,
@@ -256,12 +256,11 @@ export async function POST(req: NextRequest) {
         break
       }
 
-      case 'PURCHASE_CANCELED':
-      case 'SUBSCRIPTION_CANCELLATION': {
+      case 'PURCHASE_CANCELED': {
         if (!email) break
 
         // Get current member state before updating
-        const { data: member } = await supabase
+        const { data: cancelMember } = await supabase
           .from('spc_members')
           .select('status, amount')
           .eq('email', email)
@@ -276,11 +275,80 @@ export async function POST(req: NextRequest) {
           name: name || 'Unknown',
           email,
           cancelled_at: now.toISOString(),
-          paid_cancel: (member?.amount ?? 0) > 0,
-          trial_cancel: member?.status === 'trial',
+          paid_cancel: (cancelMember?.amount ?? 0) > 0,
+          trial_cancel: cancelMember?.status === 'trial',
           provider: 'Hotmart',
           cancel_type: 'requested',
         })
+        break
+      }
+
+      case 'SUBSCRIPTION_CANCELLATION': {
+        // Payload uses data.subscriber (not data.buyer)
+        const subscriber = body.data?.subscriber
+        const subEmail = (subscriber?.email || email || '')?.toLowerCase()?.trim()
+        const subName = subscriber?.name || name
+
+        if (!subEmail) break
+
+        const cancellationDateMs = body.data?.cancellation_date
+        const cancelledAt = cancellationDateMs
+          ? new Date(cancellationDateMs).toISOString()
+          : now.toISOString()
+
+        // Look up current member state (case-insensitive)
+        const { data: subMember } = await supabase
+          .from('spc_members')
+          .select('status, amount')
+          .ilike('email', subEmail)
+          .maybeSingle()
+
+        if (!subMember) {
+          // No member found — nothing to cancel, skip silently
+          break
+        }
+
+        const { error: subCancelError } = await supabase
+          .from('spc_members')
+          .update({ status: 'cancelled' })
+          .ilike('email', subEmail)
+
+        if (subCancelError) {
+          console.error('[Hotmart Webhook] spc_members subscription cancel failed:', subCancelError.message)
+          await supabase.from('hotmart_webhook_logs').insert({
+            event,
+            email: subEmail,
+            payload: body,
+            status: 'error',
+            error_message: `spc_members subscription cancel failed: ${subCancelError.message}`,
+          })
+          return ok()
+        }
+
+        const { error: subCancelInsertError } = await supabase.from('spc_cancellations').insert({
+          name: subName || 'Unknown',
+          email: subEmail,
+          cancelled_at: cancelledAt,
+          paid_cancel: subMember.status !== 'trial' && (subMember.amount ?? 0) > 0,
+          trial_cancel: subMember.status === 'trial',
+          provider: 'Hotmart',
+          cancel_type: 'requested',
+        })
+
+        if (subCancelInsertError) {
+          console.error('[Hotmart Webhook] spc_cancellations insert failed:', subCancelInsertError.message)
+          await supabase.from('hotmart_webhook_logs').insert({
+            event,
+            email: subEmail,
+            payload: body,
+            status: 'error',
+            error_message: `spc_cancellations insert failed: ${subCancelInsertError.message}`,
+          })
+          return ok()
+        }
+
+        // Override email for the processed log at the bottom
+        email = subEmail
         break
       }
 
@@ -400,7 +468,7 @@ export async function POST(req: NextRequest) {
     try {
       await supabase.from('hotmart_webhook_logs').insert({
         event: body?.event || 'unknown',
-        email: email || body?.data?.buyer?.email || null,
+        email: email || body?.data?.buyer?.email || body?.data?.subscriber?.email || null,
         payload: body || null,
         status: 'error',
         error_message: err?.message || 'Unknown error',
