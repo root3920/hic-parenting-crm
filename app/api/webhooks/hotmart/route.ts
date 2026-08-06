@@ -296,38 +296,56 @@ export async function POST(req: NextRequest) {
           ? new Date(cancellationDateMs).toISOString()
           : now.toISOString()
 
-        // Look up current member state (case-insensitive)
-        const { data: subMember } = await supabase
+        // Look up current member state (case-insensitive) — capture error too
+        const { data: subMember, error: subLookupError } = await supabase
           .from('spc_members')
-          .select('status, amount')
+          .select('id, status, amount, email')
           .ilike('email', subEmail)
           .maybeSingle()
 
-        if (!subMember) {
-          // No member found — nothing to cancel, skip silently
-          break
-        }
-
-        const { error: subCancelError } = await supabase
-          .from('spc_members')
-          .update({ status: 'cancelled' })
-          .ilike('email', subEmail)
-
-        if (subCancelError) {
-          console.error('[Hotmart Webhook] spc_members subscription cancel failed:', subCancelError.message)
+        if (subLookupError) {
+          console.error('[Hotmart Webhook] spc_members lookup failed:', subLookupError.message)
           await supabase.from('hotmart_webhook_logs').insert({
             event,
             email: subEmail,
             payload: body,
             status: 'error',
-            error_message: `spc_members subscription cancel failed: ${subCancelError.message}`,
+            error_message: `spc_members lookup failed: ${subLookupError.message}`,
+          })
+          return ok()
+        }
+
+        if (!subMember) {
+          // No member found — log explicitly so it's visible, not buried as "processed"
+          console.log(`[Hotmart Webhook] SUBSCRIPTION_CANCELLATION: no spc_members row for ${subEmail}`)
+          email = subEmail
+          break
+        }
+
+        // Update using the member's id — unambiguous, avoids any email-matching issues
+        const { data: updatedRow, error: subCancelError } = await supabase
+          .from('spc_members')
+          .update({ status: 'cancelled' })
+          .eq('id', subMember.id)
+          .select('id, status')
+          .maybeSingle()
+
+        if (subCancelError || !updatedRow) {
+          const errMsg = subCancelError?.message || `update matched 0 rows for id=${subMember.id} email=${subEmail}`
+          console.error('[Hotmart Webhook] spc_members subscription cancel failed:', errMsg)
+          await supabase.from('hotmart_webhook_logs').insert({
+            event,
+            email: subEmail,
+            payload: body,
+            status: 'error',
+            error_message: `spc_members subscription cancel failed: ${errMsg}`,
           })
           return ok()
         }
 
         const { error: subCancelInsertError } = await supabase.from('spc_cancellations').insert({
           name: subName || 'Unknown',
-          email: subEmail,
+          email: subMember.email,
           cancelled_at: cancelledAt,
           paid_cancel: subMember.status !== 'trial' && (subMember.amount ?? 0) > 0,
           trial_cancel: subMember.status === 'trial',
