@@ -100,7 +100,8 @@ export async function POST(req: NextRequest) {
 
     // ── Event handlers ────────────────────────────────────────────────────
     switch (event) {
-      case 'PURCHASE_APPROVED': {
+      case 'PURCHASE_APPROVED':
+      case 'PURCHASE_COMPLETE': {
         if (!email) break
 
         const dateStr = approvedDate
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
           const trialEnd = new Date(joinedAt)
           trialEnd.setDate(trialEnd.getDate() + 30)
 
-          await supabase.from('spc_members').upsert(
+          const { error: trialUpsertError } = await supabase.from('spc_members').upsert(
             {
               email,
               name: name || 'Unknown',
@@ -129,6 +130,18 @@ export async function POST(req: NextRequest) {
             },
             { onConflict: 'email' }
           )
+
+          if (trialUpsertError) {
+            console.error('[Hotmart Webhook] spc_members trial upsert failed:', trialUpsertError.message)
+            await supabase.from('hotmart_webhook_logs').insert({
+              event,
+              email,
+              payload: body,
+              status: 'error',
+              error_message: `spc_members trial upsert failed: ${trialUpsertError.message}`,
+            })
+            return ok()
+          }
 
           await supabase.from('transactions').insert({
             date: dateStr,
@@ -158,7 +171,7 @@ export async function POST(req: NextRequest) {
 
           const convertedFromTrial = existing?.status === 'trial'
 
-          await supabase.from('spc_members').upsert(
+          const { error: paidUpsertError } = await supabase.from('spc_members').upsert(
             {
               email,
               name: name || 'Unknown',
@@ -175,6 +188,18 @@ export async function POST(req: NextRequest) {
             },
             { onConflict: 'email' }
           )
+
+          if (paidUpsertError) {
+            console.error('[Hotmart Webhook] spc_members paid upsert failed:', paidUpsertError.message)
+            await supabase.from('hotmart_webhook_logs').insert({
+              event,
+              email,
+              payload: body,
+              status: 'error',
+              error_message: `spc_members paid upsert failed: ${paidUpsertError.message}`,
+            })
+            return ok()
+          }
 
           await supabase.from('transactions').insert({
             date: dateStr,
@@ -194,13 +219,25 @@ export async function POST(req: NextRequest) {
           const nextPayment = new Date(now)
           nextPayment.setDate(nextPayment.getDate() + 30)
 
-          await supabase
+          const { error: renewalError } = await supabase
             .from('spc_members')
             .update({
               next_payment_date: nextPayment.toISOString().slice(0, 10),
               status: 'active',
             })
             .eq('email', email)
+
+          if (renewalError) {
+            console.error('[Hotmart Webhook] spc_members renewal update failed:', renewalError.message)
+            await supabase.from('hotmart_webhook_logs').insert({
+              event,
+              email,
+              payload: body,
+              status: 'error',
+              error_message: `spc_members renewal update failed: ${renewalError.message}`,
+            })
+            return ok()
+          }
 
           await supabase.from('transactions').insert({
             date: dateStr,
