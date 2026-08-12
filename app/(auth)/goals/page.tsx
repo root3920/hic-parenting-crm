@@ -65,7 +65,7 @@ export default function GoalsPage() {
   }, [fromDate, toDate])
 
   const caliReports = useMemo(() => closerReports.filter(r => r.closer_name === 'Cali Luna'), [closerReports])
-  const marcelaReports = useMemo(() => closerReports.filter(r => r.closer_name === 'Marcela HIC Parenting'), [closerReports])
+  const marcelaReports = useMemo(() => closerReports.filter(r => r.closer_name === 'Marcela Collier'), [closerReports])
 
   function computeCloserKPIs(reps: CloserReport[], weeks: number) {
     const m = reps.reduce((s, r) => s + r.total_meetings, 0)
@@ -124,7 +124,7 @@ export default function GoalsPage() {
       const qualified = sr.reduce((s, r) => s + r.qualified_calls, 0)
 
       const cali = closerReports.filter(r => r.closer_name === 'Cali Luna' && r.date >= pStart && r.date <= pEnd)
-      const marcela = closerReports.filter(r => r.closer_name === 'Marcela HIC Parenting' && r.date >= pStart && r.date <= pEnd)
+      const marcela = closerReports.filter(r => r.closer_name === 'Marcela Collier' && r.date >= pStart && r.date <= pEnd)
 
       const cM = cali.reduce((s, r) => s + r.total_meetings, 0)
       const cSh = cali.reduce((s, r) => s + r.showed_meetings, 0)
@@ -367,7 +367,7 @@ export default function GoalsPage() {
                         Trend Cali
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-                        Marcela HIC
+                        Marcela Collier
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide hidden md:table-cell">
                         Trend Marcela

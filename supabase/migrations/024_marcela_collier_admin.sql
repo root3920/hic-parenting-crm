@@ -1,11 +1,15 @@
--- Grant Marcela Collier full admin access while keeping her visible
--- in both Setting Team and Closing Team reports/dropdowns.
--- Her closer_name and setter_name fields ensure she appears in report
--- form dropdowns even though her role is no longer 'setter' or 'closer'.
+-- Fix Marcela Collier's profile: grant admin access and populate both
+-- setter_name and closer_name so she appears in both team report dropdowns.
+-- Also unify historical closer_daily_reports from "Marcela HIC Parenting"
+-- to "Marcela Collier" to keep data consistent with her canonical name.
 
+-- 1. Update her profile (role is already 'admin' per Settings page)
 UPDATE profiles
-SET role        = 'admin',
-    closer_name = 'Marcela Collier',
-    setter_name = 'Marcela Collier'
-WHERE full_name ILIKE '%marcela%collier%'
-   OR full_name ILIKE '%marcela%hic%';
+SET setter_name = 'Marcela Collier',
+    closer_name = 'Marcela Collier'
+WHERE id = 'af33ea41-a1a5-4a9a-8692-21c45a5bd90c';
+
+-- 2. Rename historical closer reports so her data isn't split across two names
+UPDATE closer_daily_reports
+SET closer_name = 'Marcela Collier'
+WHERE closer_name = 'Marcela HIC Parenting';
