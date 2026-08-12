@@ -10,6 +10,20 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const role = searchParams.get('role')
 
+  if (role === 'setter' || role === 'closer') {
+    // Include profiles with the requested role AND admin profiles that have
+    // the corresponding name field populated (e.g. admins acting as setters/closers)
+    const nameCol = role === 'setter' ? 'setter_name' : 'closer_name'
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .or(`role.eq.${role},and(role.eq.admin,${nameCol}.not.is.null)`)
+      .order('created_at', { ascending: true })
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ profiles: data })
+  }
+
   let query = supabaseAdmin
     .from('profiles')
     .select('*')
