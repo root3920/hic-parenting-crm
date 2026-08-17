@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
+import { getCanonicalProduct } from '@/lib/products'
 
 function getServiceClient() {
   return createClient(
@@ -53,23 +54,23 @@ export async function GET() {
     if (student?.email) emailSet.add(student.email.toLowerCase())
   }
 
-  // 3. Fetch completed PWU transactions for those emails
-  //    We fetch all matching rows and filter per-student in code because
-  //    each student has a different amount_per_installment and start_date.
+  // 3. Fetch completed transactions for those emails and filter to PWU in code
+  //    using getCanonicalProduct (same logic the student detail modal uses)
+  //    so both views always agree on "installments paid".
   let txRows: { buyer_email: string; cost: number; date: string }[] = []
   if (emailSet.size > 0) {
     const { data, error: txError } = await supabase
       .from('transactions')
-      .select('buyer_email, cost, date')
+      .select('buyer_email, cost, date, offer_title')
       .in('buyer_email', Array.from(emailSet))
-      .ilike('offer_title', '%Parenting With Understanding%')
       .eq('status', 'completed')
 
     if (txError) {
       return NextResponse.json({ error: txError.message }, { status: 500 })
     }
 
-    txRows = (data ?? []) as typeof txRows
+    txRows = ((data ?? []) as { buyer_email: string; cost: number; date: string; offer_title: string }[])
+      .filter((tx) => getCanonicalProduct(tx.offer_title).startsWith('Parenting With Understanding'))
   }
 
   // 4. Build per-student data

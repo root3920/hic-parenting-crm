@@ -533,7 +533,15 @@ function StudentProfileModal({
     .filter((s) => s.status === 'scheduled' && new Date(s.session_date) >= now && s.id !== nextSession?.id)
     .sort((a, b) => new Date(a.session_date).getTime() - new Date(b.session_date).getTime())
 
-  const paidCount = transactions.filter((t) => t.status === 'completed').length
+  // Count installments paid using the same logic as the Payment Plans summary table:
+  // completed PWU transactions matching installment amount and on/after plan start date.
+  const paidCount = paymentPlan
+    ? transactions.filter((t) =>
+        t.status === 'completed' &&
+        Number(t.cost) === paymentPlan.amount_per_installment &&
+        t.date >= paymentPlan.start_date
+      ).length
+    : transactions.filter((t) => t.status === 'completed').length
   const remaining = paymentPlan ? Math.max(0, paymentPlan.total_installments - paidCount) : 0
   const progressPct = paymentPlan && paymentPlan.total_installments > 0
     ? Math.min(100, Math.round((paidCount / paymentPlan.total_installments) * 100))
