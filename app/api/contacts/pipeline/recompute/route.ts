@@ -124,15 +124,6 @@ export async function POST(req: NextRequest) {
       .map((m) => m.email?.toLowerCase())
       .filter(Boolean),
   )
-  // Cancelled/expired SPC members must NOT land in stage 3 even if they have
-  // SPC product transactions (the membership ended, so the tx-based mid_ticket
-  // classification should not keep them in the SPC stage).
-  const cancelledSpcEmails = new Set(
-    spcMembers
-      .filter((m) => m.status !== 'active' && m.status !== 'trial')
-      .map((m) => m.email?.toLowerCase())
-      .filter(Boolean),
-  )
   const manualOverrideMap = new Map<string, number>()
   for (const m of manualOverrides) {
     if (m.manual_override && m.buyer_email) {
@@ -174,8 +165,10 @@ export async function POST(req: NextRequest) {
 
     if (tier) {
       // Classified by pattern
+      // mid_ticket (SPC) transactions are treated as low_ticket for stage computation —
+      // stage 3 is now solely determined by spc_members.status, not transaction titles.
       if (tier === 'high_ticket') stage = 5
-      else if (tier === 'mid_ticket') stage = 3
+      else if (tier === 'mid_ticket') stage = 2
       else if (tier === 'low_ticket') stage = 2
       else if (tier === 'freebie') stage = 1
     } else if (cost === 0) {
@@ -253,10 +246,9 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // Stage 3: SPC / Mid Ticket — only active/trial SPC members.
-    // Contacts with cancelled/expired SPC memberships are excluded even if they have
-    // SPC product transactions (txStage >= 3) — they fall through to stage 2/1.
-    if ((txStage >= 3 || spcEmails.has(email)) && !cancelledSpcEmails.has(email)) {
+    // Stage 3: SPC / Mid Ticket — solely determined by spc_members.status in ('active','trial').
+    // Transaction titles alone do not qualify; spc_members is the source of truth.
+    if (spcEmails.has(email)) {
       stageCounts[3]++
       results.push({ buyer_email: email, current_stage: 3, manual_override: false })
       continue
