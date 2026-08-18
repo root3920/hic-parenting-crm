@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Loader2, RefreshCw, Users, Lock, Search, Filter } from 'lucide-react'
+import { Loader2, RefreshCw, Users, Lock, Search, Filter, UserCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProfile } from '@/hooks/useProfile'
 import { useTeamMembers } from '@/hooks/useTeamMembers'
@@ -281,30 +281,38 @@ export function PipelineKanban() {
                                 {leadCfg.label.split(' ')[0]}
                               </span>
                             )}
-                            {/* Setter initials */}
-                            {contact.setter_assigned && (
-                              <span
-                                className="text-[9px] font-bold px-1 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
-                                title={contact.setter_assigned}
-                              >
-                                {getSetterInitials(contact.setter_assigned)}
-                              </span>
-                            )}
                             {contact.manual_override && (
                               <span title="Manually assigned"><Lock className="h-3 w-3 text-zinc-300 dark:text-zinc-600 shrink-0" /></span>
                             )}
                           </div>
                         </div>
-                        {/* Highest product badge */}
-                        {contact.highest_product && (
-                          <p
-                            className="mt-1 ml-8 text-[9px] text-zinc-400 truncate"
-                            title={contact.highest_product}
-                          >
-                            <span className="font-semibold text-zinc-500 dark:text-zinc-400">⬆</span>{' '}
-                            {shortenProduct(contact.highest_product)}
-                          </p>
-                        )}
+                        {/* Info row: product + setter */}
+                        <div className="mt-1 ml-8 flex items-center gap-2 text-[9px] truncate">
+                          {contact.highest_product && (
+                            <span
+                              className="text-zinc-400 truncate"
+                              title={contact.highest_product}
+                            >
+                              <span className="font-semibold text-zinc-500 dark:text-zinc-400">&#x2B06;</span>{' '}
+                              {shortenProduct(contact.highest_product)}
+                            </span>
+                          )}
+                          {/* Setter assignment */}
+                          {contact.setter_assigned ? (
+                            <span
+                              className="inline-flex items-center gap-0.5 shrink-0 font-semibold text-blue-600 dark:text-blue-300"
+                              title={contact.setter_assigned}
+                            >
+                              <UserCircle className="h-3 w-3" />
+                              {getSetterInitials(contact.setter_assigned)}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 shrink-0 text-zinc-300 dark:text-zinc-600 italic">
+                              <UserCircle className="h-3 w-3" />
+                              —
+                            </span>
+                          )}
+                        </div>
                       </button>
                     )
                   })
