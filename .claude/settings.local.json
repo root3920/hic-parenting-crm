@@ -75,7 +75,8 @@
       "Bash(vercel:*)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); c=d.get\\(''''contact'''',{}\\); print\\(''''stage:'''', c.get\\(''''current_stage''''\\)\\); print\\(''''manual_override:'''', c.get\\(''''manual_override''''\\)\\); txs=d.get\\(''''transactions'''',[]\\); [print\\(f''''  tx: {t[\"\"offer_title\"\"]} | status: {t.get\\(\"\"status\"\"\\)} | cost: {t.get\\(\"\"cost\"\"\\)}''''\\) for t in txs]\")",
       "Bash(node:*)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''success:'''', d.get\\(''''success''''\\)\\); print\\(''''total:'''', d.get\\(''''total_contacts''''\\)\\); print\\(''''upserted:'''', d.get\\(''''upserted''''\\)\\); print\\(''''removed:'''', d.get\\(''''removed_from_pipeline''''\\)\\); sc=d.get\\(''''stage_counts'''',{}\\); [print\\(f''''  Stage {k}: {v}''''\\) for k,v in sorted\\(sc.items\\(\\)\\)]\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''success:'''', d.get\\(''''success''''\\)\\); print\\(''''total:'''', d.get\\(''''total_contacts''''\\)\\); print\\(''''upserted:'''', d.get\\(''''upserted''''\\)\\); print\\(''''removed:'''', d.get\\(''''removed_from_pipeline''''\\)\\); sc=d.get\\(''''stage_counts'''',{}\\); [print\\(f''''  Stage {k}: {v}''''\\) for k,v in sorted\\(sc.items\\(\\)\\)]\")",
+      "Bash(python3 -c \":*)"
     ]
   }
 }
