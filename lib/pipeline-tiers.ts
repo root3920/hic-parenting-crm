@@ -21,14 +21,11 @@ const EXCLUDE_PATTERNS: string[][] = [
 ]
 
 // ── High Ticket patterns (stage 5) — checked FIRST ─────────────────────────
+// Strictly: PWU/Parenting With Understanding products + Advance Mentorship
 const HIGH_TICKET_PATTERNS: string[] = [
   'parenting with understanding',
   'pwu',
   'advance mentorship',
-  '10 sessions',
-  'hic coaching',
-  'graduate package',
-  'open house',              // Open House of SPC = High Ticket prospecting event
 ]
 
 // ── Mid Ticket / SPC patterns (stage 3) — checked SECOND ───────────────────
@@ -41,6 +38,7 @@ const MID_TICKET_PATTERNS: string[] = [
 
 // ── Low Ticket patterns (stage 2) — checked THIRD ──────────────────────────
 const LOW_TICKET_PATTERNS: string[] = [
+  'open house',               // Open House of SPC = Low Ticket event, not High Ticket
   'yelling cycle',
   'break the yelling',
   'discipline without harm',

@@ -91,9 +91,10 @@ export async function POST(req: NextRequest) {
       (q) => (q as any).eq('manual_override', true),
     ),
     // Graduate transactions — any status (including refunded) qualifies for stage 6
+    // Matches: offer_title ilike '%graduate%' OR offer_title = 'Individual 10 Sessions HIC Coaching'
     fetchAll<{ buyer_email: string }>(
       svc, 'transactions', 'buyer_email',
-      (q) => (q as any).ilike('offer_title', '%graduate%'),
+      (q) => (q as any).or('offer_title.ilike.%graduate%,offer_title.eq.Individual 10 Sessions HIC Coaching'),
     ),
   ])
 
