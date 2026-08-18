@@ -149,7 +149,14 @@ export async function POST(req: NextRequest) {
 
   // ── Process transactions: classify each title, track per-email highest ──
   const emailHighestTxStage = new Map<string, PipelineTier>()
+  // Track highest-tier product title per email (for display on pipeline cards)
+  const emailHighestProduct = new Map<string, { stage: number; title: string }>()
   const unclassifiedTitles = new Map<string, number>()
+
+  // Tier rank for product tracking (original tier, not the stage-computation mapping)
+  const TIER_DISPLAY_RANK: Record<string, number> = {
+    freebie: 1, low_ticket: 2, mid_ticket: 3, high_ticket: 5,
+  }
 
   for (const tx of transactions) {
     const email = (tx.buyer_email || '').toLowerCase()
@@ -160,6 +167,15 @@ export async function POST(req: NextRequest) {
     const tier = classifyOfferTitle(title)
 
     if (tier === 'exclude') continue
+
+    // Track the highest-tier product title for card display (using original tier rank)
+    if (tier && TIER_DISPLAY_RANK[tier] > 1) {
+      const rank = TIER_DISPLAY_RANK[tier]
+      const current = emailHighestProduct.get(email)
+      if (!current || rank > current.stage) {
+        emailHighestProduct.set(email, { stage: rank, title })
+      }
+    }
 
     let stage: PipelineTier | null = null
 
@@ -212,22 +228,24 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Compute final stage per contact ─────────────────────────────────────
-  const results: { buyer_email: string; current_stage: number; manual_override: boolean }[] = []
+  const results: { buyer_email: string; current_stage: number; manual_override: boolean; product_proposed: string | null }[] = []
   const stageCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
 
   for (const email of Array.from(allEmails)) {
+    const hp = emailHighestProduct.get(email)?.title ?? null
+
     // Respect manual overrides
     if (manualOverrideMap.has(email)) {
       const stage = manualOverrideMap.get(email)!
       stageCounts[stage] = (stageCounts[stage] || 0) + 1
-      results.push({ buyer_email: email, current_stage: stage, manual_override: true })
+      results.push({ buyer_email: email, current_stage: stage, manual_override: true, product_proposed: hp })
       continue
     }
 
     // Stage 6: Graduate (highest, always wins) — requires a "graduate" transaction
     if (graduateTxEmails.has(email)) {
       stageCounts[6]++
-      results.push({ buyer_email: email, current_stage: 6, manual_override: false })
+      results.push({ buyer_email: email, current_stage: 6, manual_override: false, product_proposed: hp })
       continue
     }
 
@@ -235,14 +253,14 @@ export async function POST(req: NextRequest) {
     const txStage = emailHighestTxStage.get(email) || 0
     if (txStage >= 5 || pwuStudentEmails.has(email)) {
       stageCounts[5]++
-      results.push({ buyer_email: email, current_stage: 5, manual_override: false })
+      results.push({ buyer_email: email, current_stage: 5, manual_override: false, product_proposed: hp })
       continue
     }
 
     // Stage 4: Prospecting Call (only if call in CURRENT calendar month and NOT High Ticket)
     if (callEmails.has(email)) {
       stageCounts[4]++
-      results.push({ buyer_email: email, current_stage: 4, manual_override: false })
+      results.push({ buyer_email: email, current_stage: 4, manual_override: false, product_proposed: hp })
       continue
     }
 
@@ -250,27 +268,25 @@ export async function POST(req: NextRequest) {
     // Transaction titles alone do not qualify; spc_members is the source of truth.
     if (spcEmails.has(email)) {
       stageCounts[3]++
-      results.push({ buyer_email: email, current_stage: 3, manual_override: false })
+      results.push({ buyer_email: email, current_stage: 3, manual_override: false, product_proposed: hp })
       continue
     }
 
     // Stage 2: Low Ticket
     if (txStage >= 2) {
       stageCounts[2]++
-      results.push({ buyer_email: email, current_stage: 2, manual_override: false })
+      results.push({ buyer_email: email, current_stage: 2, manual_override: false, product_proposed: hp })
       continue
     }
 
     // Stage 1: Freebie
     if (txStage >= 1 || freebieEmails.has(email)) {
       stageCounts[1]++
-      results.push({ buyer_email: email, current_stage: 1, manual_override: false })
+      results.push({ buyer_email: email, current_stage: 1, manual_override: false, product_proposed: hp })
       continue
     }
 
     // No qualifying data — contact should not be in the pipeline.
-    // (This shouldn't happen since allEmails now only includes contacts with
-    // real activity, but guard against it just in case.)
   }
 
   // ── Upsert in batches ──────────────────────────────────────────────────
@@ -287,6 +303,7 @@ export async function POST(req: NextRequest) {
           buyer_email: r.buyer_email,
           current_stage: r.current_stage,
           manual_override: r.manual_override,
+          product_proposed: r.product_proposed,
           updated_at: new Date().toISOString(),
         })),
         { onConflict: 'buyer_email' },

@@ -15,6 +15,7 @@ interface PipelineContact {
   updated_at: string
   setter_assigned: string | null
   lead_status: string | null
+  highest_product: string | null
 }
 
 interface PipelineStage {
@@ -46,6 +47,20 @@ function getSetterInitials(name: string): string {
     .slice(0, 2)
     .map((w) => (w[0] || '').toUpperCase())
     .join('')
+}
+
+/** Shorten a product title to a compact badge label */
+function shortenProduct(title: string): string {
+  const l = title.toLowerCase()
+  if (l.includes('graduate')) return 'Graduate'
+  if (l.includes('parenting with understanding') || l.includes('pwu')) return 'PWU'
+  if (l.includes('advance mentorship')) return 'Mentorship'
+  if (l.includes('10 sessions') || l.includes('hic coaching')) return 'HIC Coaching'
+  if (l.includes('secure parent') || l.includes('spc') || l.includes('raising secure')) return 'SPC'
+  if (l.includes('open house')) return 'Open House'
+  // For low-ticket products, take the first meaningful words
+  const words = title.split(/[\s–—-]+/).filter(w => w.length > 2).slice(0, 3).join(' ')
+  return words.length > 20 ? words.slice(0, 18) + '…' : words
 }
 
 export function PipelineKanban() {
@@ -280,6 +295,16 @@ export function PipelineKanban() {
                             )}
                           </div>
                         </div>
+                        {/* Highest product badge */}
+                        {contact.highest_product && (
+                          <p
+                            className="mt-1 ml-8 text-[9px] text-zinc-400 truncate"
+                            title={contact.highest_product}
+                          >
+                            <span className="font-semibold text-zinc-500 dark:text-zinc-400">⬆</span>{' '}
+                            {shortenProduct(contact.highest_product)}
+                          </p>
+                        )}
                       </button>
                     )
                   })

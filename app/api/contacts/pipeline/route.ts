@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   while (true) {
     let query = svc
       .from('value_ladder_contacts')
-      .select('buyer_email, buyer_name, current_stage, manual_override, updated_at, setter_assigned, lead_status')
+      .select('buyer_email, buyer_name, current_stage, manual_override, updated_at, setter_assigned, lead_status, product_proposed')
       .order('updated_at', { ascending: false })
       .range(offset, offset + PAGE - 1)
 
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     label: string
     color: string
     count: number
-    contacts: { email: string; name: string | null; manual_override: boolean; updated_at: string; setter_assigned: string | null; lead_status: string | null }[]
+    contacts: { email: string; name: string | null; manual_override: boolean; updated_at: string; setter_assigned: string | null; lead_status: string | null; highest_product: string | null }[]
   }> = {}
 
   for (let s = 1; s <= 6; s++) {
@@ -91,6 +91,7 @@ export async function GET(req: NextRequest) {
         updated_at: row.updated_at,
         setter_assigned: row.setter_assigned ?? null,
         lead_status: row.lead_status ?? null,
+        highest_product: row.product_proposed ?? null,
       })
     }
   }
