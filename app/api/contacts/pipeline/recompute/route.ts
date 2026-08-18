@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
     spcMembers,
     pwuStudents,
     manualOverrides,
+    graduateTransactions,
   ] = await Promise.all([
     fetchAll<{ buyer_email: string; offer_title: string; cost: number }>(
       svc, 'transactions', 'buyer_email, offer_title, cost',
@@ -88,6 +89,11 @@ export async function POST(req: NextRequest) {
     fetchAll<{ buyer_email: string; current_stage: number; manual_override: boolean }>(
       svc, 'value_ladder_contacts', 'buyer_email, current_stage, manual_override',
       (q) => (q as any).eq('manual_override', true),
+    ),
+    // Graduate transactions — any status (including refunded) qualifies for stage 6
+    fetchAll<{ buyer_email: string }>(
+      svc, 'transactions', 'buyer_email',
+      (q) => (q as any).ilike('offer_title', '%graduate%'),
     ),
   ])
 
@@ -132,12 +138,17 @@ export async function POST(req: NextRequest) {
     if (e) pwuStudentEmails.add(e)
   }
 
+  // ── Build graduate set from dedicated query (any tx status) ──────────
+  // Stage 6 (Graduate Plans) is based purely on having a transaction with
+  // "graduate" in the offer_title — fetched separately so refunded graduate
+  // transactions still qualify (the enrollment happened).
+  const graduateTxEmails = new Set(
+    graduateTransactions.map((t) => (t.buyer_email || '').toLowerCase()).filter(Boolean),
+  )
+
   // ── Process transactions: classify each title, track per-email highest ──
   const emailHighestTxStage = new Map<string, PipelineTier>()
   const unclassifiedTitles = new Map<string, number>()
-  // Stage 6 (Graduate Plans) is based purely on having a transaction with
-  // "graduate" in the offer_title — not on pwu_students.status or contacts flags.
-  const graduateTxEmails = new Set<string>()
 
   for (const tx of transactions) {
     const email = (tx.buyer_email || '').toLowerCase()
@@ -146,11 +157,6 @@ export async function POST(req: NextRequest) {
     const cost = Number(tx.cost) || 0
     const title = tx.offer_title || ''
     const tier = classifyOfferTitle(title)
-
-    // Track graduate transactions for stage 6
-    if (title.toLowerCase().includes('graduate')) {
-      graduateTxEmails.add(email)
-    }
 
     if (tier === 'exclude') continue
 
@@ -195,6 +201,8 @@ export async function POST(req: NextRequest) {
   }
   // Only active/trial SPC members (not cancelled/expired)
   Array.from(spcEmails).forEach((e) => allEmails.add(e))
+  // Graduate transaction emails (any status)
+  Array.from(graduateTxEmails).forEach((e) => allEmails.add(e))
   // PWU students (all statuses are real enrollments)
   for (const s of pwuStudents) {
     if (s.email) allEmails.add(s.email.toLowerCase())

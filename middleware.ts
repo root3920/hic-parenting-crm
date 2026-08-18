@@ -71,6 +71,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/api/careers/stage2' ||
     pathname === '/api/sales/backfill' ||
     pathname === '/api/spc/backfill-csv' ||
+    pathname === '/api/contacts/pipeline/recompute' ||
     pathname === '/api/growth/reports/public' ||
     pathname === '/api/growth/coaches' ||
     pathname === '/api/growth/students' ||
