@@ -90,8 +90,8 @@ export function classifyOfferTitle(offerTitle: string): TitleTier | undefined {
       return 'high_ticket' // Can't go higher for a title match, return immediately
     }
 
-    // 3. Mid Ticket / SPC
-    if (MID_TICKET_PATTERNS.some((p) => lower.includes(p))) {
+    // 3. Mid Ticket / SPC (but "open house" titles are Low Ticket, not Mid)
+    if (MID_TICKET_PATTERNS.some((p) => lower.includes(p)) && !lower.includes('open house')) {
       if (!best || tierRank(best) < tierRank('mid_ticket')) best = 'mid_ticket'
       continue
     }
