@@ -12,7 +12,7 @@ function getServiceClient() {
 /**
  * GET /api/contacts/pipeline/detail?email=...
  *
- * Returns full contact detail + recent transactions + call history for the modal.
+ * Returns full contact detail + recent transactions + call history + SPC membership.
  */
 export async function GET(req: NextRequest) {
   const userSupabase = await createServerSupabaseClient()
@@ -24,8 +24,8 @@ export async function GET(req: NextRequest) {
 
   const svc = getServiceClient()
 
-  // Fetch contact record, transactions, and calls in parallel
-  const [contactRes, txRes, callsRes] = await Promise.all([
+  // Fetch contact record, transactions, calls, and SPC membership in parallel
+  const [contactRes, txRes, callsRes, spcRes] = await Promise.all([
     svc
       .from('value_ladder_contacts')
       .select('*')
@@ -43,6 +43,12 @@ export async function GET(req: NextRequest) {
       .ilike('email', email)
       .order('start_date', { ascending: false })
       .limit(30),
+    svc
+      .from('spc_members')
+      .select('id, name, email, plan, amount, status, provider, joined_at, next_payment_date, trial_end_date')
+      .ilike('email', email)
+      .limit(1)
+      .maybeSingle(),
   ])
 
   if (contactRes.error || !contactRes.data) {
@@ -53,5 +59,6 @@ export async function GET(req: NextRequest) {
     contact: contactRes.data,
     transactions: txRes.data ?? [],
     calls: callsRes.data ?? [],
+    spc_member: spcRes.data ?? null,
   })
 }

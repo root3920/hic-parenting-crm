@@ -53,6 +53,19 @@ interface CallRecord {
   notes: string | null
 }
 
+interface SpcMemberInfo {
+  id: string
+  name: string | null
+  email: string
+  plan: string
+  amount: number
+  status: string
+  provider: string
+  joined_at: string
+  next_payment_date: string | null
+  trial_end_date: string | null
+}
+
 // ── Lead status config ───────────────────────────────────────────────────────
 
 const LEAD_STATUSES = [
@@ -105,6 +118,7 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [calls, setCalls] = useState<CallRecord[]>([])
+  const [spcMember, setSpcMember] = useState<SpcMemberInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -131,6 +145,7 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
         setContact(json.contact)
         setTransactions(json.transactions ?? [])
         setCalls(json.calls ?? [])
+        setSpcMember(json.spc_member ?? null)
         setEditNotes(json.contact?.notes ?? '')
         setNotesDirty(false)
       }
@@ -486,6 +501,45 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
                   </div>
                 )}
               </div>
+
+              {/* ─── SPC Membership ─── */}
+              {spcMember && (
+                <div>
+                  <p className={sectionLabel}>SPC Membership</p>
+                  <div className="px-3 py-2.5 rounded-lg border border-purple-200 dark:border-purple-800/50 bg-purple-50/50 dark:bg-purple-900/10 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-zinc-800 dark:text-zinc-200">Secure Parent Collective</p>
+                        <p className="text-zinc-400 mt-0.5">
+                          {spcMember.plan} · {spcMember.provider} · Since {formatDate(spcMember.joined_at)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={cn(
+                          'inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold capitalize',
+                          spcMember.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                          spcMember.status === 'trial' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                          spcMember.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' :
+                          'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+                        )}>
+                          {spcMember.status}
+                        </span>
+                        {spcMember.amount > 0 && (
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                            ${spcMember.amount}/mo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {spcMember.status === 'trial' && spcMember.trial_end_date && (
+                      <p className="text-zinc-400 mt-1">Trial ends: {formatDate(spcMember.trial_end_date)}</p>
+                    )}
+                    {spcMember.next_payment_date && spcMember.status === 'active' && (
+                      <p className="text-zinc-400 mt-1">Next payment: {formatDate(spcMember.next_payment_date)}</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* ─── Products Purchased (Transaction History) ─── */}
               <div>
