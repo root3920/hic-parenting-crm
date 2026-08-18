@@ -101,12 +101,16 @@ export async function POST(req: NextRequest) {
   // Stage 4 (Prospecting Call) only counts calls from the CURRENT calendar month.
   // Older calls should not promote contacts — they fall through to their real tier.
   const now = new Date()
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString()
-  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString()
+  const monthStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+  const monthEndMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
 
   const callEmails = new Set(
     allCalls
-      .filter((c) => c.start_date >= monthStart && c.start_date < monthEnd)
+      .filter((c) => {
+        if (!c.start_date) return false
+        const t = new Date(c.start_date).getTime()
+        return t >= monthStartMs && t < monthEndMs
+      })
       .map((c) => c.email?.toLowerCase())
       .filter(Boolean),
   )

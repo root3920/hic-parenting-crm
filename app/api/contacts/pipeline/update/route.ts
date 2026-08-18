@@ -16,7 +16,8 @@ const VALID_LEAD_STATUSES = ['hot_lead', 'engaged', 'disqualified_lead', 'non_re
  *
  * Updates setter_assigned and/or lead_status for a contact.
  *
- * Body: { email: string, setter_assigned?: string | null, lead_status?: string | null }
+ * Body: { email: string, setter_assigned?: string | null, lead_status?: string | null,
+ *         notes?: string | null, last_contacted_at?: string | null }
  *
  * Permissions:
  *   - Admin: can update any contact
@@ -38,10 +39,12 @@ export async function PATCH(req: NextRequest) {
   if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
 
   const body = await req.json()
-  const { email, setter_assigned, lead_status } = body as {
+  const { email, setter_assigned, lead_status, notes, last_contacted_at } = body as {
     email?: string
     setter_assigned?: string | null
     lead_status?: string | null
+    notes?: string | null
+    last_contacted_at?: string | null
   }
 
   if (!email) {
@@ -100,6 +103,8 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, any> = { updated_at: new Date().toISOString() }
   if (setter_assigned !== undefined) updates.setter_assigned = setter_assigned
   if (lead_status !== undefined) updates.lead_status = lead_status
+  if (notes !== undefined) updates.notes = notes
+  if (last_contacted_at !== undefined) updates.last_contacted_at = last_contacted_at
 
   const { error } = await svc
     .from('value_ladder_contacts')

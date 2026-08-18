@@ -12,7 +12,7 @@ function getServiceClient() {
 /**
  * GET /api/contacts/pipeline/detail?email=...
  *
- * Returns full contact detail + recent transactions for the modal.
+ * Returns full contact detail + recent transactions + call history for the modal.
  */
 export async function GET(req: NextRequest) {
   const userSupabase = await createServerSupabaseClient()
@@ -24,27 +24,34 @@ export async function GET(req: NextRequest) {
 
   const svc = getServiceClient()
 
-  // Fetch contact record
-  const { data: contact, error: cErr } = await svc
-    .from('value_ladder_contacts')
-    .select('*')
-    .eq('buyer_email', email)
-    .single()
+  // Fetch contact record, transactions, and calls in parallel
+  const [contactRes, txRes, callsRes] = await Promise.all([
+    svc
+      .from('value_ladder_contacts')
+      .select('*')
+      .eq('buyer_email', email)
+      .single(),
+    svc
+      .from('transactions')
+      .select('id, date, offer_title, cost, buyer_name, buyer_email, buyer_phone, currency, source, status, created_at')
+      .eq('buyer_email', email)
+      .order('date', { ascending: false })
+      .limit(20),
+    svc
+      .from('calls')
+      .select('id, start_date, full_name, email, status, call_type, call_status, call_summary, setter_name, closer_name, notes')
+      .ilike('email', email)
+      .order('start_date', { ascending: false })
+      .limit(30),
+  ])
 
-  if (cErr || !contact) {
+  if (contactRes.error || !contactRes.data) {
     return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
   }
 
-  // Fetch transactions for this email (most recent first, limit 20)
-  const { data: transactions } = await svc
-    .from('transactions')
-    .select('id, date, offer_title, cost, buyer_name, buyer_email, buyer_phone, currency, source, status, created_at')
-    .eq('buyer_email', email)
-    .order('date', { ascending: false })
-    .limit(20)
-
   return NextResponse.json({
-    contact,
-    transactions: transactions ?? [],
+    contact: contactRes.data,
+    transactions: txRes.data ?? [],
+    calls: callsRes.data ?? [],
   })
 }

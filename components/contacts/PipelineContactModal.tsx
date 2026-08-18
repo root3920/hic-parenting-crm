@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { X, Mail, Phone, Loader2, User } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { X, Mail, Phone, Loader2, User, CalendarCheck, Save, PhoneCall } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
@@ -39,6 +39,20 @@ interface Transaction {
   created_at: string
 }
 
+interface CallRecord {
+  id: string
+  start_date: string
+  full_name: string | null
+  email: string | null
+  status: string | null
+  call_type: string | null
+  call_status: string | null
+  call_summary: string | null
+  setter_name: string | null
+  closer_name: string | null
+  notes: string | null
+}
+
 // ── Lead status config ───────────────────────────────────────────────────────
 
 const LEAD_STATUSES = [
@@ -52,6 +66,25 @@ export type LeadStatus = typeof LEAD_STATUSES[number]['value']
 
 export function getLeadStatusConfig(status: string | null) {
   return LEAD_STATUSES.find((s) => s.value === status) ?? null
+}
+
+// ── Call status badge ────────────────────────────────────────────────────────
+
+function CallStatusBadge({ status }: { status: string | null }) {
+  if (!status) return null
+  const map: Record<string, string> = {
+    'Scheduled':   'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+    'Showed Up':   'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+    'No show':     'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+    'No Show':     'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+    'Cancelled':   'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+    'Rescheduled': 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  }
+  return (
+    <span className={cn('inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold', map[status] ?? 'bg-zinc-100 text-zinc-500')}>
+      {status}
+    </span>
+  )
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
@@ -71,34 +104,45 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
 
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [calls, setCalls] = useState<CallRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
+  // Editable notes state
+  const [editNotes, setEditNotes] = useState('')
+  const [notesDirty, setNotesDirty] = useState(false)
+  const [savingNotes, setSavingNotes] = useState(false)
+
+  // Last contacted state
+  const [savingContacted, setSavingContacted] = useState(false)
 
   // Determine this setter's identity for permission display
   const mySetterName = profile?.setter_name || profile?.full_name || ''
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/contacts/pipeline/detail?email=${encodeURIComponent(email)}`)
-        const json = await res.json()
-        if (json.error) {
-          toast.error(json.error)
-          onClose()
-        } else {
-          setContact(json.contact)
-          setTransactions(json.transactions ?? [])
-        }
-      } catch {
-        toast.error('Failed to load contact')
+  const loadContact = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/contacts/pipeline/detail?email=${encodeURIComponent(email)}`)
+      const json = await res.json()
+      if (json.error) {
+        toast.error(json.error)
         onClose()
-      } finally {
-        setLoading(false)
+      } else {
+        setContact(json.contact)
+        setTransactions(json.transactions ?? [])
+        setCalls(json.calls ?? [])
+        setEditNotes(json.contact?.notes ?? '')
+        setNotesDirty(false)
       }
+    } catch {
+      toast.error('Failed to load contact')
+      onClose()
+    } finally {
+      setLoading(false)
     }
-    load()
   }, [email, onClose])
+
+  useEffect(() => { loadContact() }, [loadContact])
 
   async function handleUpdate(field: 'setter_assigned' | 'lead_status', value: string | null) {
     if (!contact) return
@@ -124,6 +168,55 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
     }
   }
 
+  async function handleSaveNotes() {
+    if (!contact) return
+    setSavingNotes(true)
+    try {
+      const res = await fetch('/api/contacts/pipeline/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: contact.buyer_email, notes: editNotes || null }),
+      })
+      const json = await res.json()
+      if (json.error) {
+        toast.error(json.error)
+      } else {
+        setContact((prev) => prev ? { ...prev, notes: editNotes || null } : prev)
+        setNotesDirty(false)
+        toast.success('Notes saved')
+      }
+    } catch {
+      toast.error('Failed to save notes')
+    } finally {
+      setSavingNotes(false)
+    }
+  }
+
+  async function handleMarkContacted(dateOverride?: string) {
+    if (!contact) return
+    setSavingContacted(true)
+    const ts = dateOverride || new Date().toISOString()
+    try {
+      const res = await fetch('/api/contacts/pipeline/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: contact.buyer_email, last_contacted_at: ts }),
+      })
+      const json = await res.json()
+      if (json.error) {
+        toast.error(json.error)
+      } else {
+        setContact((prev) => prev ? { ...prev, last_contacted_at: ts } : prev)
+        onUpdated()
+        toast.success('Last contacted date updated')
+      }
+    } catch {
+      toast.error('Update failed')
+    } finally {
+      setSavingContacted(false)
+    }
+  }
+
   // Permission: setter can only edit contacts assigned to them or unassigned
   const canEditThisContact = isAdmin || (isSetter && (!contact?.setter_assigned || contact.setter_assigned === mySetterName))
 
@@ -133,6 +226,7 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
   const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3'
   const rowLabel = 'text-xs text-zinc-500 dark:text-zinc-400'
   const rowValue = 'text-xs font-medium text-zinc-800 dark:text-zinc-200 text-right'
+  const inputCls = 'w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] disabled:opacity-50'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -212,7 +306,7 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
                     value={contact.setter_assigned || ''}
                     onChange={(e) => handleUpdate('setter_assigned', e.target.value || null)}
                     disabled={saving || settersLoading}
-                    className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] disabled:opacity-50"
+                    className={inputCls}
                   >
                     <option value="">Unassigned</option>
                     {setterNames.map((name) => (
@@ -267,6 +361,68 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
                 )}
               </div>
 
+              {/* ─── Last Contacted ─── */}
+              <div>
+                <p className={sectionLabel}>Last Contacted</p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                    {contact.last_contacted_at ? formatDate(contact.last_contacted_at) : <span className="text-zinc-400 italic">Never</span>}
+                  </span>
+                  {canEdit && canEditThisContact && (
+                    <>
+                      <button
+                        onClick={() => handleMarkContacted()}
+                        disabled={savingContacted}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                      >
+                        <CalendarCheck className="h-3 w-3" />
+                        {savingContacted ? 'Saving…' : 'Mark as contacted today'}
+                      </button>
+                      <input
+                        type="date"
+                        className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
+                        title="Backdate last contacted"
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleMarkContacted(new Date(e.target.value + 'T12:00:00').toISOString())
+                          }
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* ─── Setter Notes ─── */}
+              <div>
+                <p className={sectionLabel}>Setter Notes</p>
+                {canEdit && canEditThisContact ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editNotes}
+                      onChange={(e) => { setEditNotes(e.target.value); setNotesDirty(true) }}
+                      rows={3}
+                      placeholder="Add notes about this contact…"
+                      className={cn(inputCls, 'resize-y min-h-[60px]')}
+                    />
+                    {notesDirty && (
+                      <button
+                        onClick={handleSaveNotes}
+                        disabled={savingNotes}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        <Save className="h-3 w-3" />
+                        {savingNotes ? 'Saving…' : 'Save Notes'}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                    {contact.notes || <span className="text-zinc-400 italic">No notes</span>}
+                  </p>
+                )}
+              </div>
+
               {/* ─── Key Details ─── */}
               <div>
                 <p className={sectionLabel}>Details</p>
@@ -277,12 +433,6 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
                       <span className={rowValue}>{contact.product_proposed}</span>
                     </div>
                   )}
-                  {contact.last_contacted_at && (
-                    <div className="flex justify-between">
-                      <span className={rowLabel}>Last Contacted</span>
-                      <span className={rowValue}>{formatDate(contact.last_contacted_at)}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between">
                     <span className={rowLabel}>Added</span>
                     <span className={rowValue}>{formatDate(contact.created_at)}</span>
@@ -291,18 +441,55 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
                     <span className={rowLabel}>Updated</span>
                     <span className={rowValue}>{formatDate(contact.updated_at)}</span>
                   </div>
-                  {contact.notes && (
-                    <div className="mt-2">
-                      <span className={rowLabel}>Notes</span>
-                      <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-1 whitespace-pre-wrap">{contact.notes}</p>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* ─── Transaction History ─── */}
+              {/* ─── Call History ─── */}
               <div>
-                <p className={sectionLabel}>Transaction History ({transactions.length})</p>
+                <p className={sectionLabel}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <PhoneCall className="h-3.5 w-3.5" />
+                    Call History ({calls.length})
+                  </span>
+                </p>
+                {calls.length === 0 ? (
+                  <p className="text-xs text-zinc-400 italic">No calls found</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                    {calls.map((call) => (
+                      <div
+                        key={call.id}
+                        className="px-3 py-2 rounded-lg border border-zinc-100 dark:border-zinc-800 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                                {formatDate(call.start_date)}
+                              </span>
+                              <CallStatusBadge status={call.call_status || call.status} />
+                              {call.call_type && (
+                                <span className="text-zinc-400">{call.call_type}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-zinc-400">
+                              {call.setter_name && <span>Setter: {call.setter_name}</span>}
+                              {call.closer_name && <span>Closer: {call.closer_name}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {call.call_summary && (
+                          <p className="mt-1.5 text-zinc-500 dark:text-zinc-400 whitespace-pre-wrap">{call.call_summary}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ─── Products Purchased (Transaction History) ─── */}
+              <div>
+                <p className={sectionLabel}>Products Purchased ({transactions.length})</p>
                 {transactions.length === 0 ? (
                   <p className="text-xs text-zinc-400 italic">No transactions found</p>
                 ) : (
