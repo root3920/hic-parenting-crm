@@ -72,7 +72,6 @@ export async function POST(req: NextRequest) {
     freebieLeads,
     allCalls,
     spcMembers,
-    contacts,
     pwuStudents,
     manualOverrides,
   ] = await Promise.all([
@@ -83,9 +82,6 @@ export async function POST(req: NextRequest) {
     fetchAll<{ email: string }>(svc, 'freebie_leads', 'email'),
     fetchAll<{ email: string; start_date: string }>(svc, 'calls', 'email, start_date'),
     fetchAll<{ email: string; status: string }>(svc, 'spc_members', 'email, status'),
-    fetchAll<{ email: string; is_spc_member: boolean | null; is_spc_trial: boolean | null; is_pwu_student: boolean | null; is_pwu_graduate: boolean | null }>(
-      svc, 'contacts', 'email, is_spc_member, is_spc_trial, is_pwu_student, is_pwu_graduate',
-    ),
     fetchAll<{ email: string | null; status: string }>(
       svc, 'pwu_students', 'email, status',
     ),
@@ -128,41 +124,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Contacts flags
-  const contactFlags = new Map<string, {
-    is_spc_member: boolean
-    is_spc_trial: boolean
-    is_pwu_student: boolean
-    is_pwu_graduate: boolean
-  }>()
-  for (const c of contacts) {
-    const e = c.email?.toLowerCase()
-    if (e) {
-      contactFlags.set(e, {
-        is_spc_member: !!c.is_spc_member,
-        is_spc_trial: !!c.is_spc_trial,
-        is_pwu_student: !!c.is_pwu_student,
-        is_pwu_graduate: !!c.is_pwu_graduate,
-      })
-    }
-  }
-
-  // PWU students
+  // PWU students — all statuses count for stage 5 (High Ticket).
+  // Stage 6 (Graduate) is determined purely by transaction evidence, not status.
   const pwuStudentEmails = new Set<string>()
-  const pwuGraduateEmails = new Set<string>()
   for (const s of pwuStudents) {
     const e = s.email?.toLowerCase()
-    if (!e) continue
-    if (s.status === 'graduated') {
-      pwuGraduateEmails.add(e)
-    } else {
-      pwuStudentEmails.add(e)
-    }
+    if (e) pwuStudentEmails.add(e)
   }
 
   // ── Process transactions: classify each title, track per-email highest ──
   const emailHighestTxStage = new Map<string, PipelineTier>()
   const unclassifiedTitles = new Map<string, number>()
+  // Stage 6 (Graduate Plans) is based purely on having a transaction with
+  // "graduate" in the offer_title — not on pwu_students.status or contacts flags.
+  const graduateTxEmails = new Set<string>()
 
   for (const tx of transactions) {
     const email = (tx.buyer_email || '').toLowerCase()
@@ -171,6 +146,11 @@ export async function POST(req: NextRequest) {
     const cost = Number(tx.cost) || 0
     const title = tx.offer_title || ''
     const tier = classifyOfferTitle(title)
+
+    // Track graduate transactions for stage 6
+    if (title.toLowerCase().includes('graduate')) {
+      graduateTxEmails.add(email)
+    }
 
     if (tier === 'exclude') continue
 
@@ -233,10 +213,8 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    const flags = contactFlags.get(email)
-
-    // Stage 6: Graduate (highest, always wins)
-    if (pwuGraduateEmails.has(email) || flags?.is_pwu_graduate) {
+    // Stage 6: Graduate (highest, always wins) — requires a "graduate" transaction
+    if (graduateTxEmails.has(email)) {
       stageCounts[6]++
       results.push({ buyer_email: email, current_stage: 6, manual_override: false })
       continue
@@ -244,7 +222,7 @@ export async function POST(req: NextRequest) {
 
     // Stage 5: High Ticket
     const txStage = emailHighestTxStage.get(email) || 0
-    if (txStage >= 5 || pwuStudentEmails.has(email) || flags?.is_pwu_student) {
+    if (txStage >= 5 || pwuStudentEmails.has(email)) {
       stageCounts[5]++
       results.push({ buyer_email: email, current_stage: 5, manual_override: false })
       continue
