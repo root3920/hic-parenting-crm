@@ -17,6 +17,10 @@ const PAGE = 1000
  *
  * Returns contacts grouped by pipeline stage for Kanban display.
  * Reads from value_ladder_contacts (precomputed by /recompute).
+ *
+ * Query params:
+ *   search  – filter by name/email (ilike)
+ *   setter  – filter by setter_assigned (exact match, or "__unassigned__" for null)
  */
 export async function GET(req: NextRequest) {
   const userSupabase = await createServerSupabaseClient()
@@ -25,6 +29,7 @@ export async function GET(req: NextRequest) {
 
   const svc = getServiceClient()
   const search = (req.nextUrl.searchParams.get('search') || '').toLowerCase().trim()
+  const setter = (req.nextUrl.searchParams.get('setter') || '').trim()
 
   // Fetch all value_ladder_contacts (paginated)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,12 +39,18 @@ export async function GET(req: NextRequest) {
   while (true) {
     let query = svc
       .from('value_ladder_contacts')
-      .select('buyer_email, buyer_name, current_stage, manual_override, updated_at')
+      .select('buyer_email, buyer_name, current_stage, manual_override, updated_at, setter_assigned, lead_status')
       .order('updated_at', { ascending: false })
       .range(offset, offset + PAGE - 1)
 
     if (search) {
       query = query.or(`buyer_email.ilike.%${search}%,buyer_name.ilike.%${search}%`)
+    }
+
+    if (setter === '__unassigned__') {
+      query = query.is('setter_assigned', null)
+    } else if (setter) {
+      query = query.eq('setter_assigned', setter)
     }
 
     const { data, error } = await query
@@ -56,7 +67,7 @@ export async function GET(req: NextRequest) {
     label: string
     color: string
     count: number
-    contacts: { email: string; name: string | null; manual_override: boolean; updated_at: string }[]
+    contacts: { email: string; name: string | null; manual_override: boolean; updated_at: string; setter_assigned: string | null; lead_status: string | null }[]
   }> = {}
 
   for (let s = 1; s <= 6; s++) {
@@ -78,6 +89,8 @@ export async function GET(req: NextRequest) {
         name: row.buyer_name,
         manual_override: row.manual_override || false,
         updated_at: row.updated_at,
+        setter_assigned: row.setter_assigned ?? null,
+        lead_status: row.lead_status ?? null,
       })
     }
   }

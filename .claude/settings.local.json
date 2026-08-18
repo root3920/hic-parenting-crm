@@ -61,7 +61,9 @@
       "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *spc*members* -o -name *members*spc* \\\\\\) \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
       "Bash(find /Users/federicoalarconu/hic-dashboard/app -type d -name \"\\(auth\\)\")",
       "Bash(for f:*)",
-      "Bash(xargs sed:*)"
+      "Bash(xargs sed:*)",
+      "Bash(git status:*)",
+      "Bash(gh api:*)"
     ]
   }
 }

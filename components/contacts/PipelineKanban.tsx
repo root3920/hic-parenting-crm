@@ -1,16 +1,20 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Loader2, RefreshCw, Users, Lock, Search } from 'lucide-react'
+import { Loader2, RefreshCw, Users, Lock, Search, Filter } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProfile } from '@/hooks/useProfile'
+import { useTeamMembers } from '@/hooks/useTeamMembers'
 import { cn } from '@/lib/utils'
+import { PipelineContactModal, getLeadStatusConfig } from './PipelineContactModal'
 
 interface PipelineContact {
   email: string
   name: string | null
   manual_override: boolean
   updated_at: string
+  setter_assigned: string | null
+  lead_status: string | null
 }
 
 interface PipelineStage {
@@ -36,22 +40,34 @@ function getInitials(str: string): string {
     .join('')
 }
 
+function getSetterInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => (w[0] || '').toUpperCase())
+    .join('')
+}
+
 export function PipelineKanban() {
   const { profile } = useProfile()
   const isAdmin = profile?.role === 'admin'
+  const { names: setterNames, loading: settersLoading } = useTeamMembers('setter')
 
   const [data, setData] = useState<PipelineData | null>(null)
   const [loading, setLoading] = useState(true)
   const [recomputing, setRecomputing] = useState(false)
   const [search, setSearch] = useState('')
+  const [setterFilter, setSetterFilter] = useState('')
   const [expandedStage, setExpandedStage] = useState<number | null>(null)
   const [visibleCounts, setVisibleCounts] = useState<Record<number, number>>({})
+  const [selectedEmail, setSelectedEmail] = useState<string | null>(null)
 
-  const fetchPipeline = useCallback(async (searchTerm?: string) => {
+  const fetchPipeline = useCallback(async (searchTerm?: string, setter?: string) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (searchTerm) params.set('search', searchTerm)
+      if (setter) params.set('setter', setter)
       const res = await fetch(`/api/contacts/pipeline?${params}`)
       const json = await res.json()
       if (json.error) {
@@ -72,13 +88,13 @@ export function PipelineKanban() {
 
   useEffect(() => { fetchPipeline() }, [fetchPipeline])
 
-  // Debounced search
+  // Debounced search + setter filter
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchPipeline(search || undefined)
+      fetchPipeline(search || undefined, setterFilter || undefined)
     }, 400)
     return () => clearTimeout(timer)
-  }, [search, fetchPipeline])
+  }, [search, setterFilter, fetchPipeline])
 
   async function handleRecompute() {
     setRecomputing(true)
@@ -92,7 +108,7 @@ export function PipelineKanban() {
         if (json.unclassified_titles?.length > 0) {
           console.log('Unclassified offer_titles:', json.unclassified_titles)
         }
-        fetchPipeline(search || undefined)
+        fetchPipeline(search || undefined, setterFilter || undefined)
       }
     } catch {
       toast.error('Recompute failed')
@@ -106,6 +122,11 @@ export function PipelineKanban() {
       ...prev,
       [stage]: (prev[stage] || CARDS_PER_PAGE) + CARDS_PER_PAGE,
     }))
+  }
+
+  function handleContactUpdated() {
+    // Refresh pipeline data after a contact edit
+    fetchPipeline(search || undefined, setterFilter || undefined)
   }
 
   if (loading && !data) {
@@ -132,6 +153,24 @@ export function PipelineKanban() {
             className="w-full pl-9 pr-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
           />
         </div>
+
+        {/* Setter filter */}
+        <div className="relative">
+          <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+          <select
+            value={setterFilter}
+            onChange={(e) => setSetterFilter(e.target.value)}
+            disabled={settersLoading}
+            className="pl-8 pr-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] disabled:opacity-50 appearance-none min-w-[160px]"
+          >
+            <option value="">All Setters</option>
+            <option value="__unassigned__">Unassigned</option>
+            {setterNames.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="flex items-center gap-1.5 text-xs text-zinc-400">
           <Users className="h-3.5 w-3.5" />
           {data.total.toLocaleString()} total
@@ -193,32 +232,57 @@ export function PipelineKanban() {
                 {displayContacts.length === 0 ? (
                   <p className="text-[10px] text-zinc-400 text-center py-4">No contacts</p>
                 ) : (
-                  displayContacts.map((contact) => (
-                    <div
-                      key={contact.email}
-                      className="group px-2.5 py-2 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
-                          style={{ backgroundColor: stage.color }}
-                        >
-                          {getInitials(contact.name || contact.email)}
+                  displayContacts.map((contact) => {
+                    const leadCfg = getLeadStatusConfig(contact.lead_status)
+                    return (
+                      <button
+                        key={contact.email}
+                        onClick={() => setSelectedEmail(contact.email)}
+                        className="group w-full text-left px-2.5 py-2 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                            style={{ backgroundColor: stage.color }}
+                          >
+                            {getInitials(contact.name || contact.email)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-medium text-zinc-800 dark:text-zinc-200 truncate">
+                              {contact.name || '—'}
+                            </p>
+                            <p className="text-[10px] text-zinc-400 truncate">
+                              {contact.email}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {/* Lead status badge */}
+                            {leadCfg && (
+                              <span
+                                className="text-[8px] font-bold px-1 py-0.5 rounded"
+                                style={{ backgroundColor: `${leadCfg.color}20`, color: leadCfg.color }}
+                                title={leadCfg.label}
+                              >
+                                {leadCfg.label.split(' ')[0]}
+                              </span>
+                            )}
+                            {/* Setter initials */}
+                            {contact.setter_assigned && (
+                              <span
+                                className="text-[9px] font-bold px-1 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
+                                title={contact.setter_assigned}
+                              >
+                                {getSetterInitials(contact.setter_assigned)}
+                              </span>
+                            )}
+                            {contact.manual_override && (
+                              <span title="Manually assigned"><Lock className="h-3 w-3 text-zinc-300 dark:text-zinc-600 shrink-0" /></span>
+                            )}
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-medium text-zinc-800 dark:text-zinc-200 truncate">
-                            {contact.name || '—'}
-                          </p>
-                          <p className="text-[10px] text-zinc-400 truncate">
-                            {contact.email}
-                          </p>
-                        </div>
-                        {contact.manual_override && (
-                          <span title="Manually assigned"><Lock className="h-3 w-3 text-zinc-300 dark:text-zinc-600 shrink-0" /></span>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                      </button>
+                    )
+                  })
                 )}
                 {hasMore && (
                   <button
@@ -233,6 +297,15 @@ export function PipelineKanban() {
           )
         })}
       </div>
+
+      {/* Contact Detail Modal */}
+      {selectedEmail && (
+        <PipelineContactModal
+          email={selectedEmail}
+          onClose={() => setSelectedEmail(null)}
+          onUpdated={handleContactUpdated}
+        />
+      )}
     </div>
   )
 }
