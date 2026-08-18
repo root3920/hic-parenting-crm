@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   const [
     transactions,
     freebieLeads,
-    calls,
+    allCalls,
     spcMembers,
     contacts,
     pwuStudents,
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       (q) => (q as any).or('status.eq.completed,status.is.null'),
     ),
     fetchAll<{ email: string }>(svc, 'freebie_leads', 'email'),
-    fetchAll<{ email: string }>(svc, 'calls', 'email'),
+    fetchAll<{ email: string; start_date: string }>(svc, 'calls', 'email, start_date'),
     fetchAll<{ email: string; status: string }>(svc, 'spc_members', 'email, status'),
     fetchAll<{ email: string; is_spc_member: boolean | null; is_spc_trial: boolean | null; is_pwu_student: boolean | null; is_pwu_graduate: boolean | null }>(
       svc, 'contacts', 'email, is_spc_member, is_spc_trial, is_pwu_student, is_pwu_graduate',
@@ -97,7 +97,19 @@ export async function POST(req: NextRequest) {
 
   // ── Build lookup sets ───────────────────────────────────────────────────
   const freebieEmails = new Set(freebieLeads.map((f) => f.email?.toLowerCase()).filter(Boolean))
-  const callEmails = new Set(calls.map((c) => c.email?.toLowerCase()).filter(Boolean))
+
+  // Stage 4 (Prospecting Call) only counts calls from the CURRENT calendar month.
+  // Older calls should not promote contacts — they fall through to their real tier.
+  const now = new Date()
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString()
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString()
+
+  const callEmails = new Set(
+    allCalls
+      .filter((c) => c.start_date >= monthStart && c.start_date < monthEnd)
+      .map((c) => c.email?.toLowerCase())
+      .filter(Boolean),
+  )
   const spcEmails = new Set(spcMembers.map((m) => m.email?.toLowerCase()).filter(Boolean))
   const manualOverrideMap = new Map<string, number>()
   for (const m of manualOverrides) {
@@ -185,7 +197,7 @@ export async function POST(req: NextRequest) {
   for (const f of freebieLeads) {
     if (f.email) allEmails.add(f.email.toLowerCase())
   }
-  for (const c of calls) {
+  for (const c of allCalls) {
     if (c.email) allEmails.add(c.email.toLowerCase())
   }
   for (const m of spcMembers) {
@@ -228,7 +240,7 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // Stage 4: Prospecting Call (only if NOT High Ticket)
+    // Stage 4: Prospecting Call (only if call in CURRENT calendar month and NOT High Ticket)
     if (callEmails.has(email)) {
       stageCounts[4]++
       results.push({ buyer_email: email, current_stage: 4, manual_override: false })

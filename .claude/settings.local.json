@@ -63,7 +63,8 @@
       "Bash(for f:*)",
       "Bash(xargs sed:*)",
       "Bash(git status:*)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(npm i:*)"
     ]
   }
 }
