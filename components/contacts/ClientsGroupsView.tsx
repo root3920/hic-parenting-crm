@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 import { formatDate } from '@/lib/utils'
+import { PipelineKanban } from './PipelineKanban'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -565,6 +566,8 @@ export function ClientsGroupsView() {
   const { profile } = useProfile()
   const isAdmin = profile?.role === 'admin'
 
+  const [activeTab, setActiveTab] = useState<'groups' | 'pipeline'>('groups')
+
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null)
@@ -661,7 +664,31 @@ export function ClientsGroupsView() {
           <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Clients</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">All buyers and leads grouped by product</p>
         </div>
-        {isAdmin && (
+        <div className="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 p-0.5">
+          <button
+            onClick={() => setActiveTab('groups')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-semibold rounded-md transition-colors',
+              activeTab === 'groups'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300',
+            )}
+          >
+            Groups
+          </button>
+          <button
+            onClick={() => setActiveTab('pipeline')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-semibold rounded-md transition-colors',
+              activeTab === 'pipeline'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300',
+            )}
+          >
+            Pipeline
+          </button>
+        </div>
+        {isAdmin && activeTab === 'groups' && (
           <div className="flex items-center gap-2">
             <button
               onClick={handleCalculateScores}
@@ -686,6 +713,11 @@ export function ClientsGroupsView() {
         )}
       </div>
 
+      {/* Pipeline tab */}
+      {activeTab === 'pipeline' && <PipelineKanban />}
+
+      {/* Groups tab content */}
+      {activeTab === 'groups' && <>
       {/* Global search + score filter */}
       <div className="mb-6 flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-md">
@@ -748,6 +780,7 @@ export function ClientsGroupsView() {
       {selectedScore && (
         <ScoreDetailModal data={selectedScore} onClose={() => setSelectedScore(null)} />
       )}
+      </>}
 
       {/* Import modal */}
       {showImportModal && (

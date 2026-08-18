@@ -15,8 +15,8 @@ export async function POST(
   const body = await request.json()
   const { stage } = body
 
-  if (!stage || stage < 1 || stage > 5) {
-    return NextResponse.json({ error: 'Stage must be 1-5' }, { status: 400 })
+  if (!stage || stage < 1 || stage > 6) {
+    return NextResponse.json({ error: 'Stage must be 1-6' }, { status: 400 })
   }
 
   const { data, error } = await supabase
