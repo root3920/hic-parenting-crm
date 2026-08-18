@@ -114,7 +114,13 @@ export async function POST(req: NextRequest) {
       .map((c) => c.email?.toLowerCase())
       .filter(Boolean),
   )
-  const spcEmails = new Set(spcMembers.map((m) => m.email?.toLowerCase()).filter(Boolean))
+  // Only active/trial SPC members qualify for stage 3 — exclude cancelled/expired
+  const spcEmails = new Set(
+    spcMembers
+      .filter((m) => m.status === 'active' || m.status === 'trial')
+      .map((m) => m.email?.toLowerCase())
+      .filter(Boolean),
+  )
   const manualOverrideMap = new Map<string, number>()
   for (const m of manualOverrides) {
     if (m.manual_override && m.buyer_email) {
@@ -193,7 +199,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── Collect all unique emails ───────────────────────────────────────────
+  // ── Collect all unique emails with REAL qualifying activity ─────────────
+  // Only include emails that have at least one real data point (transaction,
+  // freebie lead, call, active/trial SPC, or PWU student/graduate).
+  // Cancelled/expired SPC-only contacts with no other activity are excluded.
   const allEmails = new Set<string>()
   for (const tx of transactions) {
     if (tx.buyer_email) allEmails.add(tx.buyer_email.toLowerCase())
@@ -204,12 +213,9 @@ export async function POST(req: NextRequest) {
   for (const c of allCalls) {
     if (c.email) allEmails.add(c.email.toLowerCase())
   }
-  for (const m of spcMembers) {
-    if (m.email) allEmails.add(m.email.toLowerCase())
-  }
-  for (const c of contacts) {
-    if (c.email) allEmails.add(c.email.toLowerCase())
-  }
+  // Only active/trial SPC members (not cancelled/expired)
+  Array.from(spcEmails).forEach((e) => allEmails.add(e))
+  // PWU students (all statuses are real enrollments)
   for (const s of pwuStudents) {
     if (s.email) allEmails.add(s.email.toLowerCase())
   }
@@ -251,8 +257,9 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // Stage 3: SPC / Mid Ticket
-    if (txStage >= 3 || spcEmails.has(email) || flags?.is_spc_member || flags?.is_spc_trial) {
+    // Stage 3: SPC / Mid Ticket — spcEmails is already filtered to active/trial only;
+    // do NOT trust contacts.is_spc_member/is_spc_trial flags (they may reflect cancelled members)
+    if (txStage >= 3 || spcEmails.has(email)) {
       stageCounts[3]++
       results.push({ buyer_email: email, current_stage: 3, manual_override: false })
       continue
@@ -272,9 +279,9 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // No qualifying data — still place as freebie if they exist in any source
-    stageCounts[1]++
-    results.push({ buyer_email: email, current_stage: 1, manual_override: false })
+    // No qualifying data — contact should not be in the pipeline.
+    // (This shouldn't happen since allEmails now only includes contacts with
+    // real activity, but guard against it just in case.)
   }
 
   // ── Upsert in batches ──────────────────────────────────────────────────
@@ -302,6 +309,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Remove contacts that no longer qualify for any stage ─────────────
+  // Fetch all existing emails in value_ladder_contacts, then delete any
+  // that are not in the current results set (and not manually overridden).
+  const resultEmails = new Set(results.map((r) => r.buyer_email))
+  let removed = 0
+  const existingAll = await fetchAll<{ buyer_email: string; manual_override: boolean }>(
+    svc, 'value_ladder_contacts', 'buyer_email, manual_override',
+  )
+  const toRemove = existingAll
+    .filter((e) => !e.manual_override && !resultEmails.has(e.buyer_email))
+    .map((e) => e.buyer_email)
+
+  for (let i = 0; i < toRemove.length; i += BATCH) {
+    const batch = toRemove.slice(i, i + BATCH)
+    const { error } = await svc
+      .from('value_ladder_contacts')
+      .delete()
+      .in('buyer_email', batch)
+    if (error) {
+      errors.push(`Remove batch ${i / BATCH}: ${error.message}`)
+    } else {
+      removed += batch.length
+    }
+  }
+
   // Build unclassified report
   const unclassifiedReport = Array.from(unclassifiedTitles.entries())
     .map(([title, count]) => ({ title, count, assigned_tier: 'low_ticket (fallback)' }))
@@ -311,6 +343,7 @@ export async function POST(req: NextRequest) {
     success: true,
     total_contacts: results.length,
     upserted,
+    removed_from_pipeline: removed,
     stage_counts: stageCounts,
     unclassified_titles: unclassifiedReport,
     manual_overrides_preserved: manualOverrideMap.size,
