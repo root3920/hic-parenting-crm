@@ -12,6 +12,7 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/client-success':     ['admin', 'csm_ht'],
   '/equipo/csm':         ['admin', 'csm_ht'],
   '/equipo/spc':         ['admin', 'csm_spc'],
+  '/setter-portal':      ['admin', 'setter'],
   '/equipo/setter':      ['admin', 'setter'],
   '/equipo/closer':      ['admin', 'closer'],
   '/equipo/profiles':    ['admin'],
@@ -28,7 +29,7 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 const ROLE_HOME: Record<UserRole, string> = {
   admin:   '/dashboard',
   closer:  '/llamadas',
-  setter:  '/equipo/setter',
+  setter:  '/setter-portal',
   csm_spc: '/spc',
   csm_ht:  '/equipo/csm',
   coach:   '/growth',
@@ -72,6 +73,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/api/sales/backfill' ||
     pathname === '/api/spc/backfill-csv' ||
     pathname === '/api/contacts/pipeline/recompute' ||
+    pathname === '/api/setter-portal/daily-assignment' ||
     pathname === '/api/growth/reports/public' ||
     pathname === '/api/growth/coaches' ||
     pathname === '/api/growth/students' ||

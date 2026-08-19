@@ -27,6 +27,7 @@ import {
   Eye,
   Sprout,
   HeartHandshake,
+  Inbox,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -49,6 +50,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 const ALL_NAV_ITEMS = [
   { href: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, roles: ['admin'] as UserRole[] },
+  { href: '/setter-portal', label: 'Setter Portal', icon: Inbox,         roles: ['admin', 'setter'] as UserRole[] },
   { href: '/sales',        label: 'Sales',        icon: DollarSign,      roles: ['admin', 'csm_spc', 'csm_ht'] as UserRole[] },
   { href: '/llamadas',     label: 'Calls',        icon: Phone,           roles: ['admin', 'closer'] as UserRole[] },
   { href: '/spc',          label: 'SPC Members',  icon: Users,           roles: ['admin', 'csm_spc'] as UserRole[] },

@@ -11,6 +11,10 @@
     {
       "path": "/api/contacts/pipeline/recompute",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/setter-portal/daily-assignment",
+      "schedule": "10 6 * * *"
     }
   ]
 }

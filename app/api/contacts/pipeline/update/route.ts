@@ -9,7 +9,7 @@ function getServiceClient() {
   )
 }
 
-const VALID_LEAD_STATUSES = ['hot_lead', 'engaged', 'disqualified_lead', 'non_responsive'] as const
+const VALID_LEAD_STATUSES = ['not_contacted', 'contacted', 'following_up', 'call_proposed', 'call_scheduled'] as const
 
 /**
  * PATCH /api/contacts/pipeline/update

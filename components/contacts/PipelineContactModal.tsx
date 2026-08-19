@@ -69,10 +69,11 @@ interface SpcMemberInfo {
 // ── Lead status config ───────────────────────────────────────────────────────
 
 const LEAD_STATUSES = [
-  { value: 'hot_lead', label: 'Hot Lead', color: '#F97316', bg: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' },
-  { value: 'engaged', label: 'Engaged', color: '#22C55E', bg: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' },
-  { value: 'disqualified_lead', label: 'Disqualified Lead', color: '#6B7280', bg: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400' },
-  { value: 'non_responsive', label: 'Non-Responsive', color: '#EAB308', bg: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' },
+  { value: 'not_contacted', label: 'Not Contacted', color: '#6B7280', bg: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400' },
+  { value: 'contacted', label: 'Contacted', color: '#3B82F6', bg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' },
+  { value: 'following_up', label: 'Following Up', color: '#EAB308', bg: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' },
+  { value: 'call_proposed', label: 'Call Proposed', color: '#F97316', bg: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' },
+  { value: 'call_scheduled', label: 'Call Scheduled', color: '#22C55E', bg: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' },
 ] as const
 
 export type LeadStatus = typeof LEAD_STATUSES[number]['value']
