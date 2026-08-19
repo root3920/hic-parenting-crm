@@ -26,7 +26,16 @@ function getServiceClient() {
  * to the SAME setter whose status is still 'not_contacted' or stuck in
  * 'following_up' for more than RECYCLE_STALE_DAYS days.
  */
+// Vercel Cron Jobs send GET requests; also support POST for manual triggers
+export async function GET(req: NextRequest) {
+  return runDailyAssignment(req)
+}
+
 export async function POST(req: NextRequest) {
+  return runDailyAssignment(req)
+}
+
+async function runDailyAssignment(req: NextRequest) {
   // Verify cron authorization
   const isVercelCron = req.headers.get('x-vercel-cron') === '1'
   const authHeader = req.headers.get('authorization')
@@ -63,29 +72,14 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 2) Build eligibility pool ───────────────────────────────────────────
-  // Get contacts in stages 1-3
-  const { data: stageContacts } = await supabase
-    .from('value_ladder_contacts')
-    .select('buyer_email')
-    .in('current_stage', [1, 2, 3])
-
-  if (!stageContacts?.length) {
-    return NextResponse.json({
-      ...results,
-      errors: ['No contacts in stages 1-3'],
-    })
-  }
-
-  const stageEmailsList = stageContacts.map((c) => c.buyer_email)
-  const stageEmails = new Set(stageEmailsList)
+  // Start from the SMALLER scored/SPC sets, then validate against stages 1-3.
+  // This avoids the Supabase 1000-row default limit on the large contacts table.
 
   // Get emails with contact_scores.score > 45
   const { data: scoredContacts } = await supabase
     .from('contact_scores')
     .select('email')
     .gt('score', 45)
-
-  const scoredEmails = new Set((scoredContacts ?? []).map((c) => c.email))
 
   // Get emails with spc_members.lead_score > 45 OR spc_members.status = 'active'
   const { data: spcScored } = await supabase
@@ -98,14 +92,48 @@ export async function POST(req: NextRequest) {
     .select('email')
     .eq('status', 'active')
 
-  const spcEmails = new Set(
-    (spcScored ?? []).map((c) => c.email).concat((spcActive ?? []).map((c) => c.email)),
-  )
+  // Union of all candidate emails (deduplicated)
+  const candidateEmails: string[] = []
+  const seen = new Set<string>()
+  for (const list of [scoredContacts ?? [], spcScored ?? [], spcActive ?? []]) {
+    for (const row of list) {
+      const email = row.email
+      if (!seen.has(email)) {
+        seen.add(email)
+        candidateEmails.push(email)
+      }
+    }
+  }
 
-  // Eligible = in stages 1-3 AND (scored > 45 OR spc scored > 45 OR spc active)
-  const eligibleEmails = stageEmailsList.filter(
-    (email) => scoredEmails.has(email) || spcEmails.has(email),
-  )
+  if (!candidateEmails.length) {
+    return NextResponse.json({
+      ...results,
+      errors: ['No scored or active SPC contacts found'],
+    })
+  }
+
+  // Validate candidates are in stages 1-3 (batch in chunks of 200 for the IN filter)
+  const eligibleEmails: string[] = []
+  const BATCH = 200
+  for (let i = 0; i < candidateEmails.length; i += BATCH) {
+    const batch = candidateEmails.slice(i, i + BATCH)
+    const { data: matched } = await supabase
+      .from('value_ladder_contacts')
+      .select('buyer_email')
+      .in('buyer_email', batch)
+      .in('current_stage', [1, 2, 3])
+
+    for (const m of matched ?? []) {
+      eligibleEmails.push(m.buyer_email)
+    }
+  }
+
+  if (!eligibleEmails.length) {
+    return NextResponse.json({
+      ...results,
+      errors: ['No eligible contacts in stages 1-3 with score > 45 or active SPC'],
+    })
+  }
 
   // ── 3) Get contacts currently "in progress" (assigned in last 30 days, still active) ──
   const { data: recentAssignments } = await supabase
