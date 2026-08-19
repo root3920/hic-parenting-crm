@@ -120,6 +120,8 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
     dq_detected: String(report.dq_detected ?? ''),
     dq_spc_offered: String(report.dq_spc_offered ?? ''),
     spc_buyers: String(report.spc_buyers ?? ''),
+    portal_escalated: String(report.portal_escalated ?? ''),
+    portal_calls_scheduled: String(report.portal_calls_scheduled ?? ''),
     performance_score: report.performance_score ?? 7,
     highs: Array.isArray(report.highs) ? report.highs : (typeof report.highs === 'string' && report.highs ? report.highs.split(', ') : []),
     lows: Array.isArray(report.lows) ? report.lows : (typeof report.lows === 'string' && report.lows ? report.lows.split(', ') : []),
@@ -140,6 +142,24 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
         }
       })
   }, [])
+
+  // Auto-calculate portal metrics when values are empty (not already saved)
+  useEffect(() => {
+    if (!form.setter_name || !form.date) return
+    // Only auto-fill if both fields are still empty (not previously saved)
+    if (form.portal_escalated || form.portal_calls_scheduled) return
+    fetch(`/api/setter-portal/metrics?setter_name=${encodeURIComponent(form.setter_name)}&date=${form.date}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) return
+        setForm((prev) => ({
+          ...prev,
+          portal_escalated: prev.portal_escalated || String(data.portal_escalated ?? 0),
+          portal_calls_scheduled: prev.portal_calls_scheduled || String(data.portal_calls_scheduled ?? 0),
+        }))
+      })
+      .catch(() => {})
+  }, [form.setter_name, form.date])
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -179,6 +199,8 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
           dq_detected: n(form.dq_detected),
           dq_spc_offered: n(form.dq_spc_offered),
           spc_buyers: n(form.spc_buyers),
+          portal_escalated: n(form.portal_escalated) || null,
+          portal_calls_scheduled: n(form.portal_calls_scheduled) || null,
           performance_score: form.performance_score,
           highs: form.highs.length ? form.highs : null,
           lows: form.lows.length ? form.lows : null,
@@ -282,6 +304,23 @@ function EditReportModal({ report, onClose, onSaved }: { report: Row; onClose: (
           </div>
         </div>
 
+        {/* Internal Escalations */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-indigo-600 mb-2">Internal Escalations</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Contacts escalated</label>
+              <input type="number" min={0} value={form.portal_escalated} onChange={(e) => set('portal_escalated', e.target.value)} className={inputCls} />
+              <p className="text-[10px] text-zinc-400 mt-1">Moved past &quot;Not Contacted&quot; in portal</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Calls scheduled (portal)</label>
+              <input type="number" min={0} value={form.portal_calls_scheduled} onChange={(e) => set('portal_calls_scheduled', e.target.value)} className={inputCls} />
+              <p className="text-[10px] text-zinc-400 mt-1">Marked &quot;Call Scheduled&quot; in portal</p>
+            </div>
+          </div>
+        </div>
+
         {/* Performance */}
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Performance</p>
@@ -361,6 +400,13 @@ function ReportDetail({ report, onClose }: { report: Row; onClose: () => void })
           <Row label="Proposed calls" value={report.call_proposed} />
           <Row label="Scheduled calls" value={report.qualified_calls} />
         </div>
+        {(report.portal_escalated > 0 || report.portal_calls_scheduled > 0) && (
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-indigo-600 mb-2">Internal Escalations</p>
+            <Row label="Contacts escalated" value={report.portal_escalated} />
+            <Row label="Calls scheduled (portal)" value={report.portal_calls_scheduled} />
+          </div>
+        )}
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2">Self-evaluation</p>
           <Row label="Performance" value={`${report.performance_score}/10`} />
@@ -455,6 +501,8 @@ export default function SetterDashboardPage() {
           dq_detected:       r.dq_detected ?? 0,
           dq_spc_offered:    r.dq_spc_offered ?? 0,
           spc_buyers:        r.spc_buyers ?? 0,
+          portal_escalated:  r.portal_escalated ?? 0,
+          portal_calls_scheduled: r.portal_calls_scheduled ?? 0,
           source:            'Formulario' as const,
         })),
       ].sort((a, b) => b.date.localeCompare(a.date))
@@ -514,6 +562,8 @@ export default function SetterDashboardPage() {
     const totalDqDetected = sumField(filtered, 'dq_detected')
     const totalDqSpcOffered = sumField(filtered, 'dq_spc_offered')
     const totalSpcBuyers = sumField(filtered, 'spc_buyers')
+    const totalPortalEscalated = sumField(filtered, 'portal_escalated')
+    const totalPortalCallsScheduled = sumField(filtered, 'portal_calls_scheduled')
     return {
       totalConvos,
       totalFollowups,
@@ -525,6 +575,8 @@ export default function SetterDashboardPage() {
       totalDqDetected,
       totalDqSpcOffered,
       totalSpcBuyers,
+      totalPortalEscalated,
+      totalPortalCallsScheduled,
     }
   }, [filtered])
 
@@ -722,6 +774,8 @@ export default function SetterDashboardPage() {
                 sub={`${fmtPct(safeDiv(volume.totalDqSpcOffered, volume.totalDqDetected) * 100)} de DQ`}
               />
               <VolumeCard label="Compradores SPC" value={volume.totalSpcBuyers} />
+              <VolumeCard label="Portal Escalated" value={volume.totalPortalEscalated} sub="Contacts moved past Not Contacted" />
+              <VolumeCard label="Portal Calls Scheduled" value={volume.totalPortalCallsScheduled} sub="Via Setter Portal queue" />
             </div>
 
             {/* ── Section 3: Charts ── */}
@@ -900,6 +954,8 @@ export default function SetterDashboardPage() {
                       dq_detected: updated.dq_detected ?? 0,
                       dq_spc_offered: updated.dq_spc_offered ?? 0,
                       spc_buyers: updated.spc_buyers ?? 0,
+                      portal_escalated: updated.portal_escalated ?? 0,
+                      portal_calls_scheduled: updated.portal_calls_scheduled ?? 0,
                     }
                   : r
               ))

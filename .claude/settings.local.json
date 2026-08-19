@@ -80,7 +80,9 @@
       "Bash(lsof -ti:3847)",
       "Bash(xargs kill:*)",
       "Bash(kill 95940)",
-      "Bash(lsof -ti:3951)"
+      "Bash(lsof -ti:3951)",
+      "Bash(while read:*)",
+      "Bash(kill 97544)"
     ]
   }
 }

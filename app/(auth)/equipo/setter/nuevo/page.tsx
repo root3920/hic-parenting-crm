@@ -49,6 +49,9 @@ interface FormState {
   dq_detected: string
   dq_spc_offered: string
   spc_buyers: string
+  // Internal Escalations (portal)
+  portal_escalated: string
+  portal_calls_scheduled: string
   // Autoevaluación
   performance_score: number
   highs: string[]
@@ -64,6 +67,7 @@ const initialState: FormState = {
   calls_proposed: '', calls_booked: '', calls_no_reply: '', calls_followup: '',
   qual_apps: '', disqual_apps: '', waiting: '', requalified: 'N/A', disqual_reasons: [],
   dq_detected: '', dq_spc_offered: '', spc_buyers: '',
+  portal_escalated: '', portal_calls_scheduled: '',
   performance_score: 7, highs: [], lows: [], notas: '',
 }
 
@@ -160,6 +164,22 @@ export default function NuevoReporteSetterPage() {
       })
   }, [])
 
+  // Auto-calculate portal escalation metrics when setter + date are set
+  useEffect(() => {
+    if (!form.setter_name || !form.date) return
+    fetch(`/api/setter-portal/metrics?setter_name=${encodeURIComponent(form.setter_name)}&date=${form.date}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) return
+        setForm((prev) => ({
+          ...prev,
+          portal_escalated: prev.portal_escalated || String(data.portal_escalated ?? 0),
+          portal_calls_scheduled: prev.portal_calls_scheduled || String(data.portal_calls_scheduled ?? 0),
+        }))
+      })
+      .catch(() => {})
+  }, [form.setter_name, form.date])
+
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
@@ -202,6 +222,8 @@ export default function NuevoReporteSetterPage() {
       dq_detected: n(form.dq_detected),
       dq_spc_offered: n(form.dq_spc_offered),
       spc_buyers: n(form.spc_buyers),
+      portal_escalated: n(form.portal_escalated) || null,
+      portal_calls_scheduled: n(form.portal_calls_scheduled) || null,
       performance_score: form.performance_score,
       highs: form.highs.length ? form.highs : null,
       lows: form.lows.length ? form.lows : null,
@@ -367,7 +389,28 @@ export default function NuevoReporteSetterPage() {
             </div>
           </SectionCard>
 
-          {/* SECTION 5 — Autoevaluación */}
+          {/* SECTION 5 — Internal Escalations */}
+          <SectionCard className="border-indigo-300 dark:border-indigo-700 border-l-4 border-l-indigo-500">
+            <SectionHeader
+              color="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+              label="Internal Escalations"
+              sub="Auto-calculated from Setter Portal queue"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Contacts escalated</FieldLabel>
+                <NumberInput value={form.portal_escalated} onChange={(v) => set('portal_escalated', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">Contacts moved past &quot;Not Contacted&quot; in the portal today</p>
+              </div>
+              <div>
+                <FieldLabel>Calls scheduled (portal)</FieldLabel>
+                <NumberInput value={form.portal_calls_scheduled} onChange={(v) => set('portal_calls_scheduled', v)} />
+                <p className="text-[10px] text-zinc-400 mt-1">Contacts marked &quot;Call Scheduled&quot; in the portal today</p>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* SECTION 6 — Autoevaluación */}
           <SectionCard>
             <SectionHeader
               color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
