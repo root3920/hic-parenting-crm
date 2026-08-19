@@ -13,6 +13,7 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/equipo/csm':         ['admin', 'csm_ht'],
   '/equipo/spc':         ['admin', 'csm_spc'],
   '/setter-portal':      ['admin', 'setter'],
+  '/instagram-dm':       ['admin', 'setter'],
   '/equipo/setter':      ['admin', 'setter'],
   '/equipo/closer':      ['admin', 'closer'],
   '/equipo/profiles':    ['admin'],
@@ -74,6 +75,9 @@ export async function middleware(request: NextRequest) {
     pathname === '/api/spc/backfill-csv' ||
     pathname === '/api/contacts/pipeline/recompute' ||
     pathname === '/api/setter-portal/daily-assignment' ||
+    pathname.startsWith('/api/instagram/webhook') ||
+    pathname.startsWith('/api/instagram/generate-draft') ||
+    pathname.startsWith('/api/instagram/oauth/') ||
     pathname === '/api/growth/reports/public' ||
     pathname === '/api/growth/coaches' ||
     pathname === '/api/growth/students' ||

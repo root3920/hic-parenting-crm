@@ -28,6 +28,7 @@ import {
   Sprout,
   HeartHandshake,
   Inbox,
+  MessageSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -62,6 +63,7 @@ const ALL_NAV_ITEMS = [
   { href: '/finance',      label: 'Finance',      icon: DollarSign,      roles: ['admin'] as UserRole[] },
   { href: '/goals',        label: 'Goals',        icon: Target,          roles: ['admin'] as UserRole[] },
   { href: '/growth',       label: 'Growth',       icon: Sprout,          roles: ['admin', 'closer', 'csm_spc', 'csm_ht', 'coach'] as UserRole[] },
+  { href: '/instagram-dm', label: 'Instagram DM',  icon: MessageSquare,   roles: ['admin', 'setter'] as UserRole[] },
   { href: '/contacts',     label: 'Clients',      icon: BookUser,        roles: ['admin', 'setter'] as UserRole[] },
   { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
   { href: '/calendar',     label: 'Calendar',     icon: CalendarDays,    roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
