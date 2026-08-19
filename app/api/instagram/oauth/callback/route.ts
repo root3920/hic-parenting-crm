@@ -62,30 +62,35 @@ export async function GET(req: NextRequest) {
 
   try {
     // ── 1) Exchange code for short-lived token ────────────────────────────
-    const tokenUrl = new URL('https://graph.facebook.com/v21.0/oauth/access_token')
-    tokenUrl.searchParams.set('client_id', appId)
-    tokenUrl.searchParams.set('client_secret', appSecret)
-    tokenUrl.searchParams.set('redirect_uri', redirectUri)
-    tokenUrl.searchParams.set('code', code)
-
-    const tokenRes = await fetch(tokenUrl.toString())
+    // Instagram Login flow uses api.instagram.com (POST with form body)
+    const tokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: appId,
+        client_secret: appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+        code,
+      }).toString(),
+    })
     const tokenData = await tokenRes.json()
 
-    if (tokenData.error) {
-      console.error('[IG OAuth] Token exchange error:', tokenData.error)
+    if (tokenData.error_type || tokenData.error_message || !tokenData.access_token) {
+      console.error('[IG OAuth] Token exchange error:', tokenData)
       return NextResponse.redirect(
-        new URL(`/settings/instagram?error=token_exchange_failed`, req.url).toString(),
+        new URL('/settings/instagram?error=token_exchange_failed', req.url).toString(),
       )
     }
 
     const shortLivedToken = tokenData.access_token
 
     // ── 2) Exchange for long-lived token ──────────────────────────────────
-    const longLivedUrl = new URL('https://graph.facebook.com/v21.0/oauth/access_token')
-    longLivedUrl.searchParams.set('grant_type', 'fb_exchange_token')
-    longLivedUrl.searchParams.set('client_id', appId)
+    // Instagram Login uses graph.instagram.com for long-lived exchange
+    const longLivedUrl = new URL('https://graph.instagram.com/access_token')
+    longLivedUrl.searchParams.set('grant_type', 'ig_exchange_token')
     longLivedUrl.searchParams.set('client_secret', appSecret)
-    longLivedUrl.searchParams.set('fb_exchange_token', shortLivedToken)
+    longLivedUrl.searchParams.set('access_token', shortLivedToken)
 
     const longLivedRes = await fetch(longLivedUrl.toString())
     const longLivedData = await longLivedRes.json()
@@ -93,58 +98,20 @@ export async function GET(req: NextRequest) {
     const accessToken = longLivedData.access_token || shortLivedToken
     const tokenType = longLivedData.access_token ? 'long_lived' : 'short_lived'
 
-    // ── 3) Get the user's Instagram Business Account(s) ───────────────────
-    // First get the Facebook Pages the user manages
-    const pagesRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/accounts?access_token=${accessToken}`,
+    // ── 3) Get Instagram profile directly ─────────────────────────────────
+    // With Instagram Login, /me returns the IG account directly (no FB Pages lookup)
+    const meRes = await fetch(
+      `https://graph.instagram.com/v21.0/me?fields=user_id,username,name,profile_picture_url&access_token=${accessToken}`,
     )
-    const pagesData = await pagesRes.json()
+    const meData = await meRes.json()
 
-    let igUserId: string | null = null
-    let igUsername: string | null = null
-    let igProfilePic: string | null = null
-    let igName: string | null = null
-
-    // For each page, check if it has a connected Instagram Business Account
-    for (const page of pagesData.data ?? []) {
-      const igRes = await fetch(
-        `https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account&access_token=${accessToken}`,
-      )
-      const igData = await igRes.json()
-
-      if (igData.instagram_business_account?.id) {
-        igUserId = igData.instagram_business_account.id
-
-        // Get IG profile details
-        const profileRes = await fetch(
-          `https://graph.facebook.com/v21.0/${igUserId}?fields=username,name,profile_picture_url&access_token=${accessToken}`,
-        )
-        const profileData = await profileRes.json()
-
-        igUsername = profileData.username || igUserId
-        igProfilePic = profileData.profile_picture_url || null
-        igName = profileData.name || null
-        break
-      }
-    }
-
-    // If no Instagram Business Account found via pages, try the direct
-    // Instagram API (for accounts connected via instagram_business_basic)
-    if (!igUserId) {
-      const meRes = await fetch(
-        `https://graph.instagram.com/v21.0/me?fields=user_id,username,name,profile_picture_url&access_token=${accessToken}`,
-      )
-      const meData = await meRes.json()
-
-      if (meData.user_id || meData.id) {
-        igUserId = meData.user_id || meData.id
-        igUsername = meData.username || igUserId
-        igProfilePic = meData.profile_picture_url || null
-        igName = meData.name || null
-      }
-    }
+    const igUserId = meData.user_id || meData.id || null
+    const igUsername = meData.username || igUserId
+    const igProfilePic = meData.profile_picture_url || null
+    const igName = meData.name || null
 
     if (!igUserId) {
+      console.error('[IG OAuth] No user_id in /me response:', meData)
       return NextResponse.redirect(
         new URL('/settings/instagram?error=no_ig_account', req.url).toString(),
       )

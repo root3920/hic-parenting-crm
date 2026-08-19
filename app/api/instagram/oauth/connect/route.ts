@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
   // Generate a state parameter to prevent CSRF
   const state = crypto.randomBytes(16).toString('hex')
 
-  // Store state in a cookie for validation on callback
-  const authUrl = new URL('https://www.facebook.com/v21.0/dialog/oauth')
+  // Instagram Login flow uses Instagram's own OAuth endpoint (not Facebook's)
+  const authUrl = new URL('https://www.instagram.com/oauth/authorize')
   authUrl.searchParams.set('client_id', appId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('scope', 'instagram_business_basic,instagram_business_manage_messages')
