@@ -61,60 +61,110 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // ── 1) Exchange code for short-lived token ────────────────────────────
-    // Instagram Login flow uses api.instagram.com (POST with form body)
-    const tokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: appId,
-        client_secret: appSecret,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUri,
-        code,
-      }).toString(),
-    })
+    // ── 1) Exchange code for user access token ────────────────────────────
+    // Facebook Login flow uses graph.facebook.com
+    const tokenUrl = new URL('https://graph.facebook.com/v21.0/oauth/access_token')
+    tokenUrl.searchParams.set('client_id', appId)
+    tokenUrl.searchParams.set('client_secret', appSecret)
+    tokenUrl.searchParams.set('redirect_uri', redirectUri)
+    tokenUrl.searchParams.set('code', code)
+
+    const tokenRes = await fetch(tokenUrl.toString())
     const tokenData = await tokenRes.json()
 
-    if (tokenData.error_type || tokenData.error_message || !tokenData.access_token) {
+    if (tokenData.error || !tokenData.access_token) {
       console.error('[IG OAuth] Token exchange error:', tokenData)
       return NextResponse.redirect(
         new URL('/settings/instagram?error=token_exchange_failed', req.url).toString(),
       )
     }
 
-    const shortLivedToken = tokenData.access_token
+    const userAccessToken = tokenData.access_token
 
-    // ── 2) Exchange for long-lived token ──────────────────────────────────
-    // Instagram Login uses graph.instagram.com for long-lived exchange
-    const longLivedUrl = new URL('https://graph.instagram.com/access_token')
-    longLivedUrl.searchParams.set('grant_type', 'ig_exchange_token')
-    longLivedUrl.searchParams.set('client_secret', appSecret)
-    longLivedUrl.searchParams.set('access_token', shortLivedToken)
-
-    const longLivedRes = await fetch(longLivedUrl.toString())
-    const longLivedData = await longLivedRes.json()
-
-    const accessToken = longLivedData.access_token || shortLivedToken
-    const tokenType = longLivedData.access_token ? 'long_lived' : 'short_lived'
-
-    // ── 3) Get Instagram profile directly ─────────────────────────────────
-    // With Instagram Login, /me returns the IG account directly (no FB Pages lookup)
-    const meRes = await fetch(
-      `https://graph.instagram.com/v21.0/me?fields=user_id,username,name,profile_picture_url&access_token=${accessToken}`,
+    // ── 2) Get Facebook Pages the user manages ────────────────────────────
+    // Each Page has its own access_token — we need the Page token for messaging
+    const pagesRes = await fetch(
+      `https://graph.facebook.com/v21.0/me/accounts?access_token=${userAccessToken}`,
     )
-    const meData = await meRes.json()
+    const pagesData = await pagesRes.json()
 
-    const igUserId = meData.user_id || meData.id || null
-    const igUsername = meData.username || igUserId
-    const igProfilePic = meData.profile_picture_url || null
-    const igName = meData.name || null
-
-    if (!igUserId) {
-      console.error('[IG OAuth] No user_id in /me response:', meData)
+    if (!pagesData.data?.length) {
+      console.error('[IG OAuth] No Facebook Pages found:', pagesData)
       return NextResponse.redirect(
         new URL('/settings/instagram?error=no_ig_account', req.url).toString(),
       )
+    }
+
+    // ── 3) Find the Page linked to an Instagram Business Account ──────────
+    let igUserId: string | null = null
+    let igUsername: string | null = null
+    let igProfilePic: string | null = null
+    let igName: string | null = null
+    let pageAccessToken: string | null = null
+
+    for (const page of pagesData.data) {
+      const igRes = await fetch(
+        `https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`,
+      )
+      const igData = await igRes.json()
+
+      if (igData.instagram_business_account?.id) {
+        igUserId = igData.instagram_business_account.id
+        pageAccessToken = page.access_token
+
+        // Fetch IG profile details using the Page token
+        const profileRes = await fetch(
+          `https://graph.facebook.com/v21.0/${igUserId}?fields=username,name,profile_picture_url&access_token=${page.access_token}`,
+        )
+        const profileData = await profileRes.json()
+
+        igUsername = profileData.username || igUserId
+        igProfilePic = profileData.profile_picture_url || null
+        igName = profileData.name || null
+        break
+      }
+    }
+
+    if (!igUserId || !pageAccessToken) {
+      console.error('[IG OAuth] No Instagram Business Account linked to any Page')
+      return NextResponse.redirect(
+        new URL('/settings/instagram?error=no_ig_account', req.url).toString(),
+      )
+    }
+
+    // Page access tokens obtained via a long-lived user token are already
+    // long-lived (they don't expire). Exchange user token first to be safe.
+    let tokenType = 'page_token'
+
+    // Try to exchange user token for long-lived, which makes Page tokens permanent
+    const llUrl = new URL('https://graph.facebook.com/v21.0/oauth/access_token')
+    llUrl.searchParams.set('grant_type', 'fb_exchange_token')
+    llUrl.searchParams.set('client_id', appId)
+    llUrl.searchParams.set('client_secret', appSecret)
+    llUrl.searchParams.set('fb_exchange_token', userAccessToken)
+
+    const llRes = await fetch(llUrl.toString())
+    const llData = await llRes.json()
+
+    if (llData.access_token) {
+      // Re-fetch Pages with the long-lived user token to get non-expiring Page tokens
+      const llPagesRes = await fetch(
+        `https://graph.facebook.com/v21.0/me/accounts?access_token=${llData.access_token}`,
+      )
+      const llPagesData = await llPagesRes.json()
+
+      for (const page of llPagesData.data ?? []) {
+        const igCheck = await fetch(
+          `https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`,
+        )
+        const igCheckData = await igCheck.json()
+
+        if (igCheckData.instagram_business_account?.id === igUserId) {
+          pageAccessToken = page.access_token
+          tokenType = 'long_lived_page_token'
+          break
+        }
+      }
     }
 
     // ── 4) Store in database ──────────────────────────────────────────────
@@ -128,7 +178,7 @@ export async function GET(req: NextRequest) {
           ig_username: igUsername!,
           ig_profile_pic_url: igProfilePic,
           ig_name: igName,
-          access_token: accessToken,
+          access_token: pageAccessToken,
           token_type: tokenType,
           connected_by: user.id,
           connected_at: new Date().toISOString(),
