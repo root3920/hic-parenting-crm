@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
 
   console.log('[ManyChat Webhook] Step 3: Inserting message')
 
-  const { error: msgErr } = await supabase
+  const { data: insertedMsg, error: msgErr } = await supabase
     .from('instagram_messages')
     .insert({
       conversation_id: conversation.id,
@@ -166,19 +166,61 @@ export async function POST(req: NextRequest) {
       sent_at: sentAt,
       ig_message_id: dedupKey,
     })
+    .select('id')
+    .single()
 
-  if (msgErr) {
+  if (msgErr || !insertedMsg) {
     console.error('[ManyChat Webhook] ❌ Message insert FAILED')
-    console.error('[ManyChat Webhook] Error code:', msgErr.code)
-    console.error('[ManyChat Webhook] Error message:', msgErr.message)
-    console.error('[ManyChat Webhook] Error details:', msgErr.details)
+    console.error('[ManyChat Webhook] Error code:', msgErr?.code)
+    console.error('[ManyChat Webhook] Error message:', msgErr?.message)
+    console.error('[ManyChat Webhook] Error details:', msgErr?.details)
     console.error('[ManyChat Webhook] Full error:', JSON.stringify(msgErr, null, 2))
     return NextResponse.json({
       error: 'DB error on message insert',
-      details: msgErr.message,
-      code: msgErr.code,
+      details: msgErr?.message,
+      code: msgErr?.code,
     }, { status: 500 })
   }
+
+  console.log('[ManyChat Webhook] ✓ Message inserted, id:', insertedMsg.id)
+
+  // ── Create review queue entry ───────────────────────────────────────────
+  // This makes the conversation visible in the /instagram-dm review UI.
+  // Draft generation (Claude) runs async via /api/instagram/generate-draft
+  // after we respond to ManyChat.
+  console.log('[ManyChat Webhook] Step 4: Creating review queue entry')
+
+  const { error: queueErr } = await supabase
+    .from('instagram_review_queue')
+    .insert({
+      conversation_id: conversation.id,
+      trigger_message_id: insertedMsg.id,
+      draft_response: '(Generating draft…)',
+      ai_assessment: 'gathering_info',
+      ai_reasoning: 'New inbound message from ManyChat — pending AI draft.',
+      status: 'pending',
+    })
+
+  if (queueErr) {
+    // Non-fatal: message was saved, queue entry just failed
+    console.error('[ManyChat Webhook] ⚠ Review queue insert failed:', queueErr.message, queueErr.code)
+  } else {
+    console.log('[ManyChat Webhook] ✓ Review queue entry created')
+  }
+
+  // ── Trigger async draft generation (non-blocking) ───────────────────────
+  // Fire-and-forget: don't await, so we respond to ManyChat within 2s.
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.hicparenting.com'
+  fetch(`${baseUrl}/api/instagram/generate-draft`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      conversation_id: conversation.id,
+      trigger_message_id: insertedMsg.id,
+    }),
+  }).catch((err) => {
+    console.error('[ManyChat Webhook] ⚠ Draft generation trigger failed:', err)
+  })
 
   console.log(`[ManyChat Webhook] ✓ Done: ${igUsername} → "${messageText.slice(0, 50)}"`)
 
@@ -186,5 +228,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     action: 'created',
     conversation_id: conversation.id,
+    message_id: insertedMsg.id,
   })
 }
