@@ -352,14 +352,9 @@ function InstagramSettingsContent() {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({
+                                    ig_conversation_id: conv.ig_conversation_id,
                                     participant_id: conv.participant_id,
                                     participant_name: conv.participant_name,
-                                    messages: conv.messages.map((m) => ({
-                                      text: m.text,
-                                      is_from_us: m.is_from_us,
-                                      created_time: m.created_time,
-                                      id: m.id,
-                                    })),
                                   }),
                                 })
                                 const json = await res.json()

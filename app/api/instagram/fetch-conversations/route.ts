@@ -62,7 +62,7 @@ export async function GET() {
 
   try {
     // Step 1: Fetch conversations with lightweight fields only (no nested messages)
-    const convUrl = `https://graph.facebook.com/v21.0/${fbPageId}/conversations?platform=instagram&fields=participants,updated_time&limit=10&access_token=${pageToken}`
+    const convUrl = `https://graph.facebook.com/v21.0/${fbPageId}/conversations?platform=instagram&fields=participants,updated_time&limit=5&access_token=${pageToken}`
 
     console.log('[IG Fetch Conversations] Calling:', convUrl.replace(pageToken, '<REDACTED>'))
 
@@ -90,52 +90,21 @@ export async function GET() {
 
     const importedIds = new Set((existingConvs ?? []).map((c) => c.ig_user_id))
 
-    // Step 2: For each conversation, fetch just the latest message in a separate call
-    const conversations = []
-    for (const conv of convData.data ?? []) {
+    // Step 2: Transform conversation list (no message fetching — that's on-demand)
+    const conversations = (convData.data ?? []).map((conv: ConvResponse) => {
       const otherParticipant = (conv.participants?.data ?? []).find(
         (p: Participant) => p.id !== igBusinessId,
       )
 
-      // Fetch latest message preview (1 message only)
-      let messages: Array<{
-        id: string
-        text: string
-        from_id: string
-        from_name: string | null
-        is_from_us: boolean
-        created_time: string
-      }> = []
-
-      try {
-        const msgRes = await fetch(
-          `https://graph.facebook.com/v21.0/${conv.id}?fields=messages.limit(1){message,from,created_time,id}&access_token=${pageToken}`,
-        )
-        const msgData = await msgRes.json()
-
-        if (msgData.messages?.data) {
-          messages = msgData.messages.data.map((m: MsgResponse) => ({
-            id: m.id,
-            text: m.message,
-            from_id: m.from?.id,
-            from_name: m.from?.name || m.from?.username,
-            is_from_us: m.from?.id === igBusinessId,
-            created_time: m.created_time,
-          }))
-        }
-      } catch {
-        // Non-fatal — we still show the conversation without a preview
-      }
-
-      conversations.push({
+      return {
         ig_conversation_id: conv.id,
         participant_id: otherParticipant?.id || null,
         participant_name: otherParticipant?.name || otherParticipant?.username || null,
         updated_time: conv.updated_time,
         already_imported: otherParticipant ? importedIds.has(otherParticipant.id) : false,
-        messages,
-      })
-    }
+        messages: [] as Array<{ id: string; text: string; from_id: string; from_name: string | null; is_from_us: boolean; created_time: string }>,
+      }
+    })
 
     return NextResponse.json({ conversations, ig_business_id: igBusinessId })
   } catch (err) {
@@ -150,11 +119,12 @@ export async function GET() {
  * POST /api/instagram/fetch-conversations
  *
  * Imports a specific real conversation into our DB.
+ * Fetches messages on-demand from the Graph API at import time.
  *
  * Body: {
- *   participant_id: string   — the IG-scoped user ID of the sender
- *   participant_name: string — display name/username
- *   messages: Array<{ text: string, is_from_us: boolean, created_time: string, id?: string }>
+ *   ig_conversation_id: string — the Graph API conversation ID
+ *   participant_id: string     — the IG-scoped user ID of the sender
+ *   participant_name: string   — display name/username
  * }
  */
 export async function POST(req: NextRequest) {
@@ -173,26 +143,66 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { participant_id, participant_name, messages } = body as {
+  const { ig_conversation_id, participant_id, participant_name } = body as {
+    ig_conversation_id?: string
     participant_id?: string
     participant_name?: string
-    messages?: Array<{
-      text: string
-      is_from_us: boolean
-      created_time: string
-      id?: string
-    }>
   }
 
-  if (!participant_id || !messages?.length) {
+  if (!participant_id || !ig_conversation_id) {
     return NextResponse.json(
-      { error: 'participant_id and messages are required' },
+      { error: 'ig_conversation_id and participant_id are required' },
       { status: 400 },
     )
   }
 
   const svc = getServiceClient()
   const now = new Date().toISOString()
+
+  // Get connected account for API calls
+  const { data: account } = await svc
+    .from('instagram_connected_accounts')
+    .select('ig_user_id, access_token')
+    .order('connected_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (!account) {
+    return NextResponse.json({ error: 'No Instagram account connected' }, { status: 400 })
+  }
+
+  // Fetch messages for this conversation from Graph API
+  let messages: Array<{ text: string; is_from_us: boolean; created_time: string; id?: string }> = []
+  try {
+    const msgRes = await fetch(
+      `https://graph.facebook.com/v21.0/${ig_conversation_id}?fields=messages.limit(10){message,from,created_time,id}&access_token=${account.access_token}`,
+    )
+    const msgData = await msgRes.json()
+
+    if (msgData.error) {
+      console.error('[IG Import] Message fetch error:', msgData.error)
+      return NextResponse.json(
+        { error: `Failed to fetch messages: ${msgData.error.message}` },
+        { status: 502 },
+      )
+    }
+
+    messages = (msgData.messages?.data ?? []).map((m: MsgResponse) => ({
+      text: m.message,
+      is_from_us: m.from?.id === account.ig_user_id,
+      created_time: m.created_time,
+      id: m.id,
+    }))
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Failed to fetch messages: ${err}` },
+      { status: 500 },
+    )
+  }
+
+  if (!messages.length) {
+    return NextResponse.json({ error: 'No messages found in this conversation' }, { status: 400 })
+  }
 
   // Upsert conversation
   const { data: conversation, error: convErr } = await svc
