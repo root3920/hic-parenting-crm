@@ -1,10 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+function getServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error(`[ManyChat Webhook] Missing Supabase env vars — URL: ${!!url}, KEY: ${!!key}`)
+  }
+  return createClient(url, key)
+}
 
 /**
  * POST /api/webhooks/manychat
@@ -72,12 +76,26 @@ export async function POST(req: NextRequest) {
   const displayName = [firstName, lastName].filter(Boolean).join(' ') || username || subscriberId
   const igUsername = username || subscriberId
 
+  console.log('[ManyChat Webhook] ── Processing ──')
+  console.log('[ManyChat Webhook] subscriber_id:', subscriberId)
+  console.log('[ManyChat Webhook] username:', igUsername)
+  console.log('[ManyChat Webhook] message:', messageText.slice(0, 80))
+  console.log('[ManyChat Webhook] sentAt:', sentAt)
+
   // ── Dedup key for messages ──────────────────────────────────────────────
-  // ManyChat doesn't provide a unique message ID, so we use a composite:
-  // subscriber_id + timestamp + first 100 chars of text → hashed into ig_message_id
   const dedupKey = `mc_${subscriberId}_${sentAt}_${messageText.slice(0, 100)}`
 
+  let supabase: ReturnType<typeof getServiceClient>
+  try {
+    supabase = getServiceClient()
+  } catch (err) {
+    console.error('[ManyChat Webhook] Supabase client init FAILED:', err)
+    return NextResponse.json({ error: 'Server config error' }, { status: 500 })
+  }
+
   // ── Upsert conversation ─────────────────────────────────────────────────
+  console.log('[ManyChat Webhook] Step 1: Upserting conversation for ig_user_id:', subscriberId)
+
   const { data: conversation, error: convErr } = await supabase
     .from('instagram_conversations')
     .upsert(
@@ -85,6 +103,7 @@ export async function POST(req: NextRequest) {
         ig_user_id: subscriberId,
         ig_username: igUsername,
         name: displayName !== igUsername ? displayName : null,
+        status: 'active',
         last_message_at: sentAt,
       },
       { onConflict: 'ig_user_id' },
@@ -93,27 +112,50 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (convErr || !conversation) {
-    console.error('[ManyChat Webhook] Conversation upsert error:', convErr)
-    return NextResponse.json({ error: 'DB error' }, { status: 500 })
+    console.error('[ManyChat Webhook] ❌ Conversation upsert FAILED')
+    console.error('[ManyChat Webhook] Error code:', convErr?.code)
+    console.error('[ManyChat Webhook] Error message:', convErr?.message)
+    console.error('[ManyChat Webhook] Error details:', convErr?.details)
+    console.error('[ManyChat Webhook] Error hint:', convErr?.hint)
+    console.error('[ManyChat Webhook] Full error:', JSON.stringify(convErr, null, 2))
+    return NextResponse.json({
+      error: 'DB error on conversation upsert',
+      details: convErr?.message,
+      code: convErr?.code,
+    }, { status: 500 })
   }
 
+  console.log('[ManyChat Webhook] ✓ Conversation upserted, id:', conversation.id)
+
   // Update last_message_at (upsert may not update on conflict for all columns)
-  await supabase
+  const { error: updateErr } = await supabase
     .from('instagram_conversations')
     .update({ last_message_at: sentAt, ig_username: igUsername })
     .eq('id', conversation.id)
 
+  if (updateErr) {
+    console.error('[ManyChat Webhook] ⚠ Update last_message_at failed:', updateErr.message)
+  }
+
   // ── Insert message (dedup by ig_message_id) ─────────────────────────────
-  const { data: existingMsg } = await supabase
+  console.log('[ManyChat Webhook] Step 2: Checking dedup for:', dedupKey.slice(0, 60))
+
+  const { data: existingMsg, error: dedupErr } = await supabase
     .from('instagram_messages')
     .select('id')
     .eq('ig_message_id', dedupKey)
     .maybeSingle()
 
+  if (dedupErr) {
+    console.error('[ManyChat Webhook] ⚠ Dedup check error:', dedupErr.message)
+  }
+
   if (existingMsg) {
-    // Duplicate — already processed
+    console.log('[ManyChat Webhook] Duplicate detected, skipping')
     return NextResponse.json({ ok: true, action: 'duplicate_skipped' })
   }
+
+  console.log('[ManyChat Webhook] Step 3: Inserting message')
 
   const { error: msgErr } = await supabase
     .from('instagram_messages')
@@ -126,23 +168,19 @@ export async function POST(req: NextRequest) {
     })
 
   if (msgErr) {
-    console.error('[ManyChat Webhook] Message insert error:', msgErr)
-    return NextResponse.json({ error: 'DB error' }, { status: 500 })
+    console.error('[ManyChat Webhook] ❌ Message insert FAILED')
+    console.error('[ManyChat Webhook] Error code:', msgErr.code)
+    console.error('[ManyChat Webhook] Error message:', msgErr.message)
+    console.error('[ManyChat Webhook] Error details:', msgErr.details)
+    console.error('[ManyChat Webhook] Full error:', JSON.stringify(msgErr, null, 2))
+    return NextResponse.json({
+      error: 'DB error on message insert',
+      details: msgErr.message,
+      code: msgErr.code,
+    }, { status: 500 })
   }
 
-  // ── Best-effort contact match ───────────────────────────────────────────
-  // Currently value_ladder_contacts doesn't have an ig_username field.
-  // When it does, uncomment this block:
-  // if (igUsername) {
-  //   const { data: contact } = await supabase
-  //     .from('value_ladder_contacts')
-  //     .select('id')
-  //     .eq('ig_username', igUsername)
-  //     .maybeSingle()
-  //   if (contact) { /* link conversation to contact */ }
-  // }
-
-  console.log(`[ManyChat Webhook] Processed: ${igUsername} → "${messageText.slice(0, 50)}"`)
+  console.log(`[ManyChat Webhook] ✓ Done: ${igUsername} → "${messageText.slice(0, 50)}"`)
 
   return NextResponse.json({
     ok: true,
