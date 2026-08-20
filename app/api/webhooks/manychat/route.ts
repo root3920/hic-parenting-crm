@@ -186,11 +186,17 @@ export async function POST(req: NextRequest) {
 
   // ── Create review queue entry ───────────────────────────────────────────
   // This makes the conversation visible in the /instagram-dm review UI.
-  // Draft generation (Claude) runs async via /api/instagram/generate-draft
-  // after we respond to ManyChat.
   console.log('[ManyChat Webhook] Step 4: Creating review queue entry')
+  console.log('[ManyChat Webhook] Step 4 payload:', JSON.stringify({
+    conversation_id: conversation.id,
+    trigger_message_id: insertedMsg.id,
+    draft_response: '(Generating draft…)',
+    ai_assessment: 'gathering_info',
+    ai_reasoning: 'New inbound message from ManyChat — pending AI draft.',
+    status: 'pending',
+  }))
 
-  const { error: queueErr } = await supabase
+  const { data: queueEntry, error: queueErr } = await supabase
     .from('instagram_review_queue')
     .insert({
       conversation_id: conversation.id,
@@ -200,12 +206,18 @@ export async function POST(req: NextRequest) {
       ai_reasoning: 'New inbound message from ManyChat — pending AI draft.',
       status: 'pending',
     })
+    .select('id')
+    .single()
 
-  if (queueErr) {
-    // Non-fatal: message was saved, queue entry just failed
-    console.error('[ManyChat Webhook] ⚠ Review queue insert failed:', queueErr.message, queueErr.code)
+  if (queueErr || !queueEntry) {
+    console.error('[ManyChat Webhook] ❌ Review queue insert FAILED')
+    console.error('[ManyChat Webhook] Step 4 error code:', queueErr?.code)
+    console.error('[ManyChat Webhook] Step 4 error message:', queueErr?.message)
+    console.error('[ManyChat Webhook] Step 4 error details:', queueErr?.details)
+    console.error('[ManyChat Webhook] Step 4 error hint:', queueErr?.hint)
+    console.error('[ManyChat Webhook] Step 4 full error:', JSON.stringify(queueErr, null, 2))
   } else {
-    console.log('[ManyChat Webhook] ✓ Review queue entry created')
+    console.log('[ManyChat Webhook] ✓ Review queue entry created, id:', queueEntry.id)
   }
 
   // ── Trigger async draft generation (non-blocking) ───────────────────────
@@ -229,5 +241,7 @@ export async function POST(req: NextRequest) {
     action: 'created',
     conversation_id: conversation.id,
     message_id: insertedMsg.id,
+    review_queue_id: queueEntry?.id ?? null,
+    review_queue_error: queueErr ? { code: queueErr.code, message: queueErr.message } : null,
   })
 }
