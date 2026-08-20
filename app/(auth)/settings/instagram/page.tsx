@@ -50,7 +50,8 @@ function InstagramSettingsContent() {
   const [testRecipientId, setTestRecipientId] = useState('')
   const [testMessageText, setTestMessageText] = useState('')
   const [sendingTest, setSendingTest] = useState(false)
-  const [testSendResult, setTestSendResult] = useState<{ ok?: boolean; error?: string; details?: Record<string, string | number | undefined> } | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [testSendResult, setTestSendResult] = useState<Record<string, any> | null>(null)
 
   // Real conversation import state
   interface RealConversation {
@@ -343,9 +344,34 @@ function InstagramSettingsContent() {
                     >
                       Check Status
                     </button>
+                    <button
+                      onClick={async () => {
+                        setSubscribing(true)
+                        setSubscribeResult(null)
+                        try {
+                          const res = await fetch('/api/instagram/subscribe-page', { method: 'PUT' })
+                          const json = await res.json()
+                          setSubscribeResult(json)
+                        } catch {
+                          setSubscribeResult({ error: 'Network error' })
+                        } finally {
+                          setSubscribing(false)
+                        }
+                      }}
+                      disabled={subscribing}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                    >
+                      {subscribing ? 'Working…' : 'Force Resubscribe'}
+                    </button>
                   </div>
+                  {subscribing && (
+                    <div className="flex items-center gap-2 mt-3 text-xs text-zinc-500">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>DELETE → wait 5s → POST → verify… this takes ~8 seconds</span>
+                    </div>
+                  )}
                   {subscribeResult && (
-                    <pre className="mt-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-mono text-zinc-700 dark:text-zinc-300 overflow-x-auto max-h-60 whitespace-pre-wrap break-all">
+                    <pre className="mt-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-mono text-zinc-700 dark:text-zinc-300 overflow-x-auto max-h-80 whitespace-pre-wrap break-all">
                       {JSON.stringify(subscribeResult, null, 2)}
                     </pre>
                   )}
@@ -500,18 +526,44 @@ function InstagramSettingsContent() {
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-                    Send a real Instagram DM directly via the Graph API. Use a recipient ID from the conversations list above or from Meta&apos;s API Explorer.
+                    Send a real Instagram DM via the Graph API. Paste any identifier — the full raw Meta API response is shown so you can debug exactly what happens.
                   </p>
+
+                  {/* Quick-pick from fetched conversations */}
+                  {realConvos.length > 0 && (
+                    <div className="mb-4 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800">
+                      <p className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-2">
+                        Quick-pick a real recipient ID from fetched conversations:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {realConvos.filter(c => c.participant_id).map((conv) => (
+                          <button
+                            key={conv.ig_conversation_id}
+                            onClick={() => setTestRecipientId(conv.participant_id!)}
+                            className={cn(
+                              'inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono rounded border transition-colors',
+                              testRecipientId === conv.participant_id
+                                ? 'bg-purple-600 text-white border-purple-600'
+                                : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-300 dark:border-zinc-600 hover:border-purple-400',
+                            )}
+                          >
+                            {conv.participant_name || 'Unknown'}: {conv.participant_id}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                        Recipient ID (Instagram-scoped user ID)
+                        Recipient (any format: IGSID, username, phone — experiment freely)
                       </label>
                       <input
                         type="text"
                         value={testRecipientId}
                         onChange={(e) => setTestRecipientId(e.target.value)}
-                        placeholder="e.g. 17841400123456789"
+                        placeholder="e.g. 17841400123456789 or @username"
                         className="w-full text-sm font-mono border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
                       />
                     </div>
@@ -545,20 +597,7 @@ function InstagramSettingsContent() {
                             }),
                           })
                           const json = await res.json()
-                          if (json.error) {
-                            setTestSendResult({
-                              error: json.error,
-                              details: {
-                                code: json.ig_error_code,
-                                subcode: json.ig_error_subcode,
-                                type: json.ig_error_type,
-                                fbtrace_id: json.ig_error_fbtrace,
-                              },
-                            })
-                          } else {
-                            setTestSendResult({ ok: true })
-                            setTestMessageText('')
-                          }
+                          setTestSendResult(json)
                         } catch {
                           setTestSendResult({ error: 'Network error — failed to reach server' })
                         } finally {
@@ -572,7 +611,7 @@ function InstagramSettingsContent() {
                       {sendingTest ? 'Sending…' : 'Send Message'}
                     </button>
 
-                    {/* Result display */}
+                    {/* Full raw result display */}
                     {testSendResult && (
                       <div className={cn(
                         'rounded-lg border p-3 mt-2',
@@ -580,25 +619,15 @@ function InstagramSettingsContent() {
                           ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10'
                           : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10',
                       )}>
-                        {testSendResult.ok ? (
-                          <p className="text-sm font-medium text-green-700 dark:text-green-300">
-                            Message sent successfully!
-                          </p>
-                        ) : (
-                          <>
-                            <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">
-                              {testSendResult.error}
-                            </p>
-                            {testSendResult.details && Object.values(testSendResult.details).some(Boolean) && (
-                              <p className="text-xs text-red-500 dark:text-red-400 font-mono break-all">
-                                {testSendResult.details.type && `Type: ${testSendResult.details.type}`}
-                                {testSendResult.details.code && ` · Code: ${testSendResult.details.code}`}
-                                {testSendResult.details.subcode && ` · Subcode: ${testSendResult.details.subcode}`}
-                                {testSendResult.details.fbtrace_id && ` · Trace: ${testSendResult.details.fbtrace_id}`}
-                              </p>
-                            )}
-                          </>
-                        )}
+                        <p className={cn(
+                          'text-sm font-medium mb-2',
+                          testSendResult.ok ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300',
+                        )}>
+                          {testSendResult.ok ? 'Message sent successfully!' : 'Send failed'}
+                        </p>
+                        <pre className="text-xs font-mono text-zinc-700 dark:text-zinc-300 overflow-x-auto max-h-60 whitespace-pre-wrap break-all">
+                          {JSON.stringify(testSendResult, null, 2)}
+                        </pre>
                       </div>
                     )}
                   </div>

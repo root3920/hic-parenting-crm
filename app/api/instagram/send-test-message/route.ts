@@ -85,27 +85,20 @@ export async function POST(req: NextRequest) {
 
     const sendData = await sendRes.json()
 
-    if (!sendRes.ok || sendData.error) {
-      const errMsg = sendData.error?.message || JSON.stringify(sendData.error)
-      console.error('[IG Send Test] API error:', JSON.stringify(sendData, null, 2))
-      return NextResponse.json(
-        {
-          error: `Instagram API error: ${errMsg}`,
-          ig_error: sendData.error,
-          ig_error_code: sendData.error?.code,
-          ig_error_subcode: sendData.error?.error_subcode,
-          ig_error_type: sendData.error?.type,
-          ig_error_fbtrace: sendData.error?.fbtrace_id,
-        },
-        { status: 502 },
-      )
-    }
+    console.log('[IG Send Test] HTTP status:', sendRes.status)
+    console.log('[IG Send Test] Full response:', JSON.stringify(sendData, null, 2))
 
+    // Always return the full raw response for debugging
     return NextResponse.json({
-      ok: true,
-      ig_message_id: sendData.message_id || null,
-      sent_to_recipient_id: recipient_id,
-    })
+      ok: sendRes.ok && !sendData.error,
+      http_status: sendRes.status,
+      request: {
+        url: sendUrl,
+        recipient_id,
+        ig_business_account_id: igBusinessAccountId,
+      },
+      raw_response: sendData,
+    }, { status: sendRes.ok && !sendData.error ? 200 : 502 })
   } catch (err) {
     console.error('[IG Send Test] Network error:', err)
     return NextResponse.json(
