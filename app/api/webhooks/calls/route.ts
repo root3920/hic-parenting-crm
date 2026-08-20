@@ -7,8 +7,24 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+/**
+ * Canonical name map: normalizes known GHL display-name variants
+ * to the real team_members name. Add new aliases here as they appear.
+ */
+const NAME_ALIASES: Record<string, string> = {
+  'marcela hic parenting': 'Marcela Collier',
+  'marcela hic':           'Marcela Collier',
+}
+
+function normalizeName(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  return NAME_ALIASES[trimmed.toLowerCase()] ?? trimmed
+}
+
 function inferSetter(calendarName: string, explicitSetter?: string): string | null {
-  if (explicitSetter) return explicitSetter
+  if (explicitSetter) return normalizeName(explicitSetter)
   const cal = (calendarName || '').toLowerCase()
   if (cal.includes('valentina')) return 'Valentina Llano'
   if (cal.includes('marcela collier')) return 'Marcela Collier'
@@ -73,9 +89,10 @@ export async function POST(req: NextRequest) {
     const lastName       = body?.last_name
     const email          = body?.email
     const phone          = body?.phone
-    const closerName     = body?.customData?.closer_name ||
+    const closerNameRaw  = body?.customData?.closer_name ||
                            `${body?.user?.firstName ?? ''} ${body?.user?.lastName ?? ''}`.trim() ||
                            null
+    const closerName     = normalizeName(closerNameRaw)
     const setterName     = inferSetter(calendarName, body?.customData?.setter_name)
     const utmSource      = body?.customData?.utm_source       ?? null
     const utmMedium      = body?.customData?.utm_medium       ?? null
