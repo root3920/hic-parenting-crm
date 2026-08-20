@@ -46,7 +46,7 @@ function InstagramSettingsContent() {
   const [testRecipientId, setTestRecipientId] = useState('')
   const [testMessageText, setTestMessageText] = useState('')
   const [sendingTest, setSendingTest] = useState(false)
-  const [testSendResult, setTestSendResult] = useState<{ ok?: boolean; error?: string; details?: Record<string, unknown> } | null>(null)
+  const [testSendResult, setTestSendResult] = useState<{ ok?: boolean; error?: string; details?: Record<string, string | number | undefined> } | null>(null)
 
   // Real conversation import state
   interface RealConversation {

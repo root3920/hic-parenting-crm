@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get('hub.verify_token')
   const challenge = searchParams.get('hub.challenge')
 
-  if (mode === 'subscribe' && token === process.env.IG_WEBHOOK_VERIFY_TOKEN) {
+  const verifyToken = process.env.IG_WEBHOOK_VERIFY_TOKEN || process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN
+  if (mode === 'subscribe' && token === verifyToken) {
     return new Response(challenge ?? '', { status: 200 })
   }
 
@@ -41,11 +42,19 @@ export async function GET(req: NextRequest) {
  * 4. Trigger draft generation
  */
 export async function POST(req: NextRequest) {
+  // ── 0) Log raw request immediately ──────────────────────────────────────
   const rawBody = await req.text()
+  console.log('[IG Webhook] ── POST received ──')
+  console.log('[IG Webhook] Content-Type:', req.headers.get('content-type'))
+  console.log('[IG Webhook] Body length:', rawBody.length)
+  console.log('[IG Webhook] Raw body:', rawBody.slice(0, 2000))
 
   // ── 1) Verify Meta signature ────────────────────────────────────────────
   const signature = req.headers.get('x-hub-signature-256')
-  const appSecret = process.env.IG_APP_SECRET
+  const appSecret = process.env.IG_APP_SECRET || process.env.INSTAGRAM_APP_SECRET
+
+  console.log('[IG Webhook] Signature header present:', !!signature)
+  console.log('[IG Webhook] App secret configured:', !!appSecret)
 
   if (appSecret && signature) {
     const expectedSig = 'sha256=' + crypto
@@ -54,26 +63,34 @@ export async function POST(req: NextRequest) {
       .digest('hex')
 
     if (signature !== expectedSig) {
-      console.error('[IG Webhook] Invalid signature')
+      console.error('[IG Webhook] ❌ Signature MISMATCH')
+      console.error('[IG Webhook]   Got:      ', signature)
+      console.error('[IG Webhook]   Expected: ', expectedSig)
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
     }
+    console.log('[IG Webhook] ✓ Signature verified OK')
   } else if (appSecret && !signature) {
-    console.error('[IG Webhook] Missing signature header')
+    console.error('[IG Webhook] ❌ Missing signature header — rejecting')
     return NextResponse.json({ error: 'Missing signature' }, { status: 403 })
+  } else {
+    console.log('[IG Webhook] ⚠ No app secret configured — skipping signature check')
   }
-  // If IG_APP_SECRET is not set (dev/testing), skip verification
 
   // ── 2) Parse payload ────────────────────────────────────────────────────
   let payload: InstagramWebhookPayload
   try {
     payload = JSON.parse(rawBody)
-  } catch {
+  } catch (e) {
+    console.error('[IG Webhook] ❌ JSON parse failed:', e)
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
+  console.log('[IG Webhook] Parsed object:', payload.object)
+  console.log('[IG Webhook] Entry count:', payload.entry?.length ?? 0)
+
   // Instagram/Messenger webhook always has object + entry[]
   if (payload.object !== 'instagram' && payload.object !== 'page') {
-    // Acknowledge but ignore non-instagram objects
+    console.log('[IG Webhook] Ignoring non-instagram object:', payload.object)
     return NextResponse.json({ received: true })
   }
 
@@ -81,18 +98,37 @@ export async function POST(req: NextRequest) {
   const results: string[] = []
 
   for (const entry of payload.entry ?? []) {
+    console.log('[IG Webhook] Entry ID:', entry.id, '| messaging count:', entry.messaging?.length ?? 0)
+    // Log full entry structure to see what keys Meta is actually sending
+    console.log('[IG Webhook] Entry keys:', Object.keys(entry))
+    if (!entry.messaging?.length) {
+      console.log('[IG Webhook] Full entry (no messaging):', JSON.stringify(entry).slice(0, 1000))
+    }
+
     for (const event of entry.messaging ?? []) {
+      console.log('[IG Webhook] Event keys:', Object.keys(event))
+      console.log('[IG Webhook] Event sender:', JSON.stringify(event.sender))
+      console.log('[IG Webhook] Event message:', JSON.stringify(event.message))
+
       // Only process actual messages (not read receipts, reactions, etc.)
-      if (!event.message?.text) continue
+      if (!event.message?.text) {
+        console.log('[IG Webhook] Skipping event — no message.text')
+        continue
+      }
 
       const senderId = event.sender?.id
-      if (!senderId) continue
+      if (!senderId) {
+        console.log('[IG Webhook] Skipping event — no sender.id')
+        continue
+      }
 
       const messageText = event.message.text
       const igMessageId = event.message.mid
       const timestamp = event.timestamp
         ? new Date(event.timestamp).toISOString()
         : new Date().toISOString()
+
+      console.log('[IG Webhook] Processing message:', { senderId, messageText: messageText.slice(0, 80), igMessageId })
 
       // ── 3) Upsert conversation ────────────────────────────────────────
       const { data: conversation, error: convErr } = await supabase
@@ -109,9 +145,11 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (convErr || !conversation) {
+        console.error('[IG Webhook] DB upsert conversation error:', convErr)
         results.push(`Error upserting conversation for ${senderId}: ${convErr?.message}`)
         continue
       }
+      console.log('[IG Webhook] Upserted conversation:', conversation.id)
 
       // Update last_message_at (upsert may not update on conflict for all fields)
       await supabase
@@ -170,6 +208,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Always return 200 to Meta to prevent retries
+  console.log('[IG Webhook] ── Done ──', results)
   return NextResponse.json({ received: true, results })
 }
 
