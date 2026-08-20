@@ -137,25 +137,8 @@ export async function POST(req: NextRequest) {
     console.error('[ManyChat Webhook] ⚠ Update last_message_at failed:', updateErr.message)
   }
 
-  // ── Insert message (dedup by ig_message_id) ─────────────────────────────
-  console.log('[ManyChat Webhook] Step 2: Checking dedup for:', dedupKey.slice(0, 60))
-
-  const { data: existingMsg, error: dedupErr } = await supabase
-    .from('instagram_messages')
-    .select('id')
-    .eq('ig_message_id', dedupKey)
-    .maybeSingle()
-
-  if (dedupErr) {
-    console.error('[ManyChat Webhook] ⚠ Dedup check error:', dedupErr.message)
-  }
-
-  if (existingMsg) {
-    console.log('[ManyChat Webhook] Duplicate detected, skipping')
-    return NextResponse.json({ ok: true, action: 'duplicate_skipped' })
-  }
-
-  console.log('[ManyChat Webhook] Step 3: Inserting message')
+  // ── Insert message (dedup by ig_message_id — UNIQUE index at DB level) ──
+  console.log('[ManyChat Webhook] Step 2: Inserting message, dedupKey:', dedupKey.slice(0, 60))
 
   const { data: insertedMsg, error: msgErr } = await supabase
     .from('instagram_messages')
@@ -169,55 +152,99 @@ export async function POST(req: NextRequest) {
     .select('id')
     .single()
 
-  if (msgErr || !insertedMsg) {
+  if (msgErr) {
+    // code 23505 = unique_violation → duplicate message, safe to ignore
+    if (msgErr.code === '23505') {
+      console.log('[ManyChat Webhook] Duplicate message (DB constraint), skipping')
+      return NextResponse.json({ ok: true, action: 'duplicate_skipped' })
+    }
     console.error('[ManyChat Webhook] ❌ Message insert FAILED')
-    console.error('[ManyChat Webhook] Error code:', msgErr?.code)
-    console.error('[ManyChat Webhook] Error message:', msgErr?.message)
-    console.error('[ManyChat Webhook] Error details:', msgErr?.details)
+    console.error('[ManyChat Webhook] Error code:', msgErr.code)
+    console.error('[ManyChat Webhook] Error message:', msgErr.message)
+    console.error('[ManyChat Webhook] Error details:', msgErr.details)
     console.error('[ManyChat Webhook] Full error:', JSON.stringify(msgErr, null, 2))
     return NextResponse.json({
       error: 'DB error on message insert',
-      details: msgErr?.message,
-      code: msgErr?.code,
+      details: msgErr.message,
+      code: msgErr.code,
     }, { status: 500 })
+  }
+
+  if (!insertedMsg) {
+    console.error('[ManyChat Webhook] ❌ Message insert returned no data')
+    return NextResponse.json({ error: 'DB error: no data returned' }, { status: 500 })
   }
 
   console.log('[ManyChat Webhook] ✓ Message inserted, id:', insertedMsg.id)
 
-  // ── Create review queue entry ───────────────────────────────────────────
-  // This makes the conversation visible in the /instagram-dm review UI.
-  console.log('[ManyChat Webhook] Step 4: Creating review queue entry')
-  console.log('[ManyChat Webhook] Step 4 payload:', JSON.stringify({
-    conversation_id: conversation.id,
-    trigger_message_id: insertedMsg.id,
-    draft_response: '(Generating draft…)',
-    ai_assessment: 'gathering_info',
-    ai_reasoning: 'New inbound message from ManyChat — pending AI draft.',
-    status: 'pending',
-  }))
+  // ── Review queue: one pending entry per conversation ────────────────────
+  // If a 'pending' entry already exists for this conversation, update it
+  // (new trigger message, regenerate draft). Only create a new entry if
+  // there's no pending one (i.e. previous was approved/rejected/edited).
+  console.log('[ManyChat Webhook] Step 3: Checking for existing pending review queue entry')
 
-  const { data: queueEntry, error: queueErr } = await supabase
+  const { data: existingPending } = await supabase
     .from('instagram_review_queue')
-    .insert({
-      conversation_id: conversation.id,
-      trigger_message_id: insertedMsg.id,
-      draft_response: '(Generating draft…)',
-      ai_assessment: 'gathering_info',
-      ai_reasoning: 'New inbound message from ManyChat — pending AI draft.',
-      status: 'pending',
-    })
     .select('id')
-    .single()
+    .eq('conversation_id', conversation.id)
+    .eq('status', 'pending')
+    .limit(1)
+    .maybeSingle()
 
-  if (queueErr || !queueEntry) {
-    console.error('[ManyChat Webhook] ❌ Review queue insert FAILED')
-    console.error('[ManyChat Webhook] Step 4 error code:', queueErr?.code)
-    console.error('[ManyChat Webhook] Step 4 error message:', queueErr?.message)
-    console.error('[ManyChat Webhook] Step 4 error details:', queueErr?.details)
-    console.error('[ManyChat Webhook] Step 4 error hint:', queueErr?.hint)
-    console.error('[ManyChat Webhook] Step 4 full error:', JSON.stringify(queueErr, null, 2))
+  let reviewQueueId: string | null = null
+  let reviewAction: string
+
+  if (existingPending) {
+    // Update existing pending entry with the latest trigger message
+    console.log('[ManyChat Webhook] Step 3: Updating existing pending entry:', existingPending.id)
+
+    const { error: updateQueueErr } = await supabase
+      .from('instagram_review_queue')
+      .update({
+        trigger_message_id: insertedMsg.id,
+        draft_response: '(Regenerating draft…)',
+        ai_reasoning: 'Updated — new message received while previous review still pending.',
+      })
+      .eq('id', existingPending.id)
+
+    if (updateQueueErr) {
+      console.error('[ManyChat Webhook] ⚠ Review queue update failed:', updateQueueErr.message, updateQueueErr.code)
+    } else {
+      console.log('[ManyChat Webhook] ✓ Review queue entry updated')
+    }
+
+    reviewQueueId = existingPending.id
+    reviewAction = 'updated_existing'
   } else {
-    console.log('[ManyChat Webhook] ✓ Review queue entry created, id:', queueEntry.id)
+    // No pending entry — create a new one
+    console.log('[ManyChat Webhook] Step 3: Creating new review queue entry')
+
+    const { data: queueEntry, error: queueErr } = await supabase
+      .from('instagram_review_queue')
+      .insert({
+        conversation_id: conversation.id,
+        trigger_message_id: insertedMsg.id,
+        draft_response: '(Generating draft…)',
+        ai_assessment: 'gathering_info',
+        ai_reasoning: 'New inbound message from ManyChat — pending AI draft.',
+        status: 'pending',
+      })
+      .select('id')
+      .single()
+
+    if (queueErr || !queueEntry) {
+      console.error('[ManyChat Webhook] ❌ Review queue insert FAILED')
+      console.error('[ManyChat Webhook] Error code:', queueErr?.code)
+      console.error('[ManyChat Webhook] Error message:', queueErr?.message)
+      console.error('[ManyChat Webhook] Error details:', queueErr?.details)
+      console.error('[ManyChat Webhook] Error hint:', queueErr?.hint)
+      console.error('[ManyChat Webhook] Full error:', JSON.stringify(queueErr, null, 2))
+    } else {
+      console.log('[ManyChat Webhook] ✓ Review queue entry created, id:', queueEntry.id)
+      reviewQueueId = queueEntry.id
+    }
+
+    reviewAction = 'created_new'
   }
 
   // ── Trigger async draft generation (non-blocking) ───────────────────────
@@ -241,7 +268,7 @@ export async function POST(req: NextRequest) {
     action: 'created',
     conversation_id: conversation.id,
     message_id: insertedMsg.id,
-    review_queue_id: queueEntry?.id ?? null,
-    review_queue_error: queueErr ? { code: queueErr.code, message: queueErr.message } : null,
+    review_queue_id: reviewQueueId,
+    review_queue_action: reviewAction,
   })
 }
