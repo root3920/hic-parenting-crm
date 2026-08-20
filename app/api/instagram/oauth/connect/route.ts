@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   const authUrl = new URL('https://www.facebook.com/v21.0/dialog/oauth')
   authUrl.searchParams.set('client_id', appId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
-  authUrl.searchParams.set('scope', 'instagram_basic,instagram_manage_messages,pages_show_list,pages_manage_metadata,business_management')
+  authUrl.searchParams.set('scope', 'instagram_basic,instagram_manage_messages,pages_messaging,pages_show_list,pages_manage_metadata,business_management')
   authUrl.searchParams.set('response_type', 'code')
   authUrl.searchParams.set('state', state)
 

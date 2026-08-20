@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, MessageCircle, Loader2, Trash2, CheckCircle, AlertCircle, Plus, FlaskConical, Download, RefreshCw, Send } from 'lucide-react'
+import { ArrowLeft, MessageCircle, Loader2, Trash2, CheckCircle, AlertCircle, Plus, FlaskConical, Download, RefreshCw, Send, Webhook } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
@@ -41,6 +41,10 @@ function InstagramSettingsContent() {
   const [seedUsername, setSeedUsername] = useState('')
   const [seedMessage, setSeedMessage] = useState('')
   const [seeding, setSeeding] = useState(false)
+
+  // Page subscription state
+  const [subscribing, setSubscribing] = useState(false)
+  const [subscribeResult, setSubscribeResult] = useState<Record<string, unknown> | null>(null)
 
   // Send Test Message state
   const [testRecipientId, setTestRecipientId] = useState('')
@@ -282,6 +286,71 @@ function InstagramSettingsContent() {
                   </div>
                 </div>
               </div>
+
+              {/* Webhook Page Subscription */}
+              {accounts.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-xl border-2 border-orange-200 dark:border-orange-800 p-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Webhook className="h-4 w-4 text-orange-500" />
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                      Webhook Page Subscription
+                    </p>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
+                      Required
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+                    Meta requires a Page-level subscription call in addition to the App-level webhook config.
+                    Without this, no webhook events will be delivered even though the endpoint is configured correctly.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={async () => {
+                        setSubscribing(true)
+                        setSubscribeResult(null)
+                        try {
+                          const res = await fetch('/api/instagram/subscribe-page', { method: 'POST' })
+                          const json = await res.json()
+                          setSubscribeResult(json)
+                        } catch {
+                          setSubscribeResult({ error: 'Network error' })
+                        } finally {
+                          setSubscribing(false)
+                        }
+                      }}
+                      disabled={subscribing}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg text-white bg-orange-500 hover:bg-orange-600 transition-colors disabled:opacity-50"
+                    >
+                      <Webhook className="h-3 w-3" />
+                      {subscribing ? 'Subscribing…' : 'Subscribe Page to Webhooks'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setSubscribing(true)
+                        setSubscribeResult(null)
+                        try {
+                          const res = await fetch('/api/instagram/subscribe-page')
+                          const json = await res.json()
+                          setSubscribeResult(json)
+                        } catch {
+                          setSubscribeResult({ error: 'Network error' })
+                        } finally {
+                          setSubscribing(false)
+                        }
+                      }}
+                      disabled={subscribing}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                    >
+                      Check Status
+                    </button>
+                  </div>
+                  {subscribeResult && (
+                    <pre className="mt-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-mono text-zinc-700 dark:text-zinc-300 overflow-x-auto max-h-60 whitespace-pre-wrap break-all">
+                      {JSON.stringify(subscribeResult, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
 
               {/* Import real conversations */}
               {accounts.length > 0 && (
