@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, MessageCircle, Loader2, Trash2, CheckCircle, AlertCircle, Plus, FlaskConical, Download, RefreshCw } from 'lucide-react'
+import { ArrowLeft, MessageCircle, Loader2, Trash2, CheckCircle, AlertCircle, Plus, FlaskConical, Download, RefreshCw, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
@@ -42,6 +42,12 @@ function InstagramSettingsContent() {
   const [seedMessage, setSeedMessage] = useState('')
   const [seeding, setSeeding] = useState(false)
 
+  // Send Test Message state
+  const [testRecipientId, setTestRecipientId] = useState('')
+  const [testMessageText, setTestMessageText] = useState('')
+  const [sendingTest, setSendingTest] = useState(false)
+  const [testSendResult, setTestSendResult] = useState<{ ok?: boolean; error?: string; details?: Record<string, unknown> } | null>(null)
+
   // Real conversation import state
   interface RealConversation {
     ig_conversation_id: string
@@ -61,6 +67,7 @@ function InstagramSettingsContent() {
   const [realConvos, setRealConvos] = useState<RealConversation[]>([])
   const [fetchingConvos, setFetchingConvos] = useState(false)
   const [importingId, setImportingId] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<{ message: string; code?: number; subcode?: number; type?: string } | null>(null)
 
   // Show toast for OAuth result from redirect
   useEffect(() => {
@@ -289,11 +296,17 @@ function InstagramSettingsContent() {
                     <button
                       onClick={async () => {
                         setFetchingConvos(true)
+                        setFetchError(null)
                         try {
                           const res = await fetch('/api/instagram/fetch-conversations')
                           const json = await res.json()
                           if (json.error) {
-                            toast.error(json.error, { duration: 8000 })
+                            setFetchError({
+                              message: json.error,
+                              code: json.ig_error_code,
+                              subcode: json.ig_error_subcode,
+                              type: json.ig_error_type,
+                            })
                           } else {
                             setRealConvos(json.conversations ?? [])
                             if (!json.conversations?.length) {
@@ -301,7 +314,7 @@ function InstagramSettingsContent() {
                             }
                           }
                         } catch {
-                          toast.error('Failed to fetch conversations')
+                          setFetchError({ message: 'Network error — failed to reach server' })
                         } finally {
                           setFetchingConvos(false)
                         }
@@ -316,6 +329,21 @@ function InstagramSettingsContent() {
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
                     Fetch real DM conversations from your connected Instagram account and import them into the review queue.
                   </p>
+
+                  {fetchError && (
+                    <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10 p-3 mb-3">
+                      <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">
+                        {fetchError.message}
+                      </p>
+                      {(fetchError.code || fetchError.type) && (
+                        <p className="text-xs text-red-500 dark:text-red-400 font-mono">
+                          {fetchError.type && `Type: ${fetchError.type}`}
+                          {fetchError.code && ` · Code: ${fetchError.code}`}
+                          {fetchError.subcode && ` · Subcode: ${fetchError.subcode}`}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {realConvos.length > 0 && (
                     <div className="space-y-2">
@@ -387,6 +415,124 @@ function InstagramSettingsContent() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Send Test Message — App Review demo tool */}
+              {accounts.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-xl border-2 border-purple-200 dark:border-purple-800 p-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Send className="h-4 w-4 text-purple-500" />
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                      Send Test Message
+                    </p>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                      App Review
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+                    Send a real Instagram DM directly via the Graph API. Use a recipient ID from the conversations list above or from Meta&apos;s API Explorer.
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Recipient ID (Instagram-scoped user ID)
+                      </label>
+                      <input
+                        type="text"
+                        value={testRecipientId}
+                        onChange={(e) => setTestRecipientId(e.target.value)}
+                        placeholder="e.g. 17841400123456789"
+                        className="w-full text-sm font-mono border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Message Text
+                      </label>
+                      <textarea
+                        value={testMessageText}
+                        onChange={(e) => setTestMessageText(e.target.value)}
+                        placeholder="Hi! This is a test message from our app."
+                        rows={2}
+                        className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 resize-none"
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!testRecipientId.trim() || !testMessageText.trim()) {
+                          setTestSendResult({ error: 'Both fields are required' })
+                          return
+                        }
+                        setSendingTest(true)
+                        setTestSendResult(null)
+                        try {
+                          const res = await fetch('/api/instagram/send-test-message', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              recipient_id: testRecipientId.trim(),
+                              message_text: testMessageText.trim(),
+                            }),
+                          })
+                          const json = await res.json()
+                          if (json.error) {
+                            setTestSendResult({
+                              error: json.error,
+                              details: {
+                                code: json.ig_error_code,
+                                subcode: json.ig_error_subcode,
+                                type: json.ig_error_type,
+                                fbtrace_id: json.ig_error_fbtrace,
+                              },
+                            })
+                          } else {
+                            setTestSendResult({ ok: true })
+                            setTestMessageText('')
+                          }
+                        } catch {
+                          setTestSendResult({ error: 'Network error — failed to reach server' })
+                        } finally {
+                          setSendingTest(false)
+                        }
+                      }}
+                      disabled={sendingTest}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-colors disabled:opacity-50"
+                    >
+                      <Send className="h-3 w-3" />
+                      {sendingTest ? 'Sending…' : 'Send Message'}
+                    </button>
+
+                    {/* Result display */}
+                    {testSendResult && (
+                      <div className={cn(
+                        'rounded-lg border p-3 mt-2',
+                        testSendResult.ok
+                          ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10'
+                          : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10',
+                      )}>
+                        {testSendResult.ok ? (
+                          <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                            Message sent successfully!
+                          </p>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">
+                              {testSendResult.error}
+                            </p>
+                            {testSendResult.details && Object.values(testSendResult.details).some(Boolean) && (
+                              <p className="text-xs text-red-500 dark:text-red-400 font-mono break-all">
+                                {testSendResult.details.type && `Type: ${testSendResult.details.type}`}
+                                {testSendResult.details.code && ` · Code: ${testSendResult.details.code}`}
+                                {testSendResult.details.subcode && ` · Subcode: ${testSendResult.details.subcode}`}
+                                {testSendResult.details.fbtrace_id && ` · Trace: ${testSendResult.details.fbtrace_id}`}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
