@@ -61,9 +61,8 @@ export async function GET() {
   const pageToken = account.access_token
 
   try {
-    // Fetch conversations using the Page ID with platform=instagram
-    // The /conversations endpoint is on the PAGE, not the IG Business Account
-    const convUrl = `https://graph.facebook.com/v21.0/${fbPageId}/conversations?platform=instagram&fields=participants,updated_time,messages.limit(5){message,from,created_time,id}&access_token=${pageToken}`
+    // Step 1: Fetch conversations with lightweight fields only (no nested messages)
+    const convUrl = `https://graph.facebook.com/v21.0/${fbPageId}/conversations?platform=instagram&fields=participants,updated_time&limit=10&access_token=${pageToken}`
 
     console.log('[IG Fetch Conversations] Calling:', convUrl.replace(pageToken, '<REDACTED>'))
 
@@ -91,31 +90,52 @@ export async function GET() {
 
     const importedIds = new Set((existingConvs ?? []).map((c) => c.ig_user_id))
 
-    // Transform into a clean list
-    const conversations = (convData.data ?? []).map((conv: ConvResponse) => {
-      // Find the participant that is NOT our business account
+    // Step 2: For each conversation, fetch just the latest message in a separate call
+    const conversations = []
+    for (const conv of convData.data ?? []) {
       const otherParticipant = (conv.participants?.data ?? []).find(
         (p: Participant) => p.id !== igBusinessId,
       )
 
-      const messages = (conv.messages?.data ?? []).map((m: MsgResponse) => ({
-        id: m.id,
-        text: m.message,
-        from_id: m.from?.id,
-        from_name: m.from?.name || m.from?.username,
-        is_from_us: m.from?.id === igBusinessId,
-        created_time: m.created_time,
-      }))
+      // Fetch latest message preview (1 message only)
+      let messages: Array<{
+        id: string
+        text: string
+        from_id: string
+        from_name: string | null
+        is_from_us: boolean
+        created_time: string
+      }> = []
 
-      return {
+      try {
+        const msgRes = await fetch(
+          `https://graph.facebook.com/v21.0/${conv.id}?fields=messages.limit(1){message,from,created_time,id}&access_token=${pageToken}`,
+        )
+        const msgData = await msgRes.json()
+
+        if (msgData.messages?.data) {
+          messages = msgData.messages.data.map((m: MsgResponse) => ({
+            id: m.id,
+            text: m.message,
+            from_id: m.from?.id,
+            from_name: m.from?.name || m.from?.username,
+            is_from_us: m.from?.id === igBusinessId,
+            created_time: m.created_time,
+          }))
+        }
+      } catch {
+        // Non-fatal — we still show the conversation without a preview
+      }
+
+      conversations.push({
         ig_conversation_id: conv.id,
         participant_id: otherParticipant?.id || null,
         participant_name: otherParticipant?.name || otherParticipant?.username || null,
         updated_time: conv.updated_time,
         already_imported: otherParticipant ? importedIds.has(otherParticipant.id) : false,
         messages,
-      }
-    })
+      })
+    }
 
     return NextResponse.json({ conversations, ig_business_id: igBusinessId })
   } catch (err) {
