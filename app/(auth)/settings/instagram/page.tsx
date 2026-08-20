@@ -198,24 +198,47 @@ function InstagramSettingsContent() {
                         <span>Connected {formatDate(account.connected_at)}</span>
                         <span className={cn(
                           'inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold',
-                          account.token_type === 'long_lived'
+                          account.token_type.includes('long_lived')
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                             : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
                         )}>
-                          {account.token_type === 'long_lived' ? 'Long-lived token' : 'Short-lived token'}
+                          {account.token_type.includes('long_lived') ? 'Long-lived page token' : 'Page token (needs refresh)'}
                         </span>
                       </div>
                     </div>
 
-                    {/* Disconnect button */}
-                    <button
-                      onClick={() => handleDisconnect(account.id)}
-                      disabled={disconnecting === account.id}
-                      className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      {disconnecting === account.id ? 'Disconnecting…' : 'Disconnect'}
-                    </button>
+                    {/* Actions */}
+                    <div className="flex flex-col gap-1.5 shrink-0">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/instagram/debug-token')
+                            const json = await res.json()
+                            if (json.error) {
+                              toast.error(json.error)
+                            } else {
+                              const td = json.token_debug
+                              const scopes = td?.scopes?.join(', ') || 'none'
+                              const valid = td?.is_valid ? 'Valid' : 'INVALID'
+                              const expires = td?.expires_at ? (td.expires_at === 0 ? 'Never' : new Date(td.expires_at * 1000).toLocaleString()) : 'Unknown'
+                              const type = td?.type || 'unknown'
+                              toast(`Token: ${valid} | Type: ${type} | Expires: ${expires} | Scopes: ${scopes}`, { duration: 15000 })
+                            }
+                          } catch { toast.error('Debug failed') }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        Debug Token
+                      </button>
+                      <button
+                        onClick={() => handleDisconnect(account.id)}
+                        disabled={disconnecting === account.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        {disconnecting === account.id ? 'Disconnecting…' : 'Disconnect'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

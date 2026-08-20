@@ -60,8 +60,15 @@ export async function GET() {
     const convData = await convRes.json()
 
     if (convData.error) {
+      console.error('[IG Fetch Conversations] Graph API error:', JSON.stringify(convData.error, null, 2))
       return NextResponse.json(
-        { error: `Graph API: ${convData.error.message}`, ig_error: convData.error },
+        {
+          error: `Graph API: ${convData.error.message}`,
+          ig_error: convData.error,
+          ig_error_code: convData.error.code,
+          ig_error_subcode: convData.error.error_subcode,
+          ig_error_type: convData.error.type,
+        },
         { status: 502 },
       )
     }

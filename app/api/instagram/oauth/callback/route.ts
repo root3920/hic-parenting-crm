@@ -132,11 +132,10 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Page access tokens obtained via a long-lived user token are already
-    // long-lived (they don't expire). Exchange user token first to be safe.
+    // Page tokens obtained via a long-lived user token are themselves
+    // long-lived (non-expiring). Exchange the short-lived user token first.
     let tokenType = 'page_token'
 
-    // Try to exchange user token for long-lived, which makes Page tokens permanent
     const llUrl = new URL('https://graph.facebook.com/v21.0/oauth/access_token')
     llUrl.searchParams.set('grant_type', 'fb_exchange_token')
     llUrl.searchParams.set('client_id', appId)
@@ -146,12 +145,23 @@ export async function GET(req: NextRequest) {
     const llRes = await fetch(llUrl.toString())
     const llData = await llRes.json()
 
+    console.log('[IG OAuth] Long-lived exchange result:', {
+      success: !!llData.access_token,
+      error: llData.error || null,
+      expires_in: llData.expires_in || null,
+    })
+
     if (llData.access_token) {
-      // Re-fetch Pages with the long-lived user token to get non-expiring Page tokens
+      // Re-fetch Pages with the long-lived user token → page tokens will be non-expiring
       const llPagesRes = await fetch(
         `https://graph.facebook.com/v21.0/me/accounts?access_token=${llData.access_token}`,
       )
       const llPagesData = await llPagesRes.json()
+
+      console.log('[IG OAuth] Re-fetched pages with LL token:', {
+        count: llPagesData.data?.length ?? 0,
+        error: llPagesData.error || null,
+      })
 
       for (const page of llPagesData.data ?? []) {
         const igCheck = await fetch(
@@ -162,9 +172,12 @@ export async function GET(req: NextRequest) {
         if (igCheckData.instagram_business_account?.id === igUserId) {
           pageAccessToken = page.access_token
           tokenType = 'long_lived_page_token'
+          console.log('[IG OAuth] Got long-lived page token for IG account', igUserId)
           break
         }
       }
+    } else {
+      console.warn('[IG OAuth] Long-lived exchange failed, storing short-lived page token. Error:', llData.error)
     }
 
     // ── 4) Store in database ──────────────────────────────────────────────
