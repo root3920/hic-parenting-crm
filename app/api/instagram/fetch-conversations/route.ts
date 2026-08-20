@@ -37,7 +37,7 @@ export async function GET() {
   // Get connected account
   const { data: account, error: accErr } = await svc
     .from('instagram_connected_accounts')
-    .select('ig_user_id, access_token')
+    .select('ig_user_id, fb_page_id, access_token')
     .order('connected_at', { ascending: false })
     .limit(1)
     .single()
@@ -49,14 +49,25 @@ export async function GET() {
     )
   }
 
+  if (!account.fb_page_id) {
+    return NextResponse.json(
+      { error: 'Facebook Page ID not stored. Please disconnect and reconnect your Instagram account.' },
+      { status: 400 },
+    )
+  }
+
   const igBusinessId = account.ig_user_id
+  const fbPageId = account.fb_page_id
   const pageToken = account.access_token
 
   try {
-    // Fetch conversations from IG Graph API
-    const convRes = await fetch(
-      `https://graph.facebook.com/v21.0/${igBusinessId}/conversations?fields=participants,updated_time,messages.limit(5){message,from,created_time,id}&access_token=${pageToken}`,
-    )
+    // Fetch conversations using the Page ID with platform=instagram
+    // The /conversations endpoint is on the PAGE, not the IG Business Account
+    const convUrl = `https://graph.facebook.com/v21.0/${fbPageId}/conversations?platform=instagram&fields=participants,updated_time,messages.limit(5){message,from,created_time,id}&access_token=${pageToken}`
+
+    console.log('[IG Fetch Conversations] Calling:', convUrl.replace(pageToken, '<REDACTED>'))
+
+    const convRes = await fetch(convUrl)
     const convData = await convRes.json()
 
     if (convData.error) {

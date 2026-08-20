@@ -32,7 +32,7 @@ export async function GET() {
   const svc = getServiceClient()
   const { data, error } = await svc
     .from('instagram_connected_accounts')
-    .select('id, ig_user_id, ig_username, ig_profile_pic_url, ig_name, token_type, connected_at')
+    .select('id, ig_user_id, ig_username, ig_profile_pic_url, ig_name, fb_page_id, token_type, connected_at')
     .order('connected_at', { ascending: false })
 
   if (error) {

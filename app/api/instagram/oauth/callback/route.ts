@@ -101,6 +101,7 @@ export async function GET(req: NextRequest) {
     let igProfilePic: string | null = null
     let igName: string | null = null
     let pageAccessToken: string | null = null
+    let fbPageId: string | null = null
 
     for (const page of pagesData.data) {
       const igRes = await fetch(
@@ -111,6 +112,7 @@ export async function GET(req: NextRequest) {
       if (igData.instagram_business_account?.id) {
         igUserId = igData.instagram_business_account.id
         pageAccessToken = page.access_token
+        fbPageId = page.id
 
         // Fetch IG profile details using the Page token
         const profileRes = await fetch(
@@ -125,7 +127,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (!igUserId || !pageAccessToken) {
+    if (!igUserId || !pageAccessToken || !fbPageId) {
       console.error('[IG OAuth] No Instagram Business Account linked to any Page')
       return NextResponse.redirect(
         new URL('/settings/instagram?error=no_ig_account', req.url).toString(),
@@ -171,8 +173,9 @@ export async function GET(req: NextRequest) {
 
         if (igCheckData.instagram_business_account?.id === igUserId) {
           pageAccessToken = page.access_token
+          fbPageId = page.id
           tokenType = 'long_lived_page_token'
-          console.log('[IG OAuth] Got long-lived page token for IG account', igUserId)
+          console.log('[IG OAuth] Got long-lived page token for IG account', igUserId, 'Page ID:', page.id)
           break
         }
       }
@@ -191,6 +194,7 @@ export async function GET(req: NextRequest) {
           ig_username: igUsername!,
           ig_profile_pic_url: igProfilePic,
           ig_name: igName,
+          fb_page_id: fbPageId,
           access_token: pageAccessToken,
           token_type: tokenType,
           connected_by: user.id,
