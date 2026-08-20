@@ -184,41 +184,46 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, status: 'rejected' })
   }
 
-  // approve or edit_and_approve
+  // approve or edit_and_approve — send via Instagram Messaging API
   const messageToSend =
     action === 'edit_and_approve' ? final_response! : item.draft_response
-  const reviewStatus =
+  const reviewAction =
     action === 'edit_and_approve' ? 'edited_and_approved' : 'approved'
 
-  // Update review queue
-  const { error: updateErr } = await svc
-    .from('instagram_review_queue')
-    .update({
-      status: reviewStatus,
-      final_response: action === 'edit_and_approve' ? final_response : null,
-      reviewed_by: reviewerName,
-      reviewed_at: now,
-    })
-    .eq('id', id)
-
-  if (updateErr) {
-    return NextResponse.json({ error: updateErr.message }, { status: 500 })
-  }
-
-  // Insert outbound message record (actual IG Send API call is Phase 2)
-  const { error: msgErr } = await svc.from('instagram_messages').insert({
-    conversation_id: item.conversation_id,
-    direction: 'outbound',
-    message_text: messageToSend,
-    sent_at: now,
+  // Call the send-message endpoint which handles:
+  // - Sending via IG API
+  // - Inserting outbound message record
+  // - Updating review queue status
+  // If sending fails, the error surfaces to the reviewer
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
+  const sendRes = await fetch(`${baseUrl}/api/instagram/send-message`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      // Forward auth cookies so the send endpoint can authenticate
+      Cookie: req.headers.get('cookie') || '',
+    },
+    body: JSON.stringify({
+      conversation_id: item.conversation_id,
+      message_text: messageToSend,
+      review_queue_id: id,
+      review_action: reviewAction,
+    }),
   })
 
-  if (msgErr) {
-    return NextResponse.json({ error: msgErr.message }, { status: 500 })
+  const sendData = await sendRes.json()
+
+  if (!sendRes.ok || sendData.error) {
+    return NextResponse.json(
+      { error: sendData.error || 'Failed to send message via Instagram' },
+      { status: sendRes.status },
+    )
   }
 
-  // TODO Phase 2: Call Instagram Send API here
-  // await sendInstagramMessage(conversation.ig_user_id, messageToSend)
-
-  return NextResponse.json({ ok: true, status: reviewStatus, sent: messageToSend })
+  return NextResponse.json({
+    ok: true,
+    status: reviewAction,
+    sent: messageToSend,
+    ig_message_id: sendData.ig_message_id,
+  })
 }

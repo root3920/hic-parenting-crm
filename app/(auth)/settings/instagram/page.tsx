@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, MessageCircle, Loader2, Trash2, CheckCircle, AlertCircle, Plus, FlaskConical } from 'lucide-react'
+import { ArrowLeft, MessageCircle, Loader2, Trash2, CheckCircle, AlertCircle, Plus, FlaskConical, Download, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
@@ -41,6 +41,26 @@ function InstagramSettingsContent() {
   const [seedUsername, setSeedUsername] = useState('')
   const [seedMessage, setSeedMessage] = useState('')
   const [seeding, setSeeding] = useState(false)
+
+  // Real conversation import state
+  interface RealConversation {
+    ig_conversation_id: string
+    participant_id: string | null
+    participant_name: string | null
+    updated_time: string
+    already_imported: boolean
+    messages: Array<{
+      id: string
+      text: string
+      from_id: string
+      from_name: string | null
+      is_from_us: boolean
+      created_time: string
+    }>
+  }
+  const [realConvos, setRealConvos] = useState<RealConversation[]>([])
+  const [fetchingConvos, setFetchingConvos] = useState(false)
+  const [importingId, setImportingId] = useState<string | null>(null)
 
   // Show toast for OAuth result from redirect
   useEffect(() => {
@@ -232,6 +252,125 @@ function InstagramSettingsContent() {
                   </div>
                 </div>
               </div>
+
+              {/* Import real conversations */}
+              {accounts.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Download className="h-4 w-4 text-blue-500" />
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        Import Real Conversations
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        setFetchingConvos(true)
+                        try {
+                          const res = await fetch('/api/instagram/fetch-conversations')
+                          const json = await res.json()
+                          if (json.error) {
+                            toast.error(json.error, { duration: 8000 })
+                          } else {
+                            setRealConvos(json.conversations ?? [])
+                            if (!json.conversations?.length) {
+                              toast('No conversations found — DM your connected account from another IG account first')
+                            }
+                          }
+                        } catch {
+                          toast.error('Failed to fetch conversations')
+                        } finally {
+                          setFetchingConvos(false)
+                        }
+                      }}
+                      disabled={fetchingConvos}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className={cn('h-3 w-3', fetchingConvos && 'animate-spin')} />
+                      {fetchingConvos ? 'Fetching…' : 'Fetch from Instagram'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+                    Fetch real DM conversations from your connected Instagram account and import them into the review queue.
+                  </p>
+
+                  {realConvos.length > 0 && (
+                    <div className="space-y-2">
+                      {realConvos.map((conv) => (
+                        <div
+                          key={conv.ig_conversation_id}
+                          className="flex items-center gap-3 px-4 py-3 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/30"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                {conv.participant_name || conv.participant_id || 'Unknown'}
+                              </p>
+                              {conv.already_imported && (
+                                <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                                  Already imported
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-zinc-400 mt-0.5">
+                              ID: {conv.participant_id} · {conv.messages.length} messages · Updated {formatDate(conv.updated_time)}
+                            </p>
+                            {conv.messages.length > 0 && (
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate">
+                                Latest: &quot;{conv.messages[0]?.text?.slice(0, 80)}{(conv.messages[0]?.text?.length ?? 0) > 80 ? '…' : ''}&quot;
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={async () => {
+                              setImportingId(conv.ig_conversation_id)
+                              try {
+                                const res = await fetch('/api/instagram/fetch-conversations', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    participant_id: conv.participant_id,
+                                    participant_name: conv.participant_name,
+                                    messages: conv.messages.map((m) => ({
+                                      text: m.text,
+                                      is_from_us: m.is_from_us,
+                                      created_time: m.created_time,
+                                      id: m.id,
+                                    })),
+                                  }),
+                                })
+                                const json = await res.json()
+                                if (json.error) {
+                                  toast.error(json.error)
+                                } else {
+                                  toast.success(`Imported ${json.messages_inserted} messages — check Instagram DM Review`)
+                                  setRealConvos((prev) =>
+                                    prev.map((c) =>
+                                      c.ig_conversation_id === conv.ig_conversation_id
+                                        ? { ...c, already_imported: true }
+                                        : c
+                                    )
+                                  )
+                                }
+                              } catch {
+                                toast.error('Import failed')
+                              } finally {
+                                setImportingId(null)
+                              }
+                            }}
+                            disabled={importingId === conv.ig_conversation_id || !conv.participant_id}
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-white transition-opacity disabled:opacity-50"
+                            style={{ backgroundColor: '#ffbd59' }}
+                          >
+                            <Download className="h-3 w-3" />
+                            {importingId === conv.ig_conversation_id ? 'Importing…' : 'Import'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Test data seeder */}
               <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5">

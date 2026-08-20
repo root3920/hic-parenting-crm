@@ -106,12 +106,11 @@ export function InstagramReviewQueue() {
       })
       const json = await res.json()
       if (json.error) {
-        toast.error(json.error)
+        toast.error(json.error, { duration: 8000 })
       } else {
         toast.success(
           action === 'reject' ? 'Draft rejected'
-            : action === 'approve' ? 'Draft approved — message logged'
-            : 'Edited draft approved — message logged',
+            : `Message sent to @${item.conversation?.ig_username || 'user'} via Instagram`,
         )
         setItems((prev) => prev.filter((i) => i.id !== item.id))
         setEditingId(null)
@@ -311,8 +310,8 @@ export function InstagramReviewQueue() {
                               disabled={isActioning || !editText.trim()}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
                             >
-                              <Check className="h-3 w-3" />
-                              {isActioning ? 'Sending…' : 'Approve Edited'}
+                              <Send className="h-3 w-3" />
+                              {isActioning ? 'Sending…' : 'Send Edited'}
                             </button>
                             <button
                               onClick={() => { setEditingId(null); setEditText('') }}
@@ -328,15 +327,15 @@ export function InstagramReviewQueue() {
                               disabled={isActioning}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
                             >
-                              <Check className="h-3 w-3" />
-                              {isActioning ? 'Approving…' : 'Approve'}
+                              <Send className="h-3 w-3" />
+                              {isActioning ? 'Sending…' : 'Approve & Send'}
                             </button>
                             <button
                               onClick={() => { setEditingId(item.id); setEditText(item.draft_response) }}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                             >
                               <Pencil className="h-3 w-3" />
-                              Edit & Approve
+                              Edit & Send
                             </button>
                             <button
                               onClick={() => handleAction(item, 'reject')}
