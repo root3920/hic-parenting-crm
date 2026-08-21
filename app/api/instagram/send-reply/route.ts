@@ -12,17 +12,11 @@ function getServiceClient() {
 /**
  * POST /api/instagram/send-reply
  *
- * Sends a reply to an Instagram DM conversation.
- *
- * Strategy:
- *   1. Try ManyChat API first (/fb/sending/sendContent, no tag — works within 24h)
- *   2. If ManyChat fails with 24h window error (code 3011), fall back to
- *      Instagram Graph API with HUMAN_AGENT tag (7-day window).
- *      Uses ManyChat's getInfo to resolve the real IG-scoped user ID,
- *      then sends via our stored Page access token.
+ * Sends a reply to an Instagram DM conversation via ManyChat API.
+ * Endpoint: POST https://api.manychat.com/fb/sending/sendContent
+ * (ManyChat uses /fb/ for all channels including Instagram)
  */
 export async function POST(req: NextRequest) {
-  // Auth
   const userSupabase = await createServerSupabaseClient()
   const { data: { user } } = await userSupabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -73,11 +67,8 @@ export async function POST(req: NextRequest) {
   }
 
   const subscriberId = conversation.ig_user_id
-  let sentVia: 'manychat' | 'graph_api' = 'manychat'
 
-  // ── 2a) Try ManyChat first (works within 24h window) ───────────────────
-  console.log('[Send Reply] Attempting ManyChat send to subscriber:', subscriberId)
-
+  // 2) Send via ManyChat API
   const mcPayload = {
     subscriber_id: Number(subscriberId),
     data: {
@@ -88,7 +79,8 @@ export async function POST(req: NextRequest) {
     },
   }
 
-  let sendSuccess = false
+  console.log('[Send Reply] Sending via ManyChat to subscriber:', subscriberId)
+  console.log('[Send Reply] Payload:', JSON.stringify(mcPayload))
 
   try {
     const mcRes = await fetch('https://api.manychat.com/fb/sending/sendContent', {
@@ -101,21 +93,22 @@ export async function POST(req: NextRequest) {
     })
 
     const mcData = await mcRes.json()
-    console.log('[Send Reply] ManyChat response:', JSON.stringify(mcData))
+    console.log('[Send Reply] ManyChat HTTP:', mcRes.status)
+    console.log('[Send Reply] ManyChat response:', JSON.stringify(mcData, null, 2))
 
-    if (mcRes.ok && mcData.status === 'success') {
-      sendSuccess = true
-    } else if (mcData.code === 3011) {
-      // 24h window expired — fall back to Graph API with HUMAN_AGENT
-      console.log('[Send Reply] 24h window expired, falling back to Graph API with HUMAN_AGENT')
-      sentVia = 'graph_api'
-    } else {
-      // Other ManyChat error — report it
+    if (!mcRes.ok || mcData.status !== 'success') {
+      const errorMsg = mcData.code === 3011
+        ? `ManyChat: la ventana de 24h expiró para este subscriber. Necesitas que el usuario envíe un nuevo mensaje primero.`
+        : `ManyChat API error: ${mcData.message || JSON.stringify(mcData)}`
+
       return NextResponse.json({
-        error: `ManyChat API error: ${mcData.message || JSON.stringify(mcData)}`,
+        error: errorMsg,
         manychat_response: mcData,
+        manychat_http_status: mcRes.status,
       }, { status: 502 })
     }
+
+    console.log('[Send Reply] ✓ Sent via ManyChat')
   } catch (err) {
     console.error('[Send Reply] ManyChat network error:', err)
     return NextResponse.json(
@@ -124,101 +117,25 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 2b) Graph API fallback with HUMAN_AGENT tag ────────────────────────
-  if (!sendSuccess && sentVia === 'graph_api') {
-    // Get the real IG-scoped user ID from ManyChat subscriber info
-    let igScopedId: string | null = null
-    try {
-      const infoRes = await fetch(
-        `https://api.manychat.com/fb/subscriber/getInfo?subscriber_id=${subscriberId}`,
-        { headers: { Authorization: `Bearer ${manychatToken}` } },
-      )
-      const infoData = await infoRes.json()
-      igScopedId = infoData.data?.ig_id ? String(infoData.data.ig_id) : null
-      console.log('[Send Reply] Resolved IG-scoped ID:', igScopedId)
-    } catch (err) {
-      console.error('[Send Reply] Failed to get subscriber info:', err)
-    }
+  // 3) Record outbound message
+  const { error: msgErr } = await svc.from('instagram_messages').insert({
+    conversation_id,
+    direction: 'outbound',
+    message_text,
+    sent_at: now,
+    ig_message_id: `mc_out_${conversation_id}_${now}`,
+  })
 
-    if (!igScopedId) {
-      return NextResponse.json({
-        error: '24h window expired and could not resolve Instagram user ID for Graph API fallback',
-      }, { status: 502 })
-    }
-
-    // Get our connected account's Page token + IG Business Account ID
-    const { data: account } = await svc
-      .from('instagram_connected_accounts')
-      .select('ig_user_id, access_token')
-      .order('connected_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (!account) {
-      return NextResponse.json({
-        error: '24h window expired and no Instagram account connected for Graph API fallback',
-      }, { status: 502 })
-    }
-
-    const sendUrl = `https://graph.facebook.com/v21.0/${account.ig_user_id}/messages`
-    console.log('[Send Reply] Sending via Graph API with HUMAN_AGENT tag to:', igScopedId)
-
-    try {
-      const graphRes = await fetch(sendUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${account.access_token}`,
-        },
-        body: JSON.stringify({
-          recipient: { id: igScopedId },
-          message: { text: message_text },
-          messaging_type: 'MESSAGE_TAG',
-          tag: 'HUMAN_AGENT',
-        }),
-      })
-
-      const graphData = await graphRes.json()
-      console.log('[Send Reply] Graph API response:', JSON.stringify(graphData))
-
-      if (graphRes.ok && !graphData.error) {
-        sendSuccess = true
-      } else {
-        return NextResponse.json({
-          error: `Graph API error: ${graphData.error?.message || JSON.stringify(graphData)}`,
-          graph_response: graphData,
-        }, { status: 502 })
-      }
-    } catch (err) {
-      console.error('[Send Reply] Graph API network error:', err)
-      return NextResponse.json(
-        { error: `Failed to reach Graph API: ${err}` },
-        { status: 502 },
-      )
-    }
+  if (msgErr) {
+    console.error('[Send Reply] DB insert error (message was sent):', msgErr)
   }
 
-  // ── 3) Record outbound message ─────────────────────────────────────────
-  if (sendSuccess) {
-    const { error: msgErr } = await svc.from('instagram_messages').insert({
-      conversation_id,
-      direction: 'outbound',
-      message_text,
-      sent_at: now,
-      ig_message_id: `mc_out_${conversation_id}_${now}`,
-    })
+  await svc
+    .from('instagram_conversations')
+    .update({ last_message_at: now })
+    .eq('id', conversation_id)
 
-    if (msgErr) {
-      console.error('[Send Reply] DB insert error (message was sent):', msgErr)
-    }
-
-    await svc
-      .from('instagram_conversations')
-      .update({ last_message_at: now })
-      .eq('id', conversation_id)
-  }
-
-  // ── 4) Update review queue ─────────────────────────────────────────────
+  // 4) Update review queue
   if (review_queue_id) {
     const reviewStatus = review_action === 'edited_and_approved'
       ? 'edited_and_approved'
@@ -237,7 +154,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    sent_via: sentVia,
+    sent_via: 'manychat',
     sent_to: conversation.ig_username,
   })
 }

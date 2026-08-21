@@ -86,7 +86,8 @@
       "Bash(openssl rand:*)",
       "WebFetch(domain:api.manychat.com)",
       "WebFetch(domain:developers.manychat.com)",
-      "WebFetch(domain:manychat.github.io)"
+      "WebFetch(domain:manychat.github.io)",
+      "Bash(/dev/null source:*)"
     ]
   }
 }
