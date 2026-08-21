@@ -16,6 +16,8 @@ interface Message {
   conversation_id: string
   direction: 'inbound' | 'outbound'
   message_text: string
+  message_type?: 'text' | 'image' | 'audio' | 'video' | 'file' | 'other'
+  attachment_url?: string | null
   sent_at: string
 }
 
@@ -249,7 +251,33 @@ export function InstagramReviewQueue() {
                                   : 'bg-[#ffbd59] text-[#1a1a2e] rounded-tr-sm',
                               )}
                             >
-                              <p className="whitespace-pre-wrap">{msg.message_text}</p>
+                              {msg.message_type === 'image' && msg.attachment_url ? (
+                                <img
+                                  src={msg.attachment_url}
+                                  alt="Imagen enviada"
+                                  className="max-w-full rounded-lg max-h-48 object-cover"
+                                  loading="lazy"
+                                />
+                              ) : msg.message_type === 'audio' && msg.attachment_url ? (
+                                <audio controls className="max-w-full" preload="none">
+                                  <source src={msg.attachment_url} />
+                                </audio>
+                              ) : msg.message_type === 'video' && msg.attachment_url ? (
+                                <video controls className="max-w-full rounded-lg max-h-48" preload="none">
+                                  <source src={msg.attachment_url} />
+                                </video>
+                              ) : msg.message_type && msg.message_type !== 'text' && msg.attachment_url ? (
+                                <a
+                                  href={msg.attachment_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline text-blue-500"
+                                >
+                                  {msg.message_text}
+                                </a>
+                              ) : (
+                                <p className="whitespace-pre-wrap">{msg.message_text}</p>
+                              )}
                               <p className={cn(
                                 'text-[10px] mt-1',
                                 msg.direction === 'inbound' ? 'text-zinc-400' : 'text-[#1a1a2e]/60',

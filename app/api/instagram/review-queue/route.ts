@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
         .in('id', triggerIds),
       svc
         .from('instagram_messages')
-        .select('id, conversation_id, direction, message_text, sent_at')
+        .select('id, conversation_id, direction, message_text, message_type, attachment_url, sent_at')
         .in('conversation_id', conversationIds)
         .order('sent_at', { ascending: true }),
     ])
@@ -190,17 +190,12 @@ export async function PATCH(req: NextRequest) {
   const reviewAction =
     action === 'edit_and_approve' ? 'edited_and_approved' : 'approved'
 
-  // Call the send-message endpoint which handles:
-  // - Sending via IG API
-  // - Inserting outbound message record
-  // - Updating review queue status
-  // If sending fails, the error surfaces to the reviewer
+  // Send reply via ManyChat API (handles sending, DB recording, queue update)
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
-  const sendRes = await fetch(`${baseUrl}/api/instagram/send-message`, {
+  const sendRes = await fetch(`${baseUrl}/api/instagram/send-reply`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // Forward auth cookies so the send endpoint can authenticate
       Cookie: req.headers.get('cookie') || '',
     },
     body: JSON.stringify({

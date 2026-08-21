@@ -11,6 +11,48 @@ function getServiceClient() {
 }
 
 /**
+ * Detect if last_input_text is actually a Meta CDN attachment URL,
+ * and classify the attachment type from the URL pattern.
+ */
+const ATTACHMENT_PATTERNS = [
+  'lookaside.fbsbx.com',
+  'scontent.cdninstagram.com',
+  'scontent-',
+  'video.cdninstagram.com',
+  'cdn.fbsbx.com',
+] as const
+
+function classifyAttachment(text: string): { isAttachment: boolean; type: 'image' | 'audio' | 'video' | 'file'; url: string } | null {
+  const trimmed = text.trim()
+
+  // Must look like a URL and match a known Meta CDN host
+  if (!trimmed.startsWith('https://')) return null
+  if (!ATTACHMENT_PATTERNS.some((p) => trimmed.includes(p))) return null
+
+  // Classify by URL path/extension patterns
+  const lower = trimmed.toLowerCase()
+  if (lower.includes('/audioclip') || lower.match(/\.(mp3|m4a|aac|ogg|opus|wav)/)) {
+    return { isAttachment: true, type: 'audio', url: trimmed }
+  }
+  if (lower.match(/\.(mp4|mov|webm|avi)/) || lower.includes('/video')) {
+    return { isAttachment: true, type: 'video', url: trimmed }
+  }
+  if (lower.match(/\.(jpg|jpeg|png|gif|webp|heic)/) || lower.includes('/ig_messaging_cdn/')) {
+    return { isAttachment: true, type: 'image', url: trimmed }
+  }
+
+  // Unknown attachment type from Meta CDN
+  return { isAttachment: true, type: 'file', url: trimmed }
+}
+
+const ATTACHMENT_LABELS: Record<string, string> = {
+  image: '📷 Imagen enviada',
+  audio: '🎤 Audio enviado',
+  video: '🎥 Video enviado',
+  file: '📎 Archivo enviado',
+}
+
+/**
  * POST /api/webhooks/manychat
  *
  * Receives Instagram DM messages forwarded by ManyChat's "External Request"
@@ -52,15 +94,21 @@ export async function POST(req: NextRequest) {
   const firstName = String(body.first_name || '').trim()
   const lastName = String(body.last_name || '').trim()
   const username = String(body.username || body.ig_username || '').trim()
-  const messageText = String(body.last_input_text || '').trim()
+  const rawInput = String(body.last_input_text || '').trim()
   const rawTimestamp = body.timestamp
 
   if (!subscriberId) {
     return NextResponse.json({ error: 'subscriber_id is required' }, { status: 400 })
   }
-  if (!messageText) {
+  if (!rawInput) {
     return NextResponse.json({ error: 'last_input_text is required' }, { status: 400 })
   }
+
+  // Detect if input is an attachment URL vs real text
+  const attachment = classifyAttachment(rawInput)
+  const messageType = attachment ? attachment.type : 'text'
+  const attachmentUrl = attachment ? attachment.url : null
+  const messageText = attachment ? ATTACHMENT_LABELS[attachment.type] : rawInput
 
   // Resolve timestamp
   let sentAt: string
@@ -79,11 +127,13 @@ export async function POST(req: NextRequest) {
   console.log('[ManyChat Webhook] ── Processing ──')
   console.log('[ManyChat Webhook] subscriber_id:', subscriberId)
   console.log('[ManyChat Webhook] username:', igUsername)
+  console.log('[ManyChat Webhook] message_type:', messageType)
   console.log('[ManyChat Webhook] message:', messageText.slice(0, 80))
+  if (attachmentUrl) console.log('[ManyChat Webhook] attachment_url:', attachmentUrl.slice(0, 100))
   console.log('[ManyChat Webhook] sentAt:', sentAt)
 
   // ── Dedup key for messages ──────────────────────────────────────────────
-  const dedupKey = `mc_${subscriberId}_${sentAt}_${messageText.slice(0, 100)}`
+  const dedupKey = `mc_${subscriberId}_${sentAt}_${rawInput.slice(0, 100)}`
 
   let supabase: ReturnType<typeof getServiceClient>
   try {
@@ -146,6 +196,8 @@ export async function POST(req: NextRequest) {
       conversation_id: conversation.id,
       direction: 'inbound',
       message_text: messageText,
+      message_type: messageType,
+      attachment_url: attachmentUrl,
       sent_at: sentAt,
       ig_message_id: dedupKey,
     })

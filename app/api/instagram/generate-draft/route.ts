@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
   // ── 1) Fetch conversation history ───────────────────────────────────────
   const { data: messages, error: msgErr } = await supabase
     .from('instagram_messages')
-    .select('direction, message_text, sent_at')
+    .select('direction, message_text, message_type, sent_at')
     .eq('conversation_id', conversation_id)
     .order('sent_at', { ascending: true })
 
@@ -131,10 +131,22 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 2) Format conversation for Claude ───────────────────────────────────
+  const ATTACHMENT_CONTEXT: Record<string, string> = {
+    image: '[El usuario envió una imagen]',
+    audio: '[El usuario envió un mensaje de voz/audio]',
+    video: '[El usuario envió un video]',
+    file: '[El usuario envió un archivo adjunto]',
+    other: '[El usuario envió un adjunto]',
+  }
+
   const conversationText = (messages ?? [])
     .map((m) => {
       const role = m.direction === 'inbound' ? 'Prospect' : 'Marcela'
-      return `[${role}]: ${m.message_text}`
+      const msgType = (m as Record<string, unknown>).message_type as string | undefined
+      const text = msgType && msgType !== 'text'
+        ? ATTACHMENT_CONTEXT[msgType] || ATTACHMENT_CONTEXT.other
+        : m.message_text
+      return `[${role}]: ${text}`
     })
     .join('\n')
 
