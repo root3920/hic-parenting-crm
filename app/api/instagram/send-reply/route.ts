@@ -83,44 +83,52 @@ export async function POST(req: NextRequest) {
 
   const subscriberId = conversation.ig_user_id
 
-  // 2) Send via ManyChat API
+  // 2) Send via ManyChat API (Instagram channel)
+  //    Endpoint: /ig/sending/sendContent (not /fb/ — that's for Facebook Messenger)
+  //    message_tag HUMAN_AGENT extends the 24h window to 7 days for human-agent replies.
+  const mcPayload = {
+    subscriber_id: Number(subscriberId),
+    message_tag: 'HUMAN_AGENT',
+    data: {
+      version: 'v2',
+      content: {
+        messages: [
+          { type: 'text', text: message_text },
+        ],
+      },
+    },
+  }
+
   console.log('[Send Reply] Sending to ManyChat subscriber:', subscriberId)
+  console.log('[Send Reply] Payload:', JSON.stringify(mcPayload))
 
   let manychatSuccess = false
   let manychatResponse: Record<string, unknown> = {}
 
   try {
-    const mcRes = await fetch('https://api.manychat.com/fb/sending/sendContent', {
+    const mcRes = await fetch('https://api.manychat.com/ig/sending/sendContent', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${manychatToken}`,
       },
-      body: JSON.stringify({
-        subscriber_id: Number(subscriberId),
-        message_tag: 'HUMAN_AGENT',
-        data: {
-          version: 'v2',
-          content: {
-            messages: [
-              { type: 'text', text: message_text },
-            ],
-          },
-        },
-      }),
+      body: JSON.stringify(mcPayload),
     })
 
     manychatResponse = await mcRes.json()
-    console.log('[Send Reply] ManyChat response:', JSON.stringify(manychatResponse))
+    console.log('[Send Reply] ManyChat HTTP status:', mcRes.status)
+    console.log('[Send Reply] ManyChat full response:', JSON.stringify(manychatResponse, null, 2))
 
     if (mcRes.ok && manychatResponse.status === 'success') {
       manychatSuccess = true
     } else {
-      console.error('[Send Reply] ManyChat API error:', JSON.stringify(manychatResponse))
+      console.error('[Send Reply] ManyChat API error — full body:', JSON.stringify(manychatResponse, null, 2))
       return NextResponse.json(
         {
-          error: `ManyChat API error: ${(manychatResponse as Record<string, unknown>).message || JSON.stringify(manychatResponse)}`,
+          error: `ManyChat API error: ${manychatResponse.message || manychatResponse.error || JSON.stringify(manychatResponse)}`,
           manychat_response: manychatResponse,
+          manychat_http_status: mcRes.status,
+          payload_sent: mcPayload,
         },
         { status: 502 },
       )
