@@ -83,7 +83,10 @@
       "Bash(lsof -ti:3951)",
       "Bash(while read:*)",
       "Bash(kill 97544)",
-      "Bash(openssl rand:*)"
+      "Bash(openssl rand:*)",
+      "WebFetch(domain:api.manychat.com)",
+      "WebFetch(domain:developers.manychat.com)",
+      "WebFetch(domain:manychat.github.io)"
     ]
   }
 }
