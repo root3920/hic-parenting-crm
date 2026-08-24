@@ -7,11 +7,10 @@ import { cn } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 
 const BASE_TABS = [
-  // Hidden temporarily - can be re-enabled
-  // { href: '/equipo/csm',    label: 'Client Success HT',  icon: Users,      roles: ['admin'] },
   { href: '/equipo/spc',    label: 'Client Success SPC',  icon: Users2,     roles: ['admin'] },
   { href: '/equipo/setter', label: 'Setting Team',        icon: BarChart2,  roles: ['admin', 'setter'] },
   { href: '/equipo/closer', label: 'Closing Team',        icon: TrendingUp, roles: ['admin', 'closer'] },
+  { href: '/equipo/csm',    label: 'Client Success HT',  icon: Users,      roles: ['admin'] },
 ]
 
 export function EquipoSubNav() {
