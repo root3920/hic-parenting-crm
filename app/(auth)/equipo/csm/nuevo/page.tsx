@@ -19,20 +19,23 @@ function today() {
 const HARDCODED_CSMS = ['Marcela Collier']
 
 const NUM_FIELDS = [
-  'active_clients', 'checkins_completed', 'at_risk_identified', 'at_risk_recovered',
-  'issues_reported', 'issues_resolved_same_day', 'follow_ups_sent', 'follow_ups_replied',
-  'sessions_scheduled', 'sessions_completed', 'no_shows', 'rescheduled',
-  'session_notes_filed', 'coach_flags_raised',
-  'new_clients_started', 'welcome_calls_done', 'onboarding_steps_completed',
-  'portal_access_verified', 'first_session_booked', 'onboarding_stuck', 'onboarding_completed_total',
-  'lt_active_clients', 'lt_checkins', 'lt_upsell_conversations', 'lt_upsells_closed', 'lt_churn_requests',
-  'graduates_contacted', 'graduates_responded', 'renewals_offered', 'renewals_closed',
-  'referrals_asked', 'referrals_received', 'testimonials_requested', 'testimonials_received',
-  'total_messages_sent', 'total_calls_made', 'hours_in_client_work',
+  'active_coaching_clients', 'followups_completed', 'contacted_after_noshow',
+  'at_risk_contacted', 'at_risk_recovered',
+  'issues_received', 'issues_resolved_direct', 'cases_escalated',
+  'sessions_scheduled', 'sessions_rescheduled', 'session_reminders_sent',
+  'qa_reminders_sent', 'coach_coordination_count', 'weekly_slides_sent',
+  'new_clients_received', 'welcome_messages_sent', 'contracts_created',
+  'clients_added_ghl_kajabi', 'coach_matches_completed', 'first_sessions_scheduled', 'access_issues_resolved',
+  'lt_conversations', 'lt_followups', 'lt_issues_resolved', 'lt_engagement_convos', 'lt_upgrade_opportunities',
+  'grad_approaching_contacted', 'family_manifestos_sent', 'clients_invited_record',
+  'recordings_scheduled', 'recordings_completed', 'grad_nurturing_convos',
+  'referred_to_grad_program', 'continuation_opportunities',
+  'total_conversations', 'total_followups', 'total_operational_tasks',
 ] as const
 
 const TEXT_FIELDS = [
-  'main_blocker', 'waiting_on_team', 'escalated_why', 'wins_today', 'focus_tomorrow',
+  'main_blocker', 'waiting_on_team', 'escalated_why',
+  'pending_tasks_tomorrow', 'clients_attention_tomorrow',
 ] as const
 
 type NumKey = typeof NUM_FIELDS[number]
@@ -258,14 +261,14 @@ export default function CsmDailyActivityPage() {
             <div className="flex items-center gap-2">
               <span className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">At-Risk Recovery Rate</span>
               <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                {pct(n.at_risk_recovered, n.at_risk_identified)}
+                {pct(n.at_risk_recovered, n.at_risk_contacted)}
               </span>
             </div>
             <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
             <div className="flex items-center gap-2">
               <span className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">Issue Resolution Rate</span>
               <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                {pct(n.issues_resolved_same_day, n.issues_reported)}
+                {pct(n.issues_resolved_direct, n.issues_received)}
               </span>
             </div>
           </div>
@@ -307,14 +310,14 @@ export default function CsmDailyActivityPage() {
           <SectionCard>
             <SectionHeader label="Clients & Follow-Up" color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" />
             <div className="grid grid-cols-2 gap-4">
-              <NumField label="Active Clients Today" value={n.active_clients} onChange={(v) => setNum('active_clients', v)} />
-              <NumField label="Check-ins Completed" value={n.checkins_completed} onChange={(v) => setNum('checkins_completed', v)} />
-              <NumField label="At-Risk Clients Identified" value={n.at_risk_identified} onChange={(v) => setNum('at_risk_identified', v)} />
+              <NumField label="Active Coaching Clients" value={n.active_coaching_clients} onChange={(v) => setNum('active_coaching_clients', v)} />
+              <NumField label="Follow-ups Completed" value={n.followups_completed} onChange={(v) => setNum('followups_completed', v)} />
+              <NumField label="Contacted After No-Show" value={n.contacted_after_noshow} onChange={(v) => setNum('contacted_after_noshow', v)} />
+              <NumField label="At-Risk Contacted" value={n.at_risk_contacted} onChange={(v) => setNum('at_risk_contacted', v)} />
               <NumField label="At-Risk Recovered" value={n.at_risk_recovered} onChange={(v) => setNum('at_risk_recovered', v)} />
-              <NumField label="Issues Reported by Clients" value={n.issues_reported} onChange={(v) => setNum('issues_reported', v)} />
-              <NumField label="Issues Resolved Same Day" value={n.issues_resolved_same_day} onChange={(v) => setNum('issues_resolved_same_day', v)} />
-              <NumField label="Follow-Ups Sent" value={n.follow_ups_sent} onChange={(v) => setNum('follow_ups_sent', v)} />
-              <NumField label="Follow-Ups Replied" value={n.follow_ups_replied} onChange={(v) => setNum('follow_ups_replied', v)} />
+              <NumField label="Issues Received" value={n.issues_received} onChange={(v) => setNum('issues_received', v)} />
+              <NumField label="Issues Resolved Direct" value={n.issues_resolved_direct} onChange={(v) => setNum('issues_resolved_direct', v)} />
+              <NumField label="Cases Escalated" value={n.cases_escalated} onChange={(v) => setNum('cases_escalated', v)} />
             </div>
           </SectionCard>
 
@@ -323,11 +326,11 @@ export default function CsmDailyActivityPage() {
             <SectionHeader label="Sessions & Coaching Operations" color="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" />
             <div className="grid grid-cols-2 gap-4">
               <NumField label="Sessions Scheduled" value={n.sessions_scheduled} onChange={(v) => setNum('sessions_scheduled', v)} />
-              <NumField label="Sessions Completed" value={n.sessions_completed} onChange={(v) => setNum('sessions_completed', v)} />
-              <NumField label="No-Shows" value={n.no_shows} onChange={(v) => setNum('no_shows', v)} />
-              <NumField label="Rescheduled" value={n.rescheduled} onChange={(v) => setNum('rescheduled', v)} />
-              <NumField label="Session Notes Filed" value={n.session_notes_filed} onChange={(v) => setNum('session_notes_filed', v)} />
-              <NumField label="Coach Flags Raised" value={n.coach_flags_raised} onChange={(v) => setNum('coach_flags_raised', v)} />
+              <NumField label="Sessions Rescheduled" value={n.sessions_rescheduled} onChange={(v) => setNum('sessions_rescheduled', v)} />
+              <NumField label="Session Reminders Sent" value={n.session_reminders_sent} onChange={(v) => setNum('session_reminders_sent', v)} />
+              <NumField label="QA Reminders Sent" value={n.qa_reminders_sent} onChange={(v) => setNum('qa_reminders_sent', v)} />
+              <NumField label="Coach Coordination Count" value={n.coach_coordination_count} onChange={(v) => setNum('coach_coordination_count', v)} />
+              <NumField label="Weekly Slides Sent" value={n.weekly_slides_sent} onChange={(v) => setNum('weekly_slides_sent', v)} />
             </div>
           </SectionCard>
 
@@ -335,25 +338,25 @@ export default function CsmDailyActivityPage() {
           <SectionCard>
             <SectionHeader label="Onboarding" color="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" />
             <div className="grid grid-cols-2 gap-4">
-              <NumField label="New Clients Started Today" value={n.new_clients_started} onChange={(v) => setNum('new_clients_started', v)} />
-              <NumField label="Welcome Calls Done" value={n.welcome_calls_done} onChange={(v) => setNum('welcome_calls_done', v)} />
-              <NumField label="Onboarding Steps Completed" value={n.onboarding_steps_completed} onChange={(v) => setNum('onboarding_steps_completed', v)} />
-              <NumField label="Portal Access Verified" value={n.portal_access_verified} onChange={(v) => setNum('portal_access_verified', v)} />
-              <NumField label="First Session Booked" value={n.first_session_booked} onChange={(v) => setNum('first_session_booked', v)} />
-              <NumField label="Onboarding Stuck / Needs Help" value={n.onboarding_stuck} onChange={(v) => setNum('onboarding_stuck', v)} />
-              <NumField label="Onboarding Fully Completed" value={n.onboarding_completed_total} onChange={(v) => setNum('onboarding_completed_total', v)} />
+              <NumField label="New Clients Received" value={n.new_clients_received} onChange={(v) => setNum('new_clients_received', v)} />
+              <NumField label="Welcome Messages Sent" value={n.welcome_messages_sent} onChange={(v) => setNum('welcome_messages_sent', v)} />
+              <NumField label="Contracts Created" value={n.contracts_created} onChange={(v) => setNum('contracts_created', v)} />
+              <NumField label="Clients Added GHL/Kajabi" value={n.clients_added_ghl_kajabi} onChange={(v) => setNum('clients_added_ghl_kajabi', v)} />
+              <NumField label="Coach Matches Completed" value={n.coach_matches_completed} onChange={(v) => setNum('coach_matches_completed', v)} />
+              <NumField label="First Sessions Scheduled" value={n.first_sessions_scheduled} onChange={(v) => setNum('first_sessions_scheduled', v)} />
+              <NumField label="Access Issues Resolved" value={n.access_issues_resolved} onChange={(v) => setNum('access_issues_resolved', v)} />
             </div>
           </SectionCard>
 
-          {/* ── Section 4: Low-Ticket ── */}
+          {/* ── Section 4: Long-Term Clients ── */}
           <SectionCard>
-            <SectionHeader label="Low-Ticket" color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" />
+            <SectionHeader label="Long-Term Clients" color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" />
             <div className="grid grid-cols-2 gap-4">
-              <NumField label="LT Active Clients" value={n.lt_active_clients} onChange={(v) => setNum('lt_active_clients', v)} />
-              <NumField label="LT Check-ins Done" value={n.lt_checkins} onChange={(v) => setNum('lt_checkins', v)} />
-              <NumField label="Upsell Conversations" value={n.lt_upsell_conversations} onChange={(v) => setNum('lt_upsell_conversations', v)} />
-              <NumField label="Upsells Closed" value={n.lt_upsells_closed} onChange={(v) => setNum('lt_upsells_closed', v)} />
-              <NumField label="LT Churn Requests" value={n.lt_churn_requests} onChange={(v) => setNum('lt_churn_requests', v)} />
+              <NumField label="LT Conversations" value={n.lt_conversations} onChange={(v) => setNum('lt_conversations', v)} />
+              <NumField label="LT Follow-ups" value={n.lt_followups} onChange={(v) => setNum('lt_followups', v)} />
+              <NumField label="LT Issues Resolved" value={n.lt_issues_resolved} onChange={(v) => setNum('lt_issues_resolved', v)} />
+              <NumField label="LT Engagement Convos" value={n.lt_engagement_convos} onChange={(v) => setNum('lt_engagement_convos', v)} />
+              <NumField label="LT Upgrade Opportunities" value={n.lt_upgrade_opportunities} onChange={(v) => setNum('lt_upgrade_opportunities', v)} />
             </div>
           </SectionCard>
 
@@ -361,14 +364,14 @@ export default function CsmDailyActivityPage() {
           <SectionCard>
             <SectionHeader label="Graduates / Retention / Expansion" color="bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" />
             <div className="grid grid-cols-2 gap-4">
-              <NumField label="Graduates Contacted" value={n.graduates_contacted} onChange={(v) => setNum('graduates_contacted', v)} />
-              <NumField label="Graduates Responded" value={n.graduates_responded} onChange={(v) => setNum('graduates_responded', v)} />
-              <NumField label="Renewals Offered" value={n.renewals_offered} onChange={(v) => setNum('renewals_offered', v)} />
-              <NumField label="Renewals Closed" value={n.renewals_closed} onChange={(v) => setNum('renewals_closed', v)} />
-              <NumField label="Referrals Asked" value={n.referrals_asked} onChange={(v) => setNum('referrals_asked', v)} />
-              <NumField label="Referrals Received" value={n.referrals_received} onChange={(v) => setNum('referrals_received', v)} />
-              <NumField label="Testimonials Requested" value={n.testimonials_requested} onChange={(v) => setNum('testimonials_requested', v)} />
-              <NumField label="Testimonials Received" value={n.testimonials_received} onChange={(v) => setNum('testimonials_received', v)} />
+              <NumField label="Grad Approaching Contacted" value={n.grad_approaching_contacted} onChange={(v) => setNum('grad_approaching_contacted', v)} />
+              <NumField label="Family Manifestos Sent" value={n.family_manifestos_sent} onChange={(v) => setNum('family_manifestos_sent', v)} />
+              <NumField label="Clients Invited to Record" value={n.clients_invited_record} onChange={(v) => setNum('clients_invited_record', v)} />
+              <NumField label="Recordings Scheduled" value={n.recordings_scheduled} onChange={(v) => setNum('recordings_scheduled', v)} />
+              <NumField label="Recordings Completed" value={n.recordings_completed} onChange={(v) => setNum('recordings_completed', v)} />
+              <NumField label="Grad Nurturing Convos" value={n.grad_nurturing_convos} onChange={(v) => setNum('grad_nurturing_convos', v)} />
+              <NumField label="Referred to Grad Program" value={n.referred_to_grad_program} onChange={(v) => setNum('referred_to_grad_program', v)} />
+              <NumField label="Continuation Opportunities" value={n.continuation_opportunities} onChange={(v) => setNum('continuation_opportunities', v)} />
             </div>
           </SectionCard>
 
@@ -376,9 +379,9 @@ export default function CsmDailyActivityPage() {
           <SectionCard>
             <SectionHeader label="Daily Volume" color="bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300" />
             <div className="grid grid-cols-3 gap-4">
-              <NumField label="Total Messages Sent" value={n.total_messages_sent} onChange={(v) => setNum('total_messages_sent', v)} />
-              <NumField label="Total Calls Made" value={n.total_calls_made} onChange={(v) => setNum('total_calls_made', v)} />
-              <NumField label="Hours in Client Work" value={n.hours_in_client_work} onChange={(v) => setNum('hours_in_client_work', v)} />
+              <NumField label="Total Conversations" value={n.total_conversations} onChange={(v) => setNum('total_conversations', v)} />
+              <NumField label="Total Follow-ups" value={n.total_followups} onChange={(v) => setNum('total_followups', v)} />
+              <NumField label="Total Operational Tasks" value={n.total_operational_tasks} onChange={(v) => setNum('total_operational_tasks', v)} />
             </div>
           </SectionCard>
 
@@ -412,16 +415,16 @@ export default function CsmDailyActivityPage() {
             <SectionHeader label="End-of-Day Status" color="bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300" />
             <div className="space-y-4">
               <TextAreaField
-                label="Wins Today"
-                value={form.texts.wins_today}
-                onChange={(v) => setText('wins_today', v)}
-                placeholder="What went well?"
+                label="Pending Tasks Tomorrow"
+                value={form.texts.pending_tasks_tomorrow}
+                onChange={(v) => setText('pending_tasks_tomorrow', v)}
+                placeholder="Tasks pending for tomorrow"
               />
               <TextAreaField
-                label="Focus Tomorrow"
-                value={form.texts.focus_tomorrow}
-                onChange={(v) => setText('focus_tomorrow', v)}
-                placeholder="Top priorities for tomorrow"
+                label="Clients Needing Attention Tomorrow"
+                value={form.texts.clients_attention_tomorrow}
+                onChange={(v) => setText('clients_attention_tomorrow', v)}
+                placeholder="Which clients need attention tomorrow?"
               />
               <div>
                 <FieldLabel>Capacity</FieldLabel>

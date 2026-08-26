@@ -29,55 +29,55 @@ interface DailyActivity {
   csm_name: string
   date: string
   // Section 1 — Client Management
-  active_clients: number
-  checkins_completed: number
-  at_risk_identified: number
+  active_coaching_clients: number
+  followups_completed: number
+  contacted_after_noshow: number
+  at_risk_contacted: number
   at_risk_recovered: number
-  issues_reported: number
-  issues_resolved_same_day: number
-  follow_ups_sent: number
-  follow_ups_replied: number
+  issues_received: number
+  issues_resolved_direct: number
+  cases_escalated: number
   // Section 2 — Sessions
   sessions_scheduled: number
-  sessions_completed: number
-  no_shows: number
-  rescheduled: number
-  session_notes_filed: number
-  coach_flags_raised: number
+  sessions_rescheduled: number
+  session_reminders_sent: number
+  qa_reminders_sent: number
+  coach_coordination_count: number
+  weekly_slides_sent: number
   // Section 3 — Onboarding
-  new_clients_started: number
-  welcome_calls_done: number
-  onboarding_steps_completed: number
-  portal_access_verified: number
-  first_session_booked: number
-  onboarding_stuck: number
-  onboarding_completed_total: number
+  new_clients_received: number
+  welcome_messages_sent: number
+  contracts_created: number
+  clients_added_ghl_kajabi: number
+  coach_matches_completed: number
+  first_sessions_scheduled: number
+  access_issues_resolved: number
   // Section 4 — Long-Term Clients
-  lt_active_clients: number
-  lt_checkins: number
-  lt_upsell_conversations: number
-  lt_upsells_closed: number
-  lt_churn_requests: number
-  // Section 5 — Graduates & Renewals
-  graduates_contacted: number
-  graduates_responded: number
-  renewals_offered: number
-  renewals_closed: number
-  referrals_asked: number
-  referrals_received: number
-  testimonials_requested: number
-  testimonials_received: number
+  lt_conversations: number
+  lt_followups: number
+  lt_issues_resolved: number
+  lt_engagement_convos: number
+  lt_upgrade_opportunities: number
+  // Section 5 — Graduates & Retention
+  grad_approaching_contacted: number
+  family_manifestos_sent: number
+  clients_invited_record: number
+  recordings_scheduled: number
+  recordings_completed: number
+  grad_nurturing_convos: number
+  referred_to_grad_program: number
+  continuation_opportunities: number
   // Section 6 — Volume
-  total_messages_sent: number
-  total_calls_made: number
-  hours_in_client_work: number
+  total_conversations: number
+  total_followups: number
+  total_operational_tasks: number
   // Section 8 — Blockers
   main_blocker: string | null
   waiting_on_team: string | null
   escalated_why: string | null
   // Section 9 — Wrap-up
-  wins_today: string | null
-  focus_tomorrow: string | null
+  pending_tasks_tomorrow: string | null
+  clients_attention_tomorrow: string | null
   capacity: string | null
   created_at: string
 }
@@ -254,56 +254,56 @@ function ReportDetail({
         {/* Left column */}
         <div>
           <p className={subLabel}>Client Management</p>
-          <Row label="Active clients" value={report.active_clients} />
-          <Row label="Check-ins completed" value={report.checkins_completed} />
-          <Row label="At-risk identified" value={report.at_risk_identified} />
+          <Row label="Active coaching clients" value={report.active_coaching_clients} />
+          <Row label="Follow-ups completed" value={report.followups_completed} />
+          <Row label="Contacted after no-show" value={report.contacted_after_noshow} />
+          <Row label="At-risk contacted" value={report.at_risk_contacted} />
           <Row label="At-risk recovered" value={report.at_risk_recovered} />
-          <Row label="Issues reported" value={report.issues_reported} />
-          <Row label="Issues resolved same day" value={report.issues_resolved_same_day} />
-          <Row label="Follow-ups sent" value={report.follow_ups_sent} />
-          <Row label="Follow-ups replied" value={report.follow_ups_replied} />
+          <Row label="Issues received" value={report.issues_received} />
+          <Row label="Issues resolved direct" value={report.issues_resolved_direct} />
+          <Row label="Cases escalated" value={report.cases_escalated} />
 
-          <p className={subLabel}>Sessions</p>
+          <p className={subLabel}>Sessions & Coaching</p>
           <Row label="Sessions scheduled" value={report.sessions_scheduled} />
-          <Row label="Sessions completed" value={report.sessions_completed} />
-          <Row label="No-shows" value={report.no_shows} />
-          <Row label="Rescheduled" value={report.rescheduled} />
-          <Row label="Session notes filed" value={report.session_notes_filed} />
-          <Row label="Coach flags raised" value={report.coach_flags_raised} />
+          <Row label="Sessions rescheduled" value={report.sessions_rescheduled} />
+          <Row label="Session reminders sent" value={report.session_reminders_sent} />
+          <Row label="QA reminders sent" value={report.qa_reminders_sent} />
+          <Row label="Coach coordination count" value={report.coach_coordination_count} />
+          <Row label="Weekly slides sent" value={report.weekly_slides_sent} />
 
           <p className={subLabel}>Onboarding</p>
-          <Row label="New clients started" value={report.new_clients_started} />
-          <Row label="Welcome calls done" value={report.welcome_calls_done} />
-          <Row label="Onboarding steps completed" value={report.onboarding_steps_completed} />
-          <Row label="Portal access verified" value={report.portal_access_verified} />
-          <Row label="First session booked" value={report.first_session_booked} />
-          <Row label="Onboarding stuck" value={report.onboarding_stuck} />
-          <Row label="Onboarding completed (total)" value={report.onboarding_completed_total} />
+          <Row label="New clients received" value={report.new_clients_received} />
+          <Row label="Welcome messages sent" value={report.welcome_messages_sent} />
+          <Row label="Contracts created" value={report.contracts_created} />
+          <Row label="Clients added GHL/Kajabi" value={report.clients_added_ghl_kajabi} />
+          <Row label="Coach matches completed" value={report.coach_matches_completed} />
+          <Row label="First sessions scheduled" value={report.first_sessions_scheduled} />
+          <Row label="Access issues resolved" value={report.access_issues_resolved} />
         </div>
 
         {/* Right column */}
         <div>
           <p className={subLabel}>Long-Term Clients</p>
-          <Row label="LT active clients" value={report.lt_active_clients} />
-          <Row label="LT check-ins" value={report.lt_checkins} />
-          <Row label="LT upsell conversations" value={report.lt_upsell_conversations} />
-          <Row label="LT upsells closed" value={report.lt_upsells_closed} />
-          <Row label="LT churn requests" value={report.lt_churn_requests} />
+          <Row label="LT conversations" value={report.lt_conversations} />
+          <Row label="LT follow-ups" value={report.lt_followups} />
+          <Row label="LT issues resolved" value={report.lt_issues_resolved} />
+          <Row label="LT engagement convos" value={report.lt_engagement_convos} />
+          <Row label="LT upgrade opportunities" value={report.lt_upgrade_opportunities} />
 
-          <p className={subLabel}>Graduates & Renewals</p>
-          <Row label="Graduates contacted" value={report.graduates_contacted} />
-          <Row label="Graduates responded" value={report.graduates_responded} />
-          <Row label="Renewals offered" value={report.renewals_offered} />
-          <Row label="Renewals closed" value={report.renewals_closed} />
-          <Row label="Referrals asked" value={report.referrals_asked} />
-          <Row label="Referrals received" value={report.referrals_received} />
-          <Row label="Testimonials requested" value={report.testimonials_requested} />
-          <Row label="Testimonials received" value={report.testimonials_received} />
+          <p className={subLabel}>Graduates & Retention</p>
+          <Row label="Grad approaching contacted" value={report.grad_approaching_contacted} />
+          <Row label="Family manifestos sent" value={report.family_manifestos_sent} />
+          <Row label="Clients invited to record" value={report.clients_invited_record} />
+          <Row label="Recordings scheduled" value={report.recordings_scheduled} />
+          <Row label="Recordings completed" value={report.recordings_completed} />
+          <Row label="Grad nurturing convos" value={report.grad_nurturing_convos} />
+          <Row label="Referred to grad program" value={report.referred_to_grad_program} />
+          <Row label="Continuation opportunities" value={report.continuation_opportunities} />
 
           <p className={subLabel}>Volume</p>
-          <Row label="Total messages sent" value={report.total_messages_sent} />
-          <Row label="Total calls made" value={report.total_calls_made} />
-          <Row label="Hours in client work" value={report.hours_in_client_work} />
+          <Row label="Total conversations" value={report.total_conversations} />
+          <Row label="Total follow-ups" value={report.total_followups} />
+          <Row label="Total operational tasks" value={report.total_operational_tasks} />
 
           <p className={subLabel}>Blockers & Escalations</p>
           <Row label="Main blocker" value={report.main_blocker} />
@@ -311,8 +311,8 @@ function ReportDetail({
           <Row label="Escalated — why" value={report.escalated_why} />
 
           <p className={subLabel}>Wrap-up</p>
-          <Row label="Wins today" value={report.wins_today} />
-          <Row label="Focus tomorrow" value={report.focus_tomorrow} />
+          <Row label="Pending tasks tomorrow" value={report.pending_tasks_tomorrow} />
+          <Row label="Clients needing attention tomorrow" value={report.clients_attention_tomorrow} />
           <Row label="Capacity" value={report.capacity} />
         </div>
       </div>
@@ -325,48 +325,48 @@ function ReportDetail({
 interface EditForm {
   csm_name: string
   date: string
-  active_clients: string
-  checkins_completed: string
-  at_risk_identified: string
+  active_coaching_clients: string
+  followups_completed: string
+  contacted_after_noshow: string
+  at_risk_contacted: string
   at_risk_recovered: string
-  issues_reported: string
-  issues_resolved_same_day: string
-  follow_ups_sent: string
-  follow_ups_replied: string
+  issues_received: string
+  issues_resolved_direct: string
+  cases_escalated: string
   sessions_scheduled: string
-  sessions_completed: string
-  no_shows: string
-  rescheduled: string
-  session_notes_filed: string
-  coach_flags_raised: string
-  new_clients_started: string
-  welcome_calls_done: string
-  onboarding_steps_completed: string
-  portal_access_verified: string
-  first_session_booked: string
-  onboarding_stuck: string
-  onboarding_completed_total: string
-  lt_active_clients: string
-  lt_checkins: string
-  lt_upsell_conversations: string
-  lt_upsells_closed: string
-  lt_churn_requests: string
-  graduates_contacted: string
-  graduates_responded: string
-  renewals_offered: string
-  renewals_closed: string
-  referrals_asked: string
-  referrals_received: string
-  testimonials_requested: string
-  testimonials_received: string
-  total_messages_sent: string
-  total_calls_made: string
-  hours_in_client_work: string
+  sessions_rescheduled: string
+  session_reminders_sent: string
+  qa_reminders_sent: string
+  coach_coordination_count: string
+  weekly_slides_sent: string
+  new_clients_received: string
+  welcome_messages_sent: string
+  contracts_created: string
+  clients_added_ghl_kajabi: string
+  coach_matches_completed: string
+  first_sessions_scheduled: string
+  access_issues_resolved: string
+  lt_conversations: string
+  lt_followups: string
+  lt_issues_resolved: string
+  lt_engagement_convos: string
+  lt_upgrade_opportunities: string
+  grad_approaching_contacted: string
+  family_manifestos_sent: string
+  clients_invited_record: string
+  recordings_scheduled: string
+  recordings_completed: string
+  grad_nurturing_convos: string
+  referred_to_grad_program: string
+  continuation_opportunities: string
+  total_conversations: string
+  total_followups: string
+  total_operational_tasks: string
   main_blocker: string
   waiting_on_team: string
   escalated_why: string
-  wins_today: string
-  focus_tomorrow: string
+  pending_tasks_tomorrow: string
+  clients_attention_tomorrow: string
   capacity: string
 }
 
@@ -374,63 +374,65 @@ function activityToEditForm(r: DailyActivity): EditForm {
   return {
     csm_name: r.csm_name,
     date: r.date,
-    active_clients: String(r.active_clients ?? 0),
-    checkins_completed: String(r.checkins_completed ?? 0),
-    at_risk_identified: String(r.at_risk_identified ?? 0),
+    active_coaching_clients: String(r.active_coaching_clients ?? 0),
+    followups_completed: String(r.followups_completed ?? 0),
+    contacted_after_noshow: String(r.contacted_after_noshow ?? 0),
+    at_risk_contacted: String(r.at_risk_contacted ?? 0),
     at_risk_recovered: String(r.at_risk_recovered ?? 0),
-    issues_reported: String(r.issues_reported ?? 0),
-    issues_resolved_same_day: String(r.issues_resolved_same_day ?? 0),
-    follow_ups_sent: String(r.follow_ups_sent ?? 0),
-    follow_ups_replied: String(r.follow_ups_replied ?? 0),
+    issues_received: String(r.issues_received ?? 0),
+    issues_resolved_direct: String(r.issues_resolved_direct ?? 0),
+    cases_escalated: String(r.cases_escalated ?? 0),
     sessions_scheduled: String(r.sessions_scheduled ?? 0),
-    sessions_completed: String(r.sessions_completed ?? 0),
-    no_shows: String(r.no_shows ?? 0),
-    rescheduled: String(r.rescheduled ?? 0),
-    session_notes_filed: String(r.session_notes_filed ?? 0),
-    coach_flags_raised: String(r.coach_flags_raised ?? 0),
-    new_clients_started: String(r.new_clients_started ?? 0),
-    welcome_calls_done: String(r.welcome_calls_done ?? 0),
-    onboarding_steps_completed: String(r.onboarding_steps_completed ?? 0),
-    portal_access_verified: String(r.portal_access_verified ?? 0),
-    first_session_booked: String(r.first_session_booked ?? 0),
-    onboarding_stuck: String(r.onboarding_stuck ?? 0),
-    onboarding_completed_total: String(r.onboarding_completed_total ?? 0),
-    lt_active_clients: String(r.lt_active_clients ?? 0),
-    lt_checkins: String(r.lt_checkins ?? 0),
-    lt_upsell_conversations: String(r.lt_upsell_conversations ?? 0),
-    lt_upsells_closed: String(r.lt_upsells_closed ?? 0),
-    lt_churn_requests: String(r.lt_churn_requests ?? 0),
-    graduates_contacted: String(r.graduates_contacted ?? 0),
-    graduates_responded: String(r.graduates_responded ?? 0),
-    renewals_offered: String(r.renewals_offered ?? 0),
-    renewals_closed: String(r.renewals_closed ?? 0),
-    referrals_asked: String(r.referrals_asked ?? 0),
-    referrals_received: String(r.referrals_received ?? 0),
-    testimonials_requested: String(r.testimonials_requested ?? 0),
-    testimonials_received: String(r.testimonials_received ?? 0),
-    total_messages_sent: String(r.total_messages_sent ?? 0),
-    total_calls_made: String(r.total_calls_made ?? 0),
-    hours_in_client_work: String(r.hours_in_client_work ?? 0),
+    sessions_rescheduled: String(r.sessions_rescheduled ?? 0),
+    session_reminders_sent: String(r.session_reminders_sent ?? 0),
+    qa_reminders_sent: String(r.qa_reminders_sent ?? 0),
+    coach_coordination_count: String(r.coach_coordination_count ?? 0),
+    weekly_slides_sent: String(r.weekly_slides_sent ?? 0),
+    new_clients_received: String(r.new_clients_received ?? 0),
+    welcome_messages_sent: String(r.welcome_messages_sent ?? 0),
+    contracts_created: String(r.contracts_created ?? 0),
+    clients_added_ghl_kajabi: String(r.clients_added_ghl_kajabi ?? 0),
+    coach_matches_completed: String(r.coach_matches_completed ?? 0),
+    first_sessions_scheduled: String(r.first_sessions_scheduled ?? 0),
+    access_issues_resolved: String(r.access_issues_resolved ?? 0),
+    lt_conversations: String(r.lt_conversations ?? 0),
+    lt_followups: String(r.lt_followups ?? 0),
+    lt_issues_resolved: String(r.lt_issues_resolved ?? 0),
+    lt_engagement_convos: String(r.lt_engagement_convos ?? 0),
+    lt_upgrade_opportunities: String(r.lt_upgrade_opportunities ?? 0),
+    grad_approaching_contacted: String(r.grad_approaching_contacted ?? 0),
+    family_manifestos_sent: String(r.family_manifestos_sent ?? 0),
+    clients_invited_record: String(r.clients_invited_record ?? 0),
+    recordings_scheduled: String(r.recordings_scheduled ?? 0),
+    recordings_completed: String(r.recordings_completed ?? 0),
+    grad_nurturing_convos: String(r.grad_nurturing_convos ?? 0),
+    referred_to_grad_program: String(r.referred_to_grad_program ?? 0),
+    continuation_opportunities: String(r.continuation_opportunities ?? 0),
+    total_conversations: String(r.total_conversations ?? 0),
+    total_followups: String(r.total_followups ?? 0),
+    total_operational_tasks: String(r.total_operational_tasks ?? 0),
     main_blocker: r.main_blocker ?? '',
     waiting_on_team: r.waiting_on_team ?? '',
     escalated_why: r.escalated_why ?? '',
-    wins_today: r.wins_today ?? '',
-    focus_tomorrow: r.focus_tomorrow ?? '',
+    pending_tasks_tomorrow: r.pending_tasks_tomorrow ?? '',
+    clients_attention_tomorrow: r.clients_attention_tomorrow ?? '',
     capacity: r.capacity ?? 'Medium',
   }
 }
 
 const NUM_FIELDS: (keyof EditForm)[] = [
-  'active_clients', 'checkins_completed', 'at_risk_identified', 'at_risk_recovered',
-  'issues_reported', 'issues_resolved_same_day', 'follow_ups_sent', 'follow_ups_replied',
-  'sessions_scheduled', 'sessions_completed', 'no_shows', 'rescheduled',
-  'session_notes_filed', 'coach_flags_raised',
-  'new_clients_started', 'welcome_calls_done', 'onboarding_steps_completed',
-  'portal_access_verified', 'first_session_booked', 'onboarding_stuck', 'onboarding_completed_total',
-  'lt_active_clients', 'lt_checkins', 'lt_upsell_conversations', 'lt_upsells_closed', 'lt_churn_requests',
-  'graduates_contacted', 'graduates_responded', 'renewals_offered', 'renewals_closed',
-  'referrals_asked', 'referrals_received', 'testimonials_requested', 'testimonials_received',
-  'total_messages_sent', 'total_calls_made', 'hours_in_client_work',
+  'active_coaching_clients', 'followups_completed', 'contacted_after_noshow',
+  'at_risk_contacted', 'at_risk_recovered',
+  'issues_received', 'issues_resolved_direct', 'cases_escalated',
+  'sessions_scheduled', 'sessions_rescheduled', 'session_reminders_sent',
+  'qa_reminders_sent', 'coach_coordination_count', 'weekly_slides_sent',
+  'new_clients_received', 'welcome_messages_sent', 'contracts_created',
+  'clients_added_ghl_kajabi', 'coach_matches_completed', 'first_sessions_scheduled', 'access_issues_resolved',
+  'lt_conversations', 'lt_followups', 'lt_issues_resolved', 'lt_engagement_convos', 'lt_upgrade_opportunities',
+  'grad_approaching_contacted', 'family_manifestos_sent', 'clients_invited_record',
+  'recordings_scheduled', 'recordings_completed', 'grad_nurturing_convos',
+  'referred_to_grad_program', 'continuation_opportunities',
+  'total_conversations', 'total_followups', 'total_operational_tasks',
 ]
 
 function fieldLabel(key: string): string {
@@ -438,6 +440,8 @@ function fieldLabel(key: string): string {
     .replace(/_/g, ' ')
     .replace(/\blt\b/g, 'LT')
     .replace(/\bcsm\b/g, 'CSM')
+    .replace(/\bghl\b/g, 'GHL')
+    .replace(/\bqa\b/g, 'QA')
     .replace(/^(.)/, (m) => m.toUpperCase())
 }
 
@@ -471,8 +475,8 @@ function EditModal({
         main_blocker: form.main_blocker || null,
         waiting_on_team: form.waiting_on_team || null,
         escalated_why: form.escalated_why || null,
-        wins_today: form.wins_today || null,
-        focus_tomorrow: form.focus_tomorrow || null,
+        pending_tasks_tomorrow: form.pending_tasks_tomorrow || null,
+        clients_attention_tomorrow: form.clients_attention_tomorrow || null,
         capacity: form.capacity || null,
       }
       for (const k of NUM_FIELDS) {
@@ -512,27 +516,27 @@ function EditModal({
   const sections: { title: string; fields: (keyof EditForm)[] }[] = [
     {
       title: 'Client Management',
-      fields: ['active_clients', 'checkins_completed', 'at_risk_identified', 'at_risk_recovered', 'issues_reported', 'issues_resolved_same_day', 'follow_ups_sent', 'follow_ups_replied'],
+      fields: ['active_coaching_clients', 'followups_completed', 'contacted_after_noshow', 'at_risk_contacted', 'at_risk_recovered', 'issues_received', 'issues_resolved_direct', 'cases_escalated'],
     },
     {
-      title: 'Sessions',
-      fields: ['sessions_scheduled', 'sessions_completed', 'no_shows', 'rescheduled', 'session_notes_filed', 'coach_flags_raised'],
+      title: 'Sessions & Coaching',
+      fields: ['sessions_scheduled', 'sessions_rescheduled', 'session_reminders_sent', 'qa_reminders_sent', 'coach_coordination_count', 'weekly_slides_sent'],
     },
     {
       title: 'Onboarding',
-      fields: ['new_clients_started', 'welcome_calls_done', 'onboarding_steps_completed', 'portal_access_verified', 'first_session_booked', 'onboarding_stuck', 'onboarding_completed_total'],
+      fields: ['new_clients_received', 'welcome_messages_sent', 'contracts_created', 'clients_added_ghl_kajabi', 'coach_matches_completed', 'first_sessions_scheduled', 'access_issues_resolved'],
     },
     {
       title: 'Long-Term Clients',
-      fields: ['lt_active_clients', 'lt_checkins', 'lt_upsell_conversations', 'lt_upsells_closed', 'lt_churn_requests'],
+      fields: ['lt_conversations', 'lt_followups', 'lt_issues_resolved', 'lt_engagement_convos', 'lt_upgrade_opportunities'],
     },
     {
-      title: 'Graduates & Renewals',
-      fields: ['graduates_contacted', 'graduates_responded', 'renewals_offered', 'renewals_closed', 'referrals_asked', 'referrals_received', 'testimonials_requested', 'testimonials_received'],
+      title: 'Graduates & Retention',
+      fields: ['grad_approaching_contacted', 'family_manifestos_sent', 'clients_invited_record', 'recordings_scheduled', 'recordings_completed', 'grad_nurturing_convos', 'referred_to_grad_program', 'continuation_opportunities'],
     },
     {
       title: 'Volume',
-      fields: ['total_messages_sent', 'total_calls_made', 'hours_in_client_work'],
+      fields: ['total_conversations', 'total_followups', 'total_operational_tasks'],
     },
   ]
 
@@ -591,8 +595,8 @@ function EditModal({
 
           <p className={sectionCls}>Wrap-up</p>
           <div className="space-y-2">
-            <div><label className={labelCls}>Wins today</label><textarea value={form.wins_today} onChange={(e) => set('wins_today', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} /></div>
-            <div><label className={labelCls}>Focus tomorrow</label><textarea value={form.focus_tomorrow} onChange={(e) => set('focus_tomorrow', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} /></div>
+            <div><label className={labelCls}>Pending tasks tomorrow</label><textarea value={form.pending_tasks_tomorrow} onChange={(e) => set('pending_tasks_tomorrow', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} /></div>
+            <div><label className={labelCls}>Clients needing attention tomorrow</label><textarea value={form.clients_attention_tomorrow} onChange={(e) => set('clients_attention_tomorrow', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} /></div>
           </div>
 
           {/* Capacity segmented control */}
@@ -716,26 +720,31 @@ export default function HtCsmDashboardPage() {
   const kpis = useMemo(() => {
     if (filteredReports.length === 0) return null
 
-    const atRiskIdentified = sum(filteredReports, 'at_risk_identified')
+    const atRiskContacted = sum(filteredReports, 'at_risk_contacted')
     const atRiskRecovered = sum(filteredReports, 'at_risk_recovered')
-    const issuesReported = sum(filteredReports, 'issues_reported')
-    const issuesResolved = sum(filteredReports, 'issues_resolved_same_day')
+    const issuesReceived = sum(filteredReports, 'issues_received')
+    const issuesResolved = sum(filteredReports, 'issues_resolved_direct')
     const sessionsScheduled = sum(filteredReports, 'sessions_scheduled')
-    const sessionsCompleted = sum(filteredReports, 'sessions_completed')
-    const onboardingCompleted = sum(filteredReports, 'onboarding_completed_total')
-    const newClientsStarted = sum(filteredReports, 'new_clients_started')
-    const followUpsSent = sum(filteredReports, 'follow_ups_sent')
-    const followUpsReplied = sum(filteredReports, 'follow_ups_replied')
-    const renewalsOffered = sum(filteredReports, 'renewals_offered')
-    const renewalsClosed = sum(filteredReports, 'renewals_closed')
+    const sessionsRescheduled = sum(filteredReports, 'sessions_rescheduled')
+    const newClientsReceived = sum(filteredReports, 'new_clients_received')
+    const coachMatchesCompleted = sum(filteredReports, 'coach_matches_completed')
+    const followupsCompleted = sum(filteredReports, 'followups_completed')
+    const totalConversations = sum(filteredReports, 'total_conversations')
 
     return {
-      atRiskRecovery: pct(atRiskRecovered, atRiskIdentified),
-      issueResolution: pct(issuesResolved, issuesReported),
-      sessionShowRate: pct(sessionsCompleted, sessionsScheduled),
-      onboardingCompletion: pct(onboardingCompleted, newClientsStarted),
-      followUpReply: pct(followUpsReplied, followUpsSent),
-      renewalClose: pct(renewalsClosed, renewalsOffered),
+      atRiskRecovery: pct(atRiskRecovered, atRiskContacted),
+      issueResolution: pct(issuesResolved, issuesReceived),
+      coachMatchRate: pct(coachMatchesCompleted, newClientsReceived),
+      atRiskContacted,
+      atRiskRecovered,
+      issuesReceived,
+      issuesResolved,
+      newClientsReceived,
+      coachMatchesCompleted,
+      followupsCompleted,
+      totalConversations,
+      sessionsScheduled,
+      sessionsRescheduled,
     }
   }, [filteredReports])
 
@@ -880,7 +889,7 @@ export default function HtCsmDashboardPage() {
               <KpiCard
                 label="At-Risk Recovery Rate"
                 value={fmtPct(kpis.atRiskRecovery)}
-                sub={`${sum(filteredReports, 'at_risk_recovered')} / ${sum(filteredReports, 'at_risk_identified')} recovered`}
+                sub={`${kpis.atRiskRecovered} / ${kpis.atRiskContacted} recovered`}
                 goal="Goal: >= 70%"
                 barPct={isNaN(kpis.atRiskRecovery) ? 0 : (kpis.atRiskRecovery / 70) * 100}
                 status={rateStatus(kpis.atRiskRecovery, 70)}
@@ -888,42 +897,39 @@ export default function HtCsmDashboardPage() {
               <KpiCard
                 label="Issue Resolution Rate"
                 value={fmtPct(kpis.issueResolution)}
-                sub={`${sum(filteredReports, 'issues_resolved_same_day')} / ${sum(filteredReports, 'issues_reported')} resolved`}
+                sub={`${kpis.issuesResolved} / ${kpis.issuesReceived} resolved`}
                 goal="Goal: >= 80%"
                 barPct={isNaN(kpis.issueResolution) ? 0 : (kpis.issueResolution / 80) * 100}
                 status={rateStatus(kpis.issueResolution, 80)}
               />
               <KpiCard
-                label="Session Show Rate"
-                value={fmtPct(kpis.sessionShowRate)}
-                sub={`${sum(filteredReports, 'sessions_completed')} / ${sum(filteredReports, 'sessions_scheduled')} showed`}
-                goal="Goal: >= 85%"
-                barPct={isNaN(kpis.sessionShowRate) ? 0 : (kpis.sessionShowRate / 85) * 100}
-                status={rateStatus(kpis.sessionShowRate, 85)}
-              />
-              <KpiCard
-                label="Onboarding Completion"
-                value={fmtPct(kpis.onboardingCompletion)}
-                sub={`${sum(filteredReports, 'onboarding_completed_total')} / ${sum(filteredReports, 'new_clients_started')} completed`}
+                label="Coach Match Rate"
+                value={fmtPct(kpis.coachMatchRate)}
+                sub={`${kpis.coachMatchesCompleted} / ${kpis.newClientsReceived} matched`}
                 goal="Goal: >= 90%"
-                barPct={isNaN(kpis.onboardingCompletion) ? 0 : (kpis.onboardingCompletion / 90) * 100}
-                status={rateStatus(kpis.onboardingCompletion, 90)}
+                barPct={isNaN(kpis.coachMatchRate) ? 0 : (kpis.coachMatchRate / 90) * 100}
+                status={rateStatus(kpis.coachMatchRate, 90)}
               />
               <KpiCard
-                label="Follow-Up Reply Rate"
-                value={fmtPct(kpis.followUpReply)}
-                sub={`${sum(filteredReports, 'follow_ups_replied')} / ${sum(filteredReports, 'follow_ups_sent')} replied`}
-                goal="Goal: >= 40%"
-                barPct={isNaN(kpis.followUpReply) ? 0 : (kpis.followUpReply / 40) * 100}
-                status={rateStatus(kpis.followUpReply, 40)}
+                label="Follow-ups Completed"
+                value={String(kpis.followupsCompleted)}
+                sub={`${filteredReports.length} reports`}
+                barPct={100}
+                status="good"
               />
               <KpiCard
-                label="Renewal Close Rate"
-                value={fmtPct(kpis.renewalClose)}
-                sub={`${sum(filteredReports, 'renewals_closed')} / ${sum(filteredReports, 'renewals_offered')} closed`}
-                goal="Goal: >= 30%"
-                barPct={isNaN(kpis.renewalClose) ? 0 : (kpis.renewalClose / 30) * 100}
-                status={rateStatus(kpis.renewalClose, 30)}
+                label="Total Conversations"
+                value={String(kpis.totalConversations)}
+                sub={`${filteredReports.length} reports`}
+                barPct={100}
+                status="good"
+              />
+              <KpiCard
+                label="Sessions Scheduled"
+                value={String(kpis.sessionsScheduled)}
+                sub={`${kpis.sessionsRescheduled} rescheduled`}
+                barPct={100}
+                status="good"
               />
             </div>
 
@@ -946,8 +952,8 @@ export default function HtCsmDashboardPage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                       {pageReports.map((r) => {
-                        const recovery = pct(r.at_risk_recovered, r.at_risk_identified)
-                        const resolution = pct(r.issues_resolved_same_day, r.issues_reported)
+                        const recovery = pct(r.at_risk_recovered, r.at_risk_contacted)
+                        const resolution = pct(r.issues_resolved_direct, r.issues_received)
                         const isOpen = expandedId === r.id
                         const hasEscalation = r.escalated_why !== null && r.escalated_why !== ''
                         const capKey = (r.capacity ?? '').toLowerCase()
@@ -985,7 +991,7 @@ export default function HtCsmDashboardPage() {
                                   <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300">Yes</span>
                                 ) : '—'}
                               </td>
-                              <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400">{r.new_clients_started}</td>
+                              <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400">{r.new_clients_received}</td>
                               <td className="px-4 py-3">
                                 {r.capacity ? (
                                   <span className={cn('inline-flex px-1.5 py-0.5 rounded text-xs font-semibold', CAPACITY_BADGE[capKey] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400')}>
