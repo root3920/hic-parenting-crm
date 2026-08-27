@@ -75,6 +75,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/api/spc/backfill-csv' ||
     pathname === '/api/contacts/pipeline/recompute' ||
     pathname === '/api/setter-portal/daily-assignment' ||
+    pathname === '/api/setter-portal/cancelled-queue/sync' ||
     pathname.startsWith('/api/instagram/webhook') ||
     pathname.startsWith('/api/instagram/generate-draft') ||
     pathname.startsWith('/api/instagram/oauth/') ||
