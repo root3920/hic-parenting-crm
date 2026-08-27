@@ -56,7 +56,7 @@ export interface SpcMember {
   name: string
   email: string
   phone?: string | null
-  plan: 'monthly' | 'annual' | null
+  plan: 'monthly' | 'annual' | 'mid_ticket' | null
   amount: number | null
   status: 'active' | 'trial' | 'cancelled' | 'expired'
   provider: 'Kajabi' | 'Stripe' | 'PayPal' | 'Hotmart' | null

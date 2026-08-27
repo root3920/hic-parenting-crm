@@ -64,7 +64,7 @@ interface SpcCancellation {
   cancelled_at: string | null
   subscribed_at: string | null
   amount: number
-  plan: 'monthly' | 'annual' | null
+  plan: 'monthly' | 'annual' | 'mid_ticket' | null
   cancel_type: 'paid_cancel' | 'pending_cancel' | 'trial_cancel' | null
   created_at: string
   // columns added via CSV import
@@ -142,7 +142,7 @@ function formatDateTime(d: string | null) {
 
 function calcNextPayment(
   txList: Transaction[] | undefined,
-  plan: 'monthly' | 'annual' | null | undefined,
+  plan: string | null | undefined,
   fallbackDate?: string | null,
 ): string {
   const completed = (txList ?? []).filter((t) => (t.status ?? 'completed') === 'completed')
@@ -159,7 +159,7 @@ function calcNextPayment(
 
 function calcNextPaymentISO(
   txList: Transaction[] | undefined,
-  plan: 'monthly' | 'annual' | null | undefined,
+  plan: string | null | undefined,
   fallbackDate?: string | null,
 ): string {
   const completed = (txList ?? []).filter((t) => (t.status ?? 'completed') === 'completed')
@@ -242,7 +242,7 @@ interface MemberEditForm {
   name: string
   email: string
   phone: string
-  plan: 'monthly' | 'annual'
+  plan: 'monthly' | 'annual' | 'mid_ticket'
   provider: 'Kajabi' | 'Stripe' | 'PayPal' | 'Hotmart'
   joined_at: string
   status: MemberStatus
@@ -445,7 +445,7 @@ function MemberProfileModal({
       name: m.name,
       email: m.email,
       phone: m.phone ?? '',
-      plan: m.plan ?? 'monthly',
+      plan: m.plan ?? 'monthly' as MemberEditForm['plan'],
       provider: m.provider ?? 'Kajabi',
       joined_at: m.joined_at ?? '',
       status: (m.status as MemberStatus) ?? 'active',
@@ -492,6 +492,11 @@ function MemberProfileModal({
       // Only update trial_end_date if the user explicitly changed it; never overwrite with null
       if (editForm.trial_end_date && editForm.trial_end_date !== (selected.data.trial_end_date ?? '')) {
         updatePayload.trial_end_date = editForm.trial_end_date
+      }
+      // Auto-fill standard amount when plan changed to monthly/annual and current amount is $0/null
+      if ((editForm.plan === 'monthly' || editForm.plan === 'annual') &&
+          (!selected.data.amount || selected.data.amount === 0)) {
+        updatePayload.amount = editForm.plan === 'annual' ? 470 : 47
       }
       // next_payment_date is NOT NULL in DB — only include if non-empty
       if (editForm.next_payment_date) {
@@ -861,7 +866,7 @@ function MemberProfileModal({
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Plan</span>
                   <span className={rowValue}>
-                    {displayPlan === 'annual' ? 'Annual' : displayPlan === 'monthly' ? 'Monthly' : '—'} · {formatCurrency(selected.data.amount ?? 0)}
+                    {displayPlan === 'annual' ? 'Annual' : displayPlan === 'monthly' ? 'Monthly' : displayPlan === 'mid_ticket' ? 'Mid Ticket' : '—'} · {formatCurrency(selected.data.amount ?? 0)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1255,9 +1260,10 @@ function MemberProfileModal({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Plan</label>
-                    <select value={editForm.plan} onChange={(e) => setField('plan', e.target.value as 'monthly' | 'annual')} className={inputCls}>
+                    <select value={editForm.plan} onChange={(e) => setField('plan', e.target.value as MemberEditForm['plan'])} className={inputCls}>
                       <option value="monthly">Monthly</option>
-                      <option value="annual">Annual</option>
+                      <option value="annual">Annual (Yearly)</option>
+                      <option value="mid_ticket">Mid Ticket</option>
                     </select>
                   </div>
                   <div>
@@ -3813,8 +3819,8 @@ export default function SpcPage() {
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate">{m.email}</TableCell>
                           <TableCell className="text-xs">
                             <StatusPill
-                              label={m.plan === 'annual' ? 'Annual' : 'Monthly'}
-                              variant={m.plan === 'annual' ? 'success' : 'info'}
+                              label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
+                              variant={m.plan === 'annual' ? 'success' : m.plan === 'mid_ticket' ? 'warning' : 'info'}
                             />
                           </TableCell>
                           <TableCell className="text-xs text-right font-semibold whitespace-nowrap">
@@ -4351,8 +4357,8 @@ export default function SpcPage() {
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
                             <TableCell>
                               <StatusPill
-                                label={m.plan === 'annual' ? 'Annual' : 'Monthly'}
-                                variant={m.plan === 'annual' ? 'success' : 'info'}
+                                label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
+                                variant={m.plan === 'annual' ? 'success' : m.plan === 'mid_ticket' ? 'warning' : 'info'}
                               />
                             </TableCell>
                             <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
@@ -4720,7 +4726,7 @@ export default function SpcPage() {
                                 </TableCell>
                                 <TableCell>
                                   {c.plan && (
-                                    <StatusPill label={c.plan === 'annual' ? 'Annual' : 'Monthly'} variant={c.plan === 'annual' ? 'success' : 'info'} />
+                                    <StatusPill label={c.plan === 'annual' ? 'Annual' : c.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'} variant={c.plan === 'annual' ? 'success' : c.plan === 'mid_ticket' ? 'warning' : 'info'} />
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(c.amount)}</TableCell>

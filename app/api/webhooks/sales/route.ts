@@ -204,13 +204,15 @@ export async function POST(req: NextRequest) {
               .limit(1)
 
             const hadTrial = priorTrial && priorTrial.length > 0
+            // Use provider amount when available; fall back to standard pricing
+            const effectiveAmount = costNum > 0 ? costNum : (plan === 'annual' ? 470 : 47)
             await supabase.from('spc_members').insert({
               name: buyer_fullname || 'Unknown',
               email: buyer_email,
               phone: buyer_phone ?? null,
               status: 'active',
               plan,
-              amount: costNum,
+              amount: effectiveAmount,
               provider: spcProvider,
               joined_at: date,
               next_payment_date: nextPaymentDate,

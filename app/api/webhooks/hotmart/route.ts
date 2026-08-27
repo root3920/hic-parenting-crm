@@ -170,6 +170,8 @@ export async function POST(req: NextRequest) {
             .maybeSingle()
 
           const convertedFromTrial = existing?.status === 'trial'
+          // Use provider amount when available; fall back to standard pricing
+          const effectiveAmount = priceValue > 0 ? priceValue : (plan === 'annual' ? 470 : 47)
 
           const { error: paidUpsertError } = await supabase.from('spc_members').upsert(
             {
@@ -177,7 +179,7 @@ export async function POST(req: NextRequest) {
               name: name || 'Unknown',
               phone: phone ?? null,
               plan,
-              amount: priceValue,
+              amount: effectiveAmount,
               status: 'active',
               provider: 'Hotmart',
               joined_at: existing ? undefined : now.toISOString(),
