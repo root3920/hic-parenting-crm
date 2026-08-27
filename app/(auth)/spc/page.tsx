@@ -4061,7 +4061,23 @@ export default function SpcPage() {
                               custom={i}
                               className={cn(
                                 i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
+                                'cursor-pointer hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/10 transition-colors'
                               )}
+                              onClick={() => {
+                                const match = members.find(m => (m.email ?? '').toLowerCase() === (c.email ?? '').toLowerCase())
+                                if (match) {
+                                  openModal({ kind: 'member', data: match })
+                                } else {
+                                  openModal({ kind: 'member', data: {
+                                    id: c.id, name: c.name ?? '', email: c.email,
+                                    phone: null, plan: null, amount: null, status: 'active',
+                                    provider: null, joined_at: c.first_access_date, next_payment_date: null,
+                                    trial_end_date: null, trial_days: null, created_at: c.synced_at ?? '',
+                                    whatsapp_active: false, whatsapp_joined_at: null,
+                                    lead_score: null, converted_from_trial: false, converted_at: null,
+                                  } as SpcMember })
+                                }
+                              }}
                             >
                               <TableCell className="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap">{c.name || '—'}</TableCell>
                               <TableCell className="text-xs text-zinc-500 hidden md:table-cell overflow-hidden text-ellipsis whitespace-nowrap">{c.email}</TableCell>
