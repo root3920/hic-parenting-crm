@@ -56,11 +56,11 @@ export interface SpcMember {
   name: string
   email: string
   phone?: string | null
-  plan: 'monthly' | 'annual'
-  amount: number
+  plan: 'monthly' | 'annual' | null
+  amount: number | null
   status: 'active' | 'trial' | 'cancelled' | 'expired'
-  provider: 'Kajabi' | 'Stripe' | 'PayPal' | 'Hotmart'
-  joined_at: string
+  provider: 'Kajabi' | 'Stripe' | 'PayPal' | 'Hotmart' | null
+  joined_at: string | null
   next_payment_date: string | null
   trial_end_date: string | null
   trial_days: number | null

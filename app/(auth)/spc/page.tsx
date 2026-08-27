@@ -159,7 +159,7 @@ function calcNextPayment(
 
 function calcNextPaymentISO(
   txList: Transaction[] | undefined,
-  plan: 'monthly' | 'annual',
+  plan: 'monthly' | 'annual' | null | undefined,
   fallbackDate?: string | null,
 ): string {
   const completed = (txList ?? []).filter((t) => (t.status ?? 'completed') === 'completed')
@@ -445,8 +445,8 @@ function MemberProfileModal({
       name: m.name,
       email: m.email,
       phone: m.phone ?? '',
-      plan: m.plan,
-      provider: m.provider,
+      plan: m.plan ?? 'monthly',
+      provider: m.provider ?? 'Kajabi',
       joined_at: m.joined_at ?? '',
       status: (m.status as MemberStatus) ?? 'active',
       next_payment_date: m.next_payment_date ?? autoDate,
@@ -861,7 +861,7 @@ function MemberProfileModal({
                 <div className="flex items-center justify-between">
                   <span className={rowLabel}>Plan</span>
                   <span className={rowValue}>
-                    {displayPlan === 'annual' ? 'Annual' : displayPlan === 'monthly' ? 'Monthly' : '—'} · {formatCurrency(selected.data.amount)}
+                    {displayPlan === 'annual' ? 'Annual' : displayPlan === 'monthly' ? 'Monthly' : '—'} · {formatCurrency(selected.data.amount ?? 0)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -2181,12 +2181,12 @@ export default function SpcPage() {
   )
 
   const mrr = activeMembers.reduce(
-    (s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount),
+    (s, m) => s + (m.plan === 'annual' ? (m.amount ?? 0) / 12 : (m.amount ?? 0)),
     0
   )
   const arr = mrr * 12
   const mrrPotential = trialMembers.reduce(
-    (s, m) => s + (m.plan === 'annual' ? m.amount / 12 : m.amount),
+    (s, m) => s + (m.plan === 'annual' ? (m.amount ?? 0) / 12 : (m.amount ?? 0)),
     0
   )
 
@@ -2361,7 +2361,7 @@ export default function SpcPage() {
 
   const mrrLost = paidCancels
     .filter((c) => c.cancelled_at && (c.cancelled_at.slice(0, 10) >= sixtyDaysAgo))
-    .reduce((s, c) => s + (c.plan === 'annual' ? c.amount / 12 : c.amount), 0)
+    .reduce((s, c) => s + (c.plan === 'annual' ? (c.amount ?? 0) / 12 : (c.amount ?? 0)), 0)
 
   // Trial churn rate
   const currentTrialCount = members.filter((m) => m.status === 'trial').length
@@ -2536,10 +2536,10 @@ export default function SpcPage() {
   // ── Growth tab calculations ─────────────────────────────────────────────
   const mrrNowMonthly = activeMembers
     .filter((m) => m.plan === 'monthly')
-    .reduce((s, m) => s + m.amount, 0)
+    .reduce((s, m) => s + (m.amount ?? 0), 0)
   const mrrNowAnnual = activeMembers
     .filter((m) => m.plan === 'annual')
-    .reduce((s, m) => s + m.amount / 12, 0)
+    .reduce((s, m) => s + (m.amount ?? 0) / 12, 0)
 
   const growthNewMembersCount = growthNewMembers.length
 
@@ -2565,9 +2565,9 @@ export default function SpcPage() {
 
   // MRR & ARR added by new members in period
   const mrrAddedInPeriod = growthNewMembers.reduce((s, m) =>
-    s + (m.plan === 'annual' ? m.amount / 12 : m.amount), 0)
+    s + (m.plan === 'annual' ? (m.amount ?? 0) / 12 : (m.amount ?? 0)), 0)
   const arrAddedInPeriod = growthNewMembers.reduce((s, m) =>
-    s + (m.plan === 'annual' ? m.amount : m.amount * 12), 0)
+    s + (m.plan === 'annual' ? (m.amount ?? 0) : (m.amount ?? 0) * 12), 0)
 
   // Trial conversion counts from converted_from_trial column
   const currentTrials = trialMembers.length
@@ -3329,7 +3329,7 @@ export default function SpcPage() {
                           {m.name}
                         </span>
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium whitespace-nowrap">
-                          Monthly ${m.amount}
+                          Monthly ${m.amount ?? 0}
                         </span>
                         <span className="text-xs text-zinc-400 whitespace-nowrap hidden sm:block">
                           {formatDate(m.created_at)}
@@ -3818,7 +3818,7 @@ export default function SpcPage() {
                             />
                           </TableCell>
                           <TableCell className="text-xs text-right font-semibold whitespace-nowrap">
-                            {formatCurrency(m.amount)}
+                            {formatCurrency(m.amount ?? 0)}
                           </TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
@@ -4075,7 +4075,7 @@ export default function SpcPage() {
                                     trial_end_date: null, trial_days: null, created_at: c.synced_at ?? '',
                                     whatsapp_active: false, whatsapp_joined_at: null,
                                     lead_score: null, converted_from_trial: false, converted_at: null,
-                                  } as SpcMember })
+                                  } })
                                 }
                               }}
                             >
@@ -4356,7 +4356,7 @@ export default function SpcPage() {
                               />
                             </TableCell>
                             <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
-                              {formatCurrency(m.amount)}
+                              {formatCurrency(m.amount ?? 0)}
                             </TableCell>
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
