@@ -71,6 +71,16 @@ interface DailyActivity {
   total_conversations: number
   total_followups: number
   total_operational_tasks: number
+  // Section 7 — Workload & Tasks
+  at_risk_identified: number
+  follow_ups_due: number
+  hours_worked: number
+  fte: number
+  estimated_max_workload: number
+  tasks_due_today: number
+  tasks_completed_today: number
+  tasks_carried_over: number
+  tasks_overdue: number
   // Section 8 — Blockers
   main_blocker: string | null
   waiting_on_team: string | null
@@ -138,7 +148,7 @@ const CAPACITY_BADGE: Record<string, string> = {
 // ── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, value, sub, status, goal, barPct,
+  label, value, sub, status, goal, barPct, breakdowns,
 }: {
   label: string
   value: string
@@ -146,6 +156,7 @@ function KpiCard({
   status: 'good' | 'warn' | 'alert'
   goal?: string
   barPct: number
+  breakdowns?: { label: string; value: string | number }[]
 }) {
   const barColor  = status === 'good' ? 'bg-green-500' : status === 'warn' ? 'bg-orange-400' : 'bg-red-500'
   const textColor = RATE_COLORS[status]
@@ -175,6 +186,15 @@ function KpiCard({
         <span>{sub}</span>
         {goal && <span>{goal}</span>}
       </div>
+      {breakdowns && breakdowns.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+          {breakdowns.map((b, i) => (
+            <span key={i} className="text-[10px] text-zinc-400 dark:text-zinc-500">
+              <span className="font-semibold text-zinc-500 dark:text-zinc-400">{b.value}</span>{' '}{b.label}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -255,8 +275,10 @@ function ReportDetail({
         <div>
           <p className={subLabel}>Client Management</p>
           <Row label="Active coaching clients" value={report.active_coaching_clients} />
+          <Row label="Follow-ups due" value={report.follow_ups_due} />
           <Row label="Follow-ups completed" value={report.followups_completed} />
           <Row label="Contacted after no-show" value={report.contacted_after_noshow} />
+          <Row label="At-risk identified" value={report.at_risk_identified} />
           <Row label="At-risk contacted" value={report.at_risk_contacted} />
           <Row label="At-risk recovered" value={report.at_risk_recovered} />
           <Row label="Issues received" value={report.issues_received} />
@@ -310,6 +332,15 @@ function ReportDetail({
           <Row label="Waiting on team" value={report.waiting_on_team} />
           <Row label="Escalated — why" value={report.escalated_why} />
 
+          <p className={subLabel}>Workload & Tasks</p>
+          <Row label="Hours worked" value={report.hours_worked} />
+          <Row label="FTE" value={report.fte} />
+          <Row label="Estimated max workload" value={report.estimated_max_workload} />
+          <Row label="Tasks due today" value={report.tasks_due_today} />
+          <Row label="Tasks completed today" value={report.tasks_completed_today} />
+          <Row label="Tasks carried over" value={report.tasks_carried_over} />
+          <Row label="Tasks overdue" value={report.tasks_overdue} />
+
           <p className={subLabel}>Wrap-up</p>
           <Row label="Pending tasks tomorrow" value={report.pending_tasks_tomorrow} />
           <Row label="Clients needing attention tomorrow" value={report.clients_attention_tomorrow} />
@@ -362,6 +393,15 @@ interface EditForm {
   total_conversations: string
   total_followups: string
   total_operational_tasks: string
+  at_risk_identified: string
+  follow_ups_due: string
+  hours_worked: string
+  fte: string
+  estimated_max_workload: string
+  tasks_due_today: string
+  tasks_completed_today: string
+  tasks_carried_over: string
+  tasks_overdue: string
   main_blocker: string
   waiting_on_team: string
   escalated_why: string
@@ -411,6 +451,15 @@ function activityToEditForm(r: DailyActivity): EditForm {
     total_conversations: String(r.total_conversations ?? 0),
     total_followups: String(r.total_followups ?? 0),
     total_operational_tasks: String(r.total_operational_tasks ?? 0),
+    at_risk_identified: String(r.at_risk_identified ?? 0),
+    follow_ups_due: String(r.follow_ups_due ?? 0),
+    hours_worked: String(r.hours_worked ?? 0),
+    fte: String(r.fte ?? 0),
+    estimated_max_workload: String(r.estimated_max_workload ?? 0),
+    tasks_due_today: String(r.tasks_due_today ?? 0),
+    tasks_completed_today: String(r.tasks_completed_today ?? 0),
+    tasks_carried_over: String(r.tasks_carried_over ?? 0),
+    tasks_overdue: String(r.tasks_overdue ?? 0),
     main_blocker: r.main_blocker ?? '',
     waiting_on_team: r.waiting_on_team ?? '',
     escalated_why: r.escalated_why ?? '',
@@ -422,8 +471,9 @@ function activityToEditForm(r: DailyActivity): EditForm {
 
 const NUM_FIELDS: (keyof EditForm)[] = [
   'active_coaching_clients', 'followups_completed', 'contacted_after_noshow',
-  'at_risk_contacted', 'at_risk_recovered',
+  'at_risk_contacted', 'at_risk_recovered', 'at_risk_identified',
   'issues_received', 'issues_resolved_direct', 'cases_escalated',
+  'follow_ups_due',
   'sessions_scheduled', 'sessions_rescheduled', 'session_reminders_sent',
   'qa_reminders_sent', 'coach_coordination_count', 'weekly_slides_sent',
   'new_clients_received', 'welcome_messages_sent', 'contracts_created',
@@ -433,7 +483,11 @@ const NUM_FIELDS: (keyof EditForm)[] = [
   'recordings_scheduled', 'recordings_completed', 'grad_nurturing_convos',
   'referred_to_grad_program', 'continuation_opportunities',
   'total_conversations', 'total_followups', 'total_operational_tasks',
+  'estimated_max_workload',
+  'tasks_due_today', 'tasks_completed_today', 'tasks_carried_over', 'tasks_overdue',
 ]
+
+const DECIMAL_FIELDS: (keyof EditForm)[] = ['hours_worked', 'fte']
 
 function fieldLabel(key: string): string {
   return key
@@ -467,6 +521,13 @@ function EditModal({
   const sectionCls = 'text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 mt-4 first:mt-0'
 
   async function handleSave() {
+    // Validation: cases_escalated cannot exceed issues_received
+    const escalated = parseInt(form.cases_escalated) || 0
+    const received = parseInt(form.issues_received) || 0
+    if (escalated > received) {
+      toast.error('Cases Escalated cannot be greater than Issues Received')
+      return
+    }
     setSaving(true)
     try {
       const payload: Record<string, unknown> = {
@@ -481,6 +542,9 @@ function EditModal({
       }
       for (const k of NUM_FIELDS) {
         payload[k] = parseInt(form[k]) || 0
+      }
+      for (const k of DECIMAL_FIELDS) {
+        payload[k] = parseFloat(form[k]) || 0
       }
 
       const { data, error } = await supabase
@@ -513,10 +577,10 @@ function EditModal({
     )
   }
 
-  const sections: { title: string; fields: (keyof EditForm)[] }[] = [
+  const sections: { title: string; fields: (keyof EditForm)[]; decimalFields?: (keyof EditForm)[] }[] = [
     {
       title: 'Client Management',
-      fields: ['active_coaching_clients', 'followups_completed', 'contacted_after_noshow', 'at_risk_contacted', 'at_risk_recovered', 'issues_received', 'issues_resolved_direct', 'cases_escalated'],
+      fields: ['active_coaching_clients', 'follow_ups_due', 'followups_completed', 'contacted_after_noshow', 'at_risk_identified', 'at_risk_contacted', 'at_risk_recovered', 'issues_received', 'issues_resolved_direct', 'cases_escalated'],
     },
     {
       title: 'Sessions & Coaching',
@@ -537,6 +601,11 @@ function EditModal({
     {
       title: 'Volume',
       fields: ['total_conversations', 'total_followups', 'total_operational_tasks'],
+    },
+    {
+      title: 'Workload & Tasks',
+      fields: ['estimated_max_workload', 'tasks_due_today', 'tasks_completed_today', 'tasks_carried_over', 'tasks_overdue'],
+      decimalFields: ['hours_worked', 'fte'],
     },
   ]
 
@@ -575,6 +644,20 @@ function EditModal({
             <div key={sec.title}>
               <p className={sectionCls}>{sec.title}</p>
               <div className="grid grid-cols-2 gap-3">
+                {sec.decimalFields?.map((f) => (
+                  <div key={f}>
+                    <label className={labelCls}>{fieldLabel(f)}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={f === 'fte' ? 0.1 : 0.5}
+                      value={form[f]}
+                      onChange={(e) => set(f, e.target.value)}
+                      placeholder="0"
+                      className={inputCls}
+                    />
+                  </div>
+                ))}
                 {sec.fields.map((f) => (
                   <div key={f}>
                     <label className={labelCls}>{fieldLabel(f)}</label>
@@ -666,6 +749,9 @@ export default function HtCsmDashboardPage() {
 
   const [reports, setReports] = useState<DailyActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [slaThreshold, setSlaThreshold] = useState(2) // days
+  const [allStudents, setAllStudents] = useState<{ status: string; last_contacted_at: string | null; created_at: string; updated_at: string }[]>([])
+  const [pipelineRecords, setPipelineRecords] = useState<{ enrollment_date: string | null; step6_status: string; step6_date: string | null; current_step: number }[]>([])
   const [preset, setPreset] = useState<Preset>('week')
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
   const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
@@ -716,37 +802,147 @@ export default function HtCsmDashboardPage() {
 
   useEffect(() => { fetchReports() }, [fetchReports])
 
-  // ── Aggregated KPIs ──
+  // Fetch auto-calc data (students + pipeline) once on mount
+  const fetchAutoCalcData = useCallback(async () => {
+    const [studentsRes, pipelineRes] = await Promise.all([
+      supabase.from('pwu_students').select('status, last_contacted_at, created_at, updated_at'),
+      supabase.from('onboarding_pipeline').select('enrollment_date, step6_status, step6_date, current_step'),
+    ])
+    if (studentsRes.data) setAllStudents(studentsRes.data)
+    if (pipelineRes.data) setPipelineRecords(pipelineRes.data)
+  }, [supabase])
+
+  useEffect(() => { fetchAutoCalcData() }, [fetchAutoCalcData])
+
+  // ── Aggregated KPIs from daily reports ──
   const kpis = useMemo(() => {
     if (filteredReports.length === 0) return null
 
     const atRiskContacted = sum(filteredReports, 'at_risk_contacted')
     const atRiskRecovered = sum(filteredReports, 'at_risk_recovered')
+    const atRiskIdentified = sum(filteredReports, 'at_risk_identified')
     const issuesReceived = sum(filteredReports, 'issues_received')
     const issuesResolved = sum(filteredReports, 'issues_resolved_direct')
+    const casesEscalated = sum(filteredReports, 'cases_escalated')
     const sessionsScheduled = sum(filteredReports, 'sessions_scheduled')
     const sessionsRescheduled = sum(filteredReports, 'sessions_rescheduled')
     const newClientsReceived = sum(filteredReports, 'new_clients_received')
     const coachMatchesCompleted = sum(filteredReports, 'coach_matches_completed')
     const followupsCompleted = sum(filteredReports, 'followups_completed')
+    const followUpsDue = sum(filteredReports, 'follow_ups_due')
     const totalConversations = sum(filteredReports, 'total_conversations')
+    const hoursWorked = filteredReports.reduce((s, r) => s + (Number(r.hours_worked) || 0), 0)
+    const tasksDueToday = sum(filteredReports, 'tasks_due_today')
+    const tasksCompletedToday = sum(filteredReports, 'tasks_completed_today')
+    const tasksCarriedOver = sum(filteredReports, 'tasks_carried_over')
+    const tasksOverdue = sum(filteredReports, 'tasks_overdue')
+
+    // Snapshot fields: use most recent report
+    const latest = filteredReports[0] // already sorted desc by date
+    const fte = Number(latest?.fte) || 0
+    const estimatedMaxWorkload = Number(latest?.estimated_max_workload) || 0
+
+    // Meaningful actions: direct client work + onboarding actions + coordination
+    const meaningfulActions = followupsCompleted + atRiskContacted + issuesResolved
+      + sum(filteredReports, 'welcome_messages_sent')
+      + coachMatchesCompleted
+      + sum(filteredReports, 'first_sessions_scheduled')
+      + sum(filteredReports, 'coach_coordination_count')
 
     return {
       atRiskRecovery: pct(atRiskRecovered, atRiskContacted),
       issueResolution: pct(issuesResolved, issuesReceived),
       coachMatchRate: pct(coachMatchesCompleted, newClientsReceived),
-      atRiskContacted,
-      atRiskRecovered,
-      issuesReceived,
-      issuesResolved,
-      newClientsReceived,
-      coachMatchesCompleted,
-      followupsCompleted,
+      followUpCompletion: pct(followupsCompleted, followUpsDue),
+      atRiskContact: pct(atRiskContacted, atRiskIdentified),
+      directResolution: pct(issuesResolved, issuesReceived),
+      escalationRate: pct(casesEscalated, issuesReceived),
+      taskCompletion: pct(tasksCompletedToday, tasksDueToday),
+      atRiskContacted, atRiskRecovered, atRiskIdentified,
+      issuesReceived, issuesResolved, casesEscalated,
+      newClientsReceived, coachMatchesCompleted,
+      followupsCompleted, followUpsDue,
       totalConversations,
-      sessionsScheduled,
-      sessionsRescheduled,
+      sessionsScheduled, sessionsRescheduled,
+      hoursWorked, fte, estimatedMaxWorkload,
+      meaningfulActions,
+      tasksDueToday, tasksCompletedToday, tasksCarriedOver, tasksOverdue,
     }
   }, [filteredReports])
+
+  // ── Auto-calculated KPIs from pwu_students + onboarding_pipeline ──
+  const autoKpis = useMemo(() => {
+    const now = new Date()
+    const sevenDaysAgo = new Date(now)
+    sevenDaysAgo.setDate(now.getDate() - 7)
+
+    // Client Coverage %
+    const activeStudents = allStudents.filter((s) => s.status === 'active')
+    const totalActive = activeStudents.length
+    const actioned = activeStudents.filter((s) => {
+      if (!s.last_contacted_at) return false
+      return new Date(s.last_contacted_at) >= sevenDaysAgo
+    }).length
+    const requiringAction = totalActive - actioned
+    const coverage = pct(actioned, totalActive)
+
+    // Retention / Churn % (period-based)
+    const range = getDateRange(preset, customFrom, customTo)
+    const periodStart = range ? range.from : '1970-01-01'
+    const periodEnd = range ? range.to : new Date().toISOString().split('T')[0]
+    const periodEndDate = new Date(periodEnd + 'T23:59:59')
+    const periodStartDate = new Date(periodStart)
+
+    // Starting active ≈ currently active created before period + those who churned during period (for better approximation)
+    const churnedInPeriod = allStudents.filter((s) =>
+      s.status === 'refund'
+      && new Date(s.created_at) < periodStartDate
+      && new Date(s.updated_at) >= periodStartDate
+      && new Date(s.updated_at) <= periodEndDate
+    )
+    const activeBeforePeriod = activeStudents.filter((s) => new Date(s.created_at) < periodStartDate)
+    const startingActive = activeBeforePeriod.length + churnedInPeriod.length
+    const churned = churnedInPeriod.length
+    const retained = startingActive - churned
+    const retention = pct(retained, startingActive)
+    const churn = pct(churned, startingActive)
+
+    // Onboarding SLA %
+    const pipelineInPeriod = pipelineRecords.filter((p) => {
+      if (!p.enrollment_date) return false
+      const ed = new Date(p.enrollment_date)
+      return ed >= periodStartDate && ed <= periodEndDate
+    })
+    const newPipelineClients = pipelineInPeriod.length
+    const fullyOnboarded = pipelineInPeriod.filter((p) => p.step6_status === 'completed')
+    const withinSla = fullyOnboarded.filter((p) => {
+      if (!p.step6_date || !p.enrollment_date) return false
+      const diff = (new Date(p.step6_date).getTime() - new Date(p.enrollment_date).getTime()) / (1000 * 60 * 60 * 24)
+      return diff <= slaThreshold
+    })
+    // SLA % uses only completed onboardings as denominator — pending students are excluded from both numerator and denominator
+    const onboardingSla = pct(withinSla.length, fullyOnboarded.length)
+
+    // Average completion time (days)
+    let avgCompletionDays = NaN
+    if (fullyOnboarded.length > 0) {
+      const totalDays = fullyOnboarded.reduce((acc, p) => {
+        if (!p.step6_date || !p.enrollment_date) return acc
+        const diff = (new Date(p.step6_date).getTime() - new Date(p.enrollment_date).getTime()) / (1000 * 60 * 60 * 24)
+        return acc + diff
+      }, 0)
+      avgCompletionDays = totalDays / fullyOnboarded.length
+    }
+    const pendingOnboarding = newPipelineClients - fullyOnboarded.length
+
+    return {
+      totalActive, actioned, requiringAction, coverage,
+      startingActive, retained, churned, retention, churn,
+      newPipelineClients, fullyOnboarded: fullyOnboarded.length,
+      withinSla: withinSla.length, onboardingSla,
+      avgCompletionDays, pendingOnboarding,
+    }
+  }, [allStudents, pipelineRecords, preset, customFrom, customTo, slaThreshold])
 
   // ── Pagination ──
   const totalPages = Math.ceil(filteredReports.length / PAGE_SIZE)
@@ -830,6 +1026,26 @@ export default function HtCsmDashboardPage() {
                 <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100" />
               </div>
             )}
+            {/* SLA threshold */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-zinc-400 font-medium whitespace-nowrap">SLA</span>
+              <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
+                {[1, 2, 3].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setSlaThreshold(d)}
+                    className={cn(
+                      'px-2 py-1.5 text-xs font-medium transition-colors',
+                      slaThreshold === d
+                        ? 'bg-[#ffbd59] text-[#1a1a2e]'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    )}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* CSM filter */}
             {csmNames.length > 1 && (
               <select
@@ -884,24 +1100,181 @@ export default function HtCsmDashboardPage() {
           />
         ) : kpis && (
           <>
-            {/* ── KPI Cards ── */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+            {/* ── Primary KPI Dashboard ── */}
+            <div className="mb-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">KPI Dashboard</p>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              {/* 1. Client Coverage % */}
               <KpiCard
-                label="At-Risk Recovery Rate"
+                label="Client Coverage %"
+                value={fmtPct(autoKpis.coverage)}
+                goal="Last 7 days"
+                barPct={isNaN(autoKpis.coverage) ? 0 : autoKpis.coverage}
+                status={rateStatus(autoKpis.coverage, 85)}
+                breakdowns={[
+                  { label: 'assigned', value: autoKpis.totalActive },
+                  { label: 'actioned', value: autoKpis.actioned },
+                  { label: 'need action', value: autoKpis.requiringAction },
+                ]}
+              />
+              {/* 2. Follow-up Completion % */}
+              <KpiCard
+                label="Follow-up Completion %"
+                value={fmtPct(kpis.followUpCompletion)}
+                goal="Goal: >= 90%"
+                barPct={isNaN(kpis.followUpCompletion) ? 0 : (kpis.followUpCompletion / 90) * 100}
+                status={rateStatus(kpis.followUpCompletion, 90)}
+                breakdowns={[
+                  { label: 'due', value: kpis.followUpsDue },
+                  { label: 'completed', value: kpis.followupsCompleted },
+                  { label: 'overdue', value: Math.max(0, kpis.followUpsDue - kpis.followupsCompleted) },
+                ]}
+              />
+              {/* 3. At-Risk Contact % */}
+              <KpiCard
+                label="At-Risk Contact %"
+                value={fmtPct(kpis.atRiskContact)}
+                goal="Goal: >= 90%"
+                barPct={isNaN(kpis.atRiskContact) ? 0 : (kpis.atRiskContact / 90) * 100}
+                status={rateStatus(kpis.atRiskContact, 90)}
+                breakdowns={[
+                  { label: 'identified', value: kpis.atRiskIdentified },
+                  { label: 'contacted', value: kpis.atRiskContacted },
+                  { label: 'not contacted', value: Math.max(0, kpis.atRiskIdentified - kpis.atRiskContacted) },
+                ]}
+              />
+              {/* 4. At-Risk Recovery % */}
+              <KpiCard
+                label="At-Risk Recovery %"
                 value={fmtPct(kpis.atRiskRecovery)}
-                sub={`${kpis.atRiskRecovered} / ${kpis.atRiskContacted} recovered`}
                 goal="Goal: >= 70%"
                 barPct={isNaN(kpis.atRiskRecovery) ? 0 : (kpis.atRiskRecovery / 70) * 100}
                 status={rateStatus(kpis.atRiskRecovery, 70)}
+                breakdowns={[
+                  { label: 'contacted', value: kpis.atRiskContacted },
+                  { label: 'recovered', value: kpis.atRiskRecovered },
+                  { label: 'still at risk', value: Math.max(0, kpis.atRiskContacted - kpis.atRiskRecovered) },
+                ]}
               />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              {/* 5. Onboarding SLA % */}
               <KpiCard
-                label="Issue Resolution Rate"
-                value={fmtPct(kpis.issueResolution)}
-                sub={`${kpis.issuesResolved} / ${kpis.issuesReceived} resolved`}
-                goal="Goal: >= 80%"
-                barPct={isNaN(kpis.issueResolution) ? 0 : (kpis.issueResolution / 80) * 100}
-                status={rateStatus(kpis.issueResolution, 80)}
+                label={`Onboarding SLA % (≤${slaThreshold}d)`}
+                value={fmtPct(autoKpis.onboardingSla)}
+                goal={`SLA: ${slaThreshold} day${slaThreshold > 1 ? 's' : ''}`}
+                barPct={isNaN(autoKpis.onboardingSla) ? 0 : autoKpis.onboardingSla}
+                status={rateStatus(autoKpis.onboardingSla, 80)}
+                breakdowns={[
+                  { label: 'new', value: autoKpis.newPipelineClients },
+                  { label: 'within SLA', value: autoKpis.withinSla },
+                  { label: 'pending', value: autoKpis.pendingOnboarding },
+                  { label: 'avg days', value: isNaN(autoKpis.avgCompletionDays) ? '—' : autoKpis.avgCompletionDays.toFixed(1) },
+                ]}
               />
+              {/* 6. Direct Resolution % + Escalation Rate */}
+              <KpiCard
+                label="Direct Resolution %"
+                value={fmtPct(kpis.directResolution)}
+                sub={`Escalation: ${fmtPct(kpis.escalationRate)}`}
+                goal="Goal: >= 80%"
+                barPct={isNaN(kpis.directResolution) ? 0 : (kpis.directResolution / 80) * 100}
+                status={rateStatus(kpis.directResolution, 80)}
+                breakdowns={[
+                  { label: 'received', value: kpis.issuesReceived },
+                  { label: 'resolved', value: kpis.issuesResolved },
+                  { label: 'escalated', value: kpis.casesEscalated },
+                ]}
+              />
+              {/* 7. Retention % / Churn % */}
+              <KpiCard
+                label="Retention %"
+                value={fmtPct(autoKpis.retention)}
+                sub={`Churn: ${fmtPct(autoKpis.churn)}`}
+                goal="Goal: >= 90%"
+                barPct={isNaN(autoKpis.retention) ? 0 : (autoKpis.retention / 90) * 100}
+                status={rateStatus(autoKpis.retention, 90)}
+                breakdowns={[
+                  { label: 'starting', value: autoKpis.startingActive },
+                  { label: 'retained', value: autoKpis.retained },
+                  { label: 'churned', value: autoKpis.churned },
+                ]}
+              />
+              {/* 8. Clients per FTE */}
+              <KpiCard
+                label="Clients per FTE"
+                value={kpis.fte > 0 ? (autoKpis.totalActive / kpis.fte).toFixed(1) : '—'}
+                barPct={100}
+                status="good"
+                breakdowns={[
+                  { label: 'clients', value: autoKpis.totalActive },
+                  { label: 'FTE', value: kpis.fte },
+                ]}
+              />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+              {/* 9. Meaningful Actions per Work Hour */}
+              <KpiCard
+                label="Actions / Work Hour"
+                value={kpis.hoursWorked > 0 ? (kpis.meaningfulActions / kpis.hoursWorked).toFixed(1) : '—'}
+                barPct={100}
+                status="good"
+                breakdowns={[
+                  { label: 'actions', value: kpis.meaningfulActions },
+                  { label: 'hours', value: kpis.hoursWorked.toFixed(1) },
+                ]}
+              />
+              {/* 10. Avg Time per Client */}
+              <KpiCard
+                label="Avg Time per Client"
+                value={kpis.hoursWorked > 0 && autoKpis.totalActive > 0 ? `${(kpis.hoursWorked / autoKpis.totalActive).toFixed(1)}h` : '—'}
+                barPct={100}
+                status="good"
+                breakdowns={[
+                  { label: 'hours', value: kpis.hoursWorked.toFixed(1) },
+                  { label: 'clients', value: autoKpis.totalActive },
+                ]}
+              />
+              {/* 11. Capacity Utilization % */}
+              {(() => {
+                const utilization = kpis.estimatedMaxWorkload > 0 ? pct(autoKpis.totalActive, kpis.estimatedMaxWorkload) : NaN
+                const additionalCapacity = Math.max(0, kpis.estimatedMaxWorkload - autoKpis.totalActive)
+                return (
+                  <KpiCard
+                    label="Capacity Utilization %"
+                    value={fmtPct(utilization)}
+                    barPct={isNaN(utilization) ? 0 : utilization}
+                    status={isNaN(utilization) ? 'alert' : utilization <= 85 ? 'good' : utilization <= 95 ? 'warn' : 'alert'}
+                    breakdowns={[
+                      { label: 'current', value: autoKpis.totalActive },
+                      { label: 'max', value: kpis.estimatedMaxWorkload },
+                      { label: 'available', value: additionalCapacity },
+                    ]}
+                  />
+                )
+              })()}
+              {/* 12. Daily Task Completion % */}
+              <KpiCard
+                label="Task Completion %"
+                value={fmtPct(kpis.taskCompletion)}
+                goal="Goal: >= 85%"
+                barPct={isNaN(kpis.taskCompletion) ? 0 : (kpis.taskCompletion / 85) * 100}
+                status={rateStatus(kpis.taskCompletion, 85)}
+                breakdowns={[
+                  { label: 'due', value: kpis.tasksDueToday },
+                  { label: 'completed', value: kpis.tasksCompletedToday },
+                  { label: 'carried', value: kpis.tasksCarriedOver },
+                  { label: 'overdue', value: kpis.tasksOverdue },
+                ]}
+              />
+            </div>
+
+            {/* ── Operational Metrics (secondary) ── */}
+            <div className="mb-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">Operational Metrics</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <KpiCard
                 label="Coach Match Rate"
                 value={fmtPct(kpis.coachMatchRate)}

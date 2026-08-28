@@ -20,8 +20,9 @@ const HARDCODED_CSMS = ['Marcela Collier']
 
 const NUM_FIELDS = [
   'active_coaching_clients', 'followups_completed', 'contacted_after_noshow',
-  'at_risk_contacted', 'at_risk_recovered',
+  'at_risk_contacted', 'at_risk_recovered', 'at_risk_identified',
   'issues_received', 'issues_resolved_direct', 'cases_escalated',
+  'follow_ups_due',
   'sessions_scheduled', 'sessions_rescheduled', 'session_reminders_sent',
   'qa_reminders_sent', 'coach_coordination_count', 'weekly_slides_sent',
   'new_clients_received', 'welcome_messages_sent', 'contracts_created',
@@ -31,7 +32,11 @@ const NUM_FIELDS = [
   'recordings_scheduled', 'recordings_completed', 'grad_nurturing_convos',
   'referred_to_grad_program', 'continuation_opportunities',
   'total_conversations', 'total_followups', 'total_operational_tasks',
+  'estimated_max_workload',
+  'tasks_due_today', 'tasks_completed_today', 'tasks_carried_over', 'tasks_overdue',
 ] as const
+
+const DECIMAL_FIELDS = ['hours_worked', 'fte'] as const
 
 const TEXT_FIELDS = [
   'main_blocker', 'waiting_on_team', 'escalated_why',
@@ -39,6 +44,7 @@ const TEXT_FIELDS = [
 ] as const
 
 type NumKey = typeof NUM_FIELDS[number]
+type DecimalKey = typeof DECIMAL_FIELDS[number]
 type TextKey = typeof TEXT_FIELDS[number]
 
 interface FormState {
@@ -46,15 +52,18 @@ interface FormState {
   date: string
   capacity: 'Low' | 'Medium' | 'High'
   nums: Record<NumKey, string>
+  decimals: Record<DecimalKey, string>
   texts: Record<TextKey, string>
 }
 
 function makeEmpty(): FormState {
   const nums = {} as Record<NumKey, string>
   for (const k of NUM_FIELDS) nums[k] = ''
+  const decimals = {} as Record<DecimalKey, string>
+  for (const k of DECIMAL_FIELDS) decimals[k] = ''
   const texts = {} as Record<TextKey, string>
   for (const k of TEXT_FIELDS) texts[k] = ''
-  return { csm_name: '', date: today(), capacity: 'Medium', nums, texts }
+  return { csm_name: '', date: today(), capacity: 'Medium', nums, decimals, texts }
 }
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
@@ -157,6 +166,10 @@ export default function CsmDailyActivityPage() {
     setForm((prev) => ({ ...prev, nums: { ...prev.nums, [key]: value } }))
   }
 
+  function setDecimal(key: DecimalKey, value: string) {
+    setForm((prev) => ({ ...prev, decimals: { ...prev.decimals, [key]: value } }))
+  }
+
   function setText(key: TextKey, value: string) {
     setForm((prev) => ({ ...prev, texts: { ...prev.texts, [key]: value } }))
   }
@@ -207,6 +220,13 @@ export default function CsmDailyActivityPage() {
       toast.error('Select a CSM name')
       return
     }
+    // Validation: cases_escalated cannot exceed issues_received
+    const escalated = parseInt(form.nums.cases_escalated) || 0
+    const received = parseInt(form.nums.issues_received) || 0
+    if (escalated > received) {
+      toast.error('Cases Escalated cannot be greater than Issues Received')
+      return
+    }
     setSaving(true)
     try {
       const row: Record<string, unknown> = {
@@ -216,6 +236,9 @@ export default function CsmDailyActivityPage() {
       }
       for (const k of NUM_FIELDS) {
         row[k] = parseInt(form.nums[k]) || 0
+      }
+      for (const k of DECIMAL_FIELDS) {
+        row[k] = parseFloat(form.decimals[k]) || 0
       }
       for (const k of TEXT_FIELDS) {
         row[k] = form.texts[k] || null
@@ -271,6 +294,20 @@ export default function CsmDailyActivityPage() {
                 {pct(n.issues_resolved_direct, n.issues_received)}
               </span>
             </div>
+            <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">Follow-up %</span>
+              <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                {pct(n.followups_completed, n.follow_ups_due)}
+              </span>
+            </div>
+            <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">At-Risk Contact %</span>
+              <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                {pct(n.at_risk_contacted, n.at_risk_identified)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -311,8 +348,10 @@ export default function CsmDailyActivityPage() {
             <SectionHeader label="Clients & Follow-Up" color="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" />
             <div className="grid grid-cols-2 gap-4">
               <NumField label="Active Coaching Clients" value={n.active_coaching_clients} onChange={(v) => setNum('active_coaching_clients', v)} />
+              <NumField label="Follow-ups Due" value={n.follow_ups_due} onChange={(v) => setNum('follow_ups_due', v)} />
               <NumField label="Follow-ups Completed" value={n.followups_completed} onChange={(v) => setNum('followups_completed', v)} />
               <NumField label="Contacted After No-Show" value={n.contacted_after_noshow} onChange={(v) => setNum('contacted_after_noshow', v)} />
+              <NumField label="At-Risk Identified" value={n.at_risk_identified} onChange={(v) => setNum('at_risk_identified', v)} />
               <NumField label="At-Risk Contacted" value={n.at_risk_contacted} onChange={(v) => setNum('at_risk_contacted', v)} />
               <NumField label="At-Risk Recovered" value={n.at_risk_recovered} onChange={(v) => setNum('at_risk_recovered', v)} />
               <NumField label="Issues Received" value={n.issues_received} onChange={(v) => setNum('issues_received', v)} />
@@ -382,6 +421,42 @@ export default function CsmDailyActivityPage() {
               <NumField label="Total Conversations" value={n.total_conversations} onChange={(v) => setNum('total_conversations', v)} />
               <NumField label="Total Follow-ups" value={n.total_followups} onChange={(v) => setNum('total_followups', v)} />
               <NumField label="Total Operational Tasks" value={n.total_operational_tasks} onChange={(v) => setNum('total_operational_tasks', v)} />
+            </div>
+          </SectionCard>
+
+          {/* ── Section 7: Workload & Tasks ── */}
+          <SectionCard>
+            <SectionHeader label="Workload & Tasks" color="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <FieldLabel>Hours Worked</FieldLabel>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={form.decimals.hours_worked}
+                  onChange={(e) => setDecimal('hours_worked', e.target.value)}
+                  placeholder="0"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <FieldLabel>FTE</FieldLabel>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={form.decimals.fte}
+                  onChange={(e) => setDecimal('fte', e.target.value)}
+                  placeholder="1.0"
+                  className={inputCls}
+                />
+              </div>
+              <NumField label="Estimated Max Workload" value={n.estimated_max_workload} onChange={(v) => setNum('estimated_max_workload', v)} />
+              <NumField label="Tasks Due Today" value={n.tasks_due_today} onChange={(v) => setNum('tasks_due_today', v)} />
+              <NumField label="Tasks Completed Today" value={n.tasks_completed_today} onChange={(v) => setNum('tasks_completed_today', v)} />
+              <NumField label="Tasks Carried Over" value={n.tasks_carried_over} onChange={(v) => setNum('tasks_carried_over', v)} />
+              <NumField label="Tasks Overdue" value={n.tasks_overdue} onChange={(v) => setNum('tasks_overdue', v)} />
             </div>
           </SectionCard>
 
