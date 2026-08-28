@@ -32,11 +32,9 @@ const NUM_FIELDS = [
   'recordings_scheduled', 'recordings_completed', 'grad_nurturing_convos',
   'referred_to_grad_program', 'continuation_opportunities',
   'total_conversations', 'total_followups', 'total_operational_tasks',
-  'estimated_max_workload',
-  'tasks_due_today', 'tasks_completed_today', 'tasks_carried_over', 'tasks_overdue',
 ] as const
 
-const DECIMAL_FIELDS = ['hours_worked', 'fte'] as const
+const DECIMAL_FIELDS = ['hours_worked'] as const
 
 const TEXT_FIELDS = [
   'main_blocker', 'waiting_on_team', 'escalated_why',
@@ -424,9 +422,9 @@ export default function CsmDailyActivityPage() {
             </div>
           </SectionCard>
 
-          {/* ── Section 7: Workload & Tasks ── */}
+          {/* ── Section 7: Workload ── */}
           <SectionCard>
-            <SectionHeader label="Workload & Tasks" color="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" />
+            <SectionHeader label="Workload" color="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" />
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FieldLabel>Hours Worked</FieldLabel>
@@ -440,23 +438,6 @@ export default function CsmDailyActivityPage() {
                   className={inputCls}
                 />
               </div>
-              <div>
-                <FieldLabel>FTE</FieldLabel>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.1}
-                  value={form.decimals.fte}
-                  onChange={(e) => setDecimal('fte', e.target.value)}
-                  placeholder="1.0"
-                  className={inputCls}
-                />
-              </div>
-              <NumField label="Estimated Max Workload" value={n.estimated_max_workload} onChange={(v) => setNum('estimated_max_workload', v)} />
-              <NumField label="Tasks Due Today" value={n.tasks_due_today} onChange={(v) => setNum('tasks_due_today', v)} />
-              <NumField label="Tasks Completed Today" value={n.tasks_completed_today} onChange={(v) => setNum('tasks_completed_today', v)} />
-              <NumField label="Tasks Carried Over" value={n.tasks_carried_over} onChange={(v) => setNum('tasks_carried_over', v)} />
-              <NumField label="Tasks Overdue" value={n.tasks_overdue} onChange={(v) => setNum('tasks_overdue', v)} />
             </div>
           </SectionCard>
 

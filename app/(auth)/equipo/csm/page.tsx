@@ -8,13 +8,15 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronRight, Download, Pencil, Trash2, X, Users, Kanban } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Download, Pencil, Trash2, X, Users, Kanban, ShieldAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getCurrentWeekRange } from '@/lib/dateUtils'
+import { classifyOfferTitle } from '@/lib/pipeline-tiers'
 import { ClientSuccessPipeline } from '@/components/client-success/ClientSuccessPipeline'
 import { ClientsGroupsView } from '@/components/contacts/ClientsGroupsView'
+import { StudentRiskOutreach } from '@/components/client-success/StudentRiskOutreach'
 import { useProfile } from '@/hooks/useProfile'
 import { usePreviewRole } from '@/contexts/PreviewRoleContext'
 
@@ -71,16 +73,10 @@ interface DailyActivity {
   total_conversations: number
   total_followups: number
   total_operational_tasks: number
-  // Section 7 — Workload & Tasks
+  // Section 7 — Workload
   at_risk_identified: number
   follow_ups_due: number
   hours_worked: number
-  fte: number
-  estimated_max_workload: number
-  tasks_due_today: number
-  tasks_completed_today: number
-  tasks_carried_over: number
-  tasks_overdue: number
   // Section 8 — Blockers
   main_blocker: string | null
   waiting_on_team: string | null
@@ -332,14 +328,8 @@ function ReportDetail({
           <Row label="Waiting on team" value={report.waiting_on_team} />
           <Row label="Escalated — why" value={report.escalated_why} />
 
-          <p className={subLabel}>Workload & Tasks</p>
+          <p className={subLabel}>Workload</p>
           <Row label="Hours worked" value={report.hours_worked} />
-          <Row label="FTE" value={report.fte} />
-          <Row label="Estimated max workload" value={report.estimated_max_workload} />
-          <Row label="Tasks due today" value={report.tasks_due_today} />
-          <Row label="Tasks completed today" value={report.tasks_completed_today} />
-          <Row label="Tasks carried over" value={report.tasks_carried_over} />
-          <Row label="Tasks overdue" value={report.tasks_overdue} />
 
           <p className={subLabel}>Wrap-up</p>
           <Row label="Pending tasks tomorrow" value={report.pending_tasks_tomorrow} />
@@ -396,12 +386,6 @@ interface EditForm {
   at_risk_identified: string
   follow_ups_due: string
   hours_worked: string
-  fte: string
-  estimated_max_workload: string
-  tasks_due_today: string
-  tasks_completed_today: string
-  tasks_carried_over: string
-  tasks_overdue: string
   main_blocker: string
   waiting_on_team: string
   escalated_why: string
@@ -454,12 +438,6 @@ function activityToEditForm(r: DailyActivity): EditForm {
     at_risk_identified: String(r.at_risk_identified ?? 0),
     follow_ups_due: String(r.follow_ups_due ?? 0),
     hours_worked: String(r.hours_worked ?? 0),
-    fte: String(r.fte ?? 0),
-    estimated_max_workload: String(r.estimated_max_workload ?? 0),
-    tasks_due_today: String(r.tasks_due_today ?? 0),
-    tasks_completed_today: String(r.tasks_completed_today ?? 0),
-    tasks_carried_over: String(r.tasks_carried_over ?? 0),
-    tasks_overdue: String(r.tasks_overdue ?? 0),
     main_blocker: r.main_blocker ?? '',
     waiting_on_team: r.waiting_on_team ?? '',
     escalated_why: r.escalated_why ?? '',
@@ -483,11 +461,9 @@ const NUM_FIELDS: (keyof EditForm)[] = [
   'recordings_scheduled', 'recordings_completed', 'grad_nurturing_convos',
   'referred_to_grad_program', 'continuation_opportunities',
   'total_conversations', 'total_followups', 'total_operational_tasks',
-  'estimated_max_workload',
-  'tasks_due_today', 'tasks_completed_today', 'tasks_carried_over', 'tasks_overdue',
 ]
 
-const DECIMAL_FIELDS: (keyof EditForm)[] = ['hours_worked', 'fte']
+const DECIMAL_FIELDS: (keyof EditForm)[] = ['hours_worked']
 
 function fieldLabel(key: string): string {
   return key
@@ -603,9 +579,9 @@ function EditModal({
       fields: ['total_conversations', 'total_followups', 'total_operational_tasks'],
     },
     {
-      title: 'Workload & Tasks',
-      fields: ['estimated_max_workload', 'tasks_due_today', 'tasks_completed_today', 'tasks_carried_over', 'tasks_overdue'],
-      decimalFields: ['hours_worked', 'fte'],
+      title: 'Workload',
+      fields: [],
+      decimalFields: ['hours_worked'],
     },
   ]
 
@@ -650,7 +626,7 @@ function EditModal({
                     <input
                       type="number"
                       min={0}
-                      step={f === 'fte' ? 0.1 : 0.5}
+                      step={0.5}
                       value={form[f]}
                       onChange={(e) => set(f, e.target.value)}
                       placeholder="0"
@@ -731,7 +707,7 @@ function EditModal({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-type CsmTab = 'clients' | 'pipeline' | 'dashboard'
+type CsmTab = 'clients' | 'pipeline' | 'risk-outreach' | 'dashboard'
 
 export default function HtCsmDashboardPage() {
   const { profile } = useProfile()
@@ -750,8 +726,12 @@ export default function HtCsmDashboardPage() {
   const [reports, setReports] = useState<DailyActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [slaThreshold, setSlaThreshold] = useState(2) // days
-  const [allStudents, setAllStudents] = useState<{ status: string; last_contacted_at: string | null; created_at: string; updated_at: string }[]>([])
+  const [allStudents, setAllStudents] = useState<{ id: string; status: string; email: string | null; graduated_at: string | null; last_contacted_at: string | null; created_at: string; updated_at: string }[]>([])
   const [pipelineRecords, setPipelineRecords] = useState<{ enrollment_date: string | null; step6_status: string; step6_date: string | null; current_step: number }[]>([])
+  const [riskTrackingAll, setRiskTrackingAll] = useState<{ id: string; student_id: string; status: string; flagged_at: string; recovered_at: string | null }[]>([])
+  const [graduationOutreach, setGraduationOutreach] = useState<{ student_id: string; family_manifesto_sent: boolean; testimonial_requested: boolean; nurturing_conversation_had: boolean; referred_to_grad_program: boolean; continuation_opportunity_identified: boolean }[]>([])
+  const [paymentPlans, setPaymentPlans] = useState<{ student_id: string; amount_per_installment: number }[]>([])
+  const [transactionsData, setTransactionsData] = useState<{ buyer_email: string; cost: number; date: string; offer_title: string }[]>([])
   const [preset, setPreset] = useState<Preset>('week')
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0] })
   const [customTo, setCustomTo] = useState(() => new Date().toISOString().split('T')[0])
@@ -802,14 +782,22 @@ export default function HtCsmDashboardPage() {
 
   useEffect(() => { fetchReports() }, [fetchReports])
 
-  // Fetch auto-calc data (students + pipeline) once on mount
+  // Fetch auto-calc data once on mount
   const fetchAutoCalcData = useCallback(async () => {
-    const [studentsRes, pipelineRes] = await Promise.all([
-      supabase.from('pwu_students').select('status, last_contacted_at, created_at, updated_at'),
+    const [studentsRes, pipelineRes, riskRes, outreachRes, plansRes, txRes] = await Promise.all([
+      supabase.from('pwu_students').select('id, status, email, graduated_at, last_contacted_at, created_at, updated_at'),
       supabase.from('onboarding_pipeline').select('enrollment_date, step6_status, step6_date, current_step'),
+      supabase.from('student_risk_tracking').select('id, student_id, status, flagged_at, recovered_at'),
+      supabase.from('student_graduation_outreach').select('student_id, family_manifesto_sent, testimonial_requested, nurturing_conversation_had, referred_to_grad_program, continuation_opportunity_identified'),
+      supabase.from('student_payment_plans').select('student_id, amount_per_installment'),
+      supabase.from('transactions').select('buyer_email, cost, date, offer_title'),
     ])
     if (studentsRes.data) setAllStudents(studentsRes.data)
     if (pipelineRes.data) setPipelineRecords(pipelineRes.data)
+    if (riskRes.data) setRiskTrackingAll(riskRes.data)
+    if (outreachRes.data) setGraduationOutreach(outreachRes.data)
+    if (plansRes.data) setPaymentPlans(plansRes.data)
+    if (txRes.data) setTransactionsData(txRes.data)
   }, [supabase])
 
   useEffect(() => { fetchAutoCalcData() }, [fetchAutoCalcData])
@@ -832,15 +820,6 @@ export default function HtCsmDashboardPage() {
     const followUpsDue = sum(filteredReports, 'follow_ups_due')
     const totalConversations = sum(filteredReports, 'total_conversations')
     const hoursWorked = filteredReports.reduce((s, r) => s + (Number(r.hours_worked) || 0), 0)
-    const tasksDueToday = sum(filteredReports, 'tasks_due_today')
-    const tasksCompletedToday = sum(filteredReports, 'tasks_completed_today')
-    const tasksCarriedOver = sum(filteredReports, 'tasks_carried_over')
-    const tasksOverdue = sum(filteredReports, 'tasks_overdue')
-
-    // Snapshot fields: use most recent report
-    const latest = filteredReports[0] // already sorted desc by date
-    const fte = Number(latest?.fte) || 0
-    const estimatedMaxWorkload = Number(latest?.estimated_max_workload) || 0
 
     // Meaningful actions: direct client work + onboarding actions + coordination
     const meaningfulActions = followupsCompleted + atRiskContacted + issuesResolved
@@ -857,16 +836,14 @@ export default function HtCsmDashboardPage() {
       atRiskContact: pct(atRiskContacted, atRiskIdentified),
       directResolution: pct(issuesResolved, issuesReceived),
       escalationRate: pct(casesEscalated, issuesReceived),
-      taskCompletion: pct(tasksCompletedToday, tasksDueToday),
       atRiskContacted, atRiskRecovered, atRiskIdentified,
       issuesReceived, issuesResolved, casesEscalated,
       newClientsReceived, coachMatchesCompleted,
       followupsCompleted, followUpsDue,
       totalConversations,
       sessionsScheduled, sessionsRescheduled,
-      hoursWorked, fte, estimatedMaxWorkload,
+      hoursWorked,
       meaningfulActions,
-      tasksDueToday, tasksCompletedToday, tasksCarriedOver, tasksOverdue,
     }
   }, [filteredReports])
 
@@ -944,6 +921,127 @@ export default function HtCsmDashboardPage() {
     }
   }, [allStudents, pipelineRecords, preset, customFrom, customTo, slaThreshold])
 
+  // ── Dashboard KPIs (Table 1 + Table 2) ──
+  const dashKpis = useMemo(() => {
+    const range = getDateRange(preset, customFrom, customTo)
+    const periodStart = range ? range.from : '1970-01-01'
+    const periodEnd = range ? range.to : new Date().toISOString().split('T')[0]
+    const periodStartDate = new Date(periodStart)
+    const periodEndDate = new Date(periodEnd + 'T23:59:59')
+    const today = new Date()
+
+    // Helper: payment plan lookup by student_id
+    const planMap = new Map(paymentPlans.map((p) => [p.student_id, p.amount_per_installment]))
+
+    // ── TABLE 1: Salud Operativa ──
+
+    // T1-1: Client Follow-Up & Engagement % (from daily reports — use kpis)
+    // Already computed in kpis: followUpCompletion, followupsCompleted, followUpsDue, contactedAfterNoshow, totalConversations
+
+    // T1-2: At-Risk Recovery % from student_risk_tracking
+    const riskRecovered = riskTrackingAll.filter((r) =>
+      r.status === 'recovered'
+      && r.recovered_at
+      && new Date(r.recovered_at) >= periodStartDate
+      && new Date(r.recovered_at) <= periodEndDate
+    )
+    const riskAtRiskInPeriod = riskTrackingAll.filter((r) =>
+      new Date(r.flagged_at) >= periodStartDate
+      && new Date(r.flagged_at) <= periodEndDate
+    )
+    // Recovery base = at_risk flagged in period + recovered in period (some may have been flagged before period but recovered within)
+    const recoveryDenominator = new Set([
+      ...riskAtRiskInPeriod.map((r) => r.id),
+      ...riskRecovered.map((r) => r.id),
+    ]).size
+    const atRiskRecoveryPct = pct(riskRecovered.length, recoveryDenominator)
+
+    // T1-3: Critical Pending = onboarding pipeline records past SLA
+    const criticalPending = pipelineRecords.filter((p) => {
+      if (!p.enrollment_date || p.current_step >= 6) return false
+      if (p.step6_status === 'completed') return false
+      const deadline = new Date(p.enrollment_date)
+      deadline.setDate(deadline.getDate() + slaThreshold)
+      return deadline < today
+    }).length
+
+    // T1-4: Graduation & Expansion %
+    const graduatedStudents = allStudents.filter((s) => s.status === 'graduated')
+    const totalGraduated = graduatedStudents.length
+    const outreachedCount = graduationOutreach.filter((o) =>
+      o.family_manifesto_sent
+      || o.testimonial_requested
+      || o.nurturing_conversation_had
+      || o.referred_to_grad_program
+      || o.continuation_opportunity_identified
+    ).length
+    const graduationExpansionPct = pct(outreachedCount, totalGraduated)
+
+    // ── TABLE 2: Impacto Financiero ──
+
+    // T2-1: Revenue Retention
+    const activeStudents = allStudents.filter((s) => s.status === 'active')
+    const activeRevenue = activeStudents.reduce((sum, s) => sum + (planMap.get(s.id) ?? 0), 0)
+    // "All who were active in period" ≈ currently active + lost/refunded in period
+    const lostInPeriod = allStudents.filter((s) =>
+      s.status === 'refund'
+      && new Date(s.created_at) < periodStartDate
+      && new Date(s.updated_at) >= periodStartDate
+      && new Date(s.updated_at) <= periodEndDate
+    )
+    const lostRevenue = lostInPeriod.reduce((sum, s) => sum + (planMap.get(s.id) ?? 0), 0)
+    const totalPeriodRevenue = activeRevenue + lostRevenue
+    const revenueRetentionPct = pct(activeRevenue, totalPeriodRevenue)
+
+    // T2-2: Revenue Recovered
+    const recoveredStudentIds = new Set(riskRecovered.map((r) => r.student_id))
+    const revenueRecovered = Array.from(recoveredStudentIds).reduce((sum, sid) => sum + (planMap.get(sid) ?? 0), 0)
+
+    // T2-3: Expansion Revenue (post-graduation transactions, excluding high-ticket re-enrollments)
+    const gradEmailMap = new Map<string, string>() // email → graduated_at
+    for (const s of graduatedStudents) {
+      if (s.email && s.graduated_at) gradEmailMap.set(s.email.toLowerCase(), s.graduated_at)
+    }
+    const expansionRevenue = transactionsData.reduce((sum, tx) => {
+      const gradDate = gradEmailMap.get(tx.buyer_email.toLowerCase())
+      if (!gradDate) return sum
+      if (new Date(tx.date) <= new Date(gradDate)) return sum
+      // Exclude high-ticket (PWU re-enrollments) and excluded transactions
+      const tier = classifyOfferTitle(tx.offer_title)
+      if (tier === 'high_ticket' || tier === 'exclude') return sum
+      // Period filter
+      const txDate = new Date(tx.date)
+      if (txDate < periodStartDate || txDate > periodEndDate) return sum
+      return sum + (Number(tx.cost) || 0)
+    }, 0)
+
+    // T2-4: Revenue at Risk (currently at-risk students)
+    const currentlyAtRisk = riskTrackingAll.filter((r) => r.status === 'at_risk')
+    const currentlyAtRiskStudentIds = new Set(currentlyAtRisk.map((r) => r.student_id))
+    const revenueAtRisk = Array.from(currentlyAtRiskStudentIds).reduce((sum, sid) => sum + (planMap.get(sid) ?? 0), 0)
+
+    return {
+      // Table 1
+      atRiskRecoveryPct,
+      riskRecoveredCount: riskRecovered.length,
+      recoveryDenominator,
+      criticalPending,
+      graduationExpansionPct,
+      outreachedCount,
+      totalGraduated,
+      // Table 2
+      activeRevenue,
+      lostRevenue,
+      totalPeriodRevenue,
+      revenueRetentionPct,
+      revenueRecovered,
+      recoveredStudentIds: recoveredStudentIds.size,
+      expansionRevenue,
+      revenueAtRisk,
+      currentlyAtRiskCount: currentlyAtRiskStudentIds.size,
+    }
+  }, [allStudents, riskTrackingAll, graduationOutreach, paymentPlans, transactionsData, pipelineRecords, preset, customFrom, customTo, slaThreshold])
+
   // ── Pagination ──
   const totalPages = Math.ceil(filteredReports.length / PAGE_SIZE)
   const pageReports = filteredReports.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
@@ -979,6 +1077,18 @@ export default function HtCsmDashboardPage() {
               Pipeline
             </button>
             <button
+              onClick={() => setActiveTab('risk-outreach')}
+              className={cn(
+                'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'risk-outreach'
+                  ? 'border-[#ffbd59] text-[#ffbd59]'
+                  : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300'
+              )}
+            >
+              <ShieldAlert className="h-4 w-4" />
+              Risk & Outreach
+            </button>
+            <button
               onClick={() => setActiveTab('dashboard')}
               className={cn(
                 'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
@@ -997,6 +1107,8 @@ export default function HtCsmDashboardPage() {
         <ClientsGroupsView />
       ) : isCsmHt && activeTab === 'pipeline' ? (
         <ClientSuccessPipeline />
+      ) : isCsmHt && activeTab === 'risk-outreach' ? (
+        <StudentRiskOutreach />
       ) : (
       <>
       <div className="max-w-7xl mx-auto">
@@ -1100,210 +1212,219 @@ export default function HtCsmDashboardPage() {
           />
         ) : kpis && (
           <>
-            {/* ── Primary KPI Dashboard ── */}
-            <div className="mb-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">KPI Dashboard</p>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-              {/* 1. Client Coverage % */}
-              <KpiCard
-                label="Client Coverage %"
-                value={fmtPct(autoKpis.coverage)}
-                goal="Last 7 days"
-                barPct={isNaN(autoKpis.coverage) ? 0 : autoKpis.coverage}
-                status={rateStatus(autoKpis.coverage, 85)}
-                breakdowns={[
-                  { label: 'assigned', value: autoKpis.totalActive },
-                  { label: 'actioned', value: autoKpis.actioned },
-                  { label: 'need action', value: autoKpis.requiringAction },
-                ]}
-              />
-              {/* 2. Follow-up Completion % */}
-              <KpiCard
-                label="Follow-up Completion %"
-                value={fmtPct(kpis.followUpCompletion)}
-                goal="Goal: >= 90%"
-                barPct={isNaN(kpis.followUpCompletion) ? 0 : (kpis.followUpCompletion / 90) * 100}
-                status={rateStatus(kpis.followUpCompletion, 90)}
-                breakdowns={[
-                  { label: 'due', value: kpis.followUpsDue },
-                  { label: 'completed', value: kpis.followupsCompleted },
-                  { label: 'overdue', value: Math.max(0, kpis.followUpsDue - kpis.followupsCompleted) },
-                ]}
-              />
-              {/* 3. At-Risk Contact % */}
-              <KpiCard
-                label="At-Risk Contact %"
-                value={fmtPct(kpis.atRiskContact)}
-                goal="Goal: >= 90%"
-                barPct={isNaN(kpis.atRiskContact) ? 0 : (kpis.atRiskContact / 90) * 100}
-                status={rateStatus(kpis.atRiskContact, 90)}
-                breakdowns={[
-                  { label: 'identified', value: kpis.atRiskIdentified },
-                  { label: 'contacted', value: kpis.atRiskContacted },
-                  { label: 'not contacted', value: Math.max(0, kpis.atRiskIdentified - kpis.atRiskContacted) },
-                ]}
-              />
-              {/* 4. At-Risk Recovery % */}
-              <KpiCard
-                label="At-Risk Recovery %"
-                value={fmtPct(kpis.atRiskRecovery)}
-                goal="Goal: >= 70%"
-                barPct={isNaN(kpis.atRiskRecovery) ? 0 : (kpis.atRiskRecovery / 70) * 100}
-                status={rateStatus(kpis.atRiskRecovery, 70)}
-                breakdowns={[
-                  { label: 'contacted', value: kpis.atRiskContacted },
-                  { label: 'recovered', value: kpis.atRiskRecovered },
-                  { label: 'still at risk', value: Math.max(0, kpis.atRiskContacted - kpis.atRiskRecovered) },
-                ]}
-              />
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-              {/* 5. Onboarding SLA % */}
-              <KpiCard
-                label={`Onboarding SLA % (≤${slaThreshold}d)`}
-                value={fmtPct(autoKpis.onboardingSla)}
-                goal={`SLA: ${slaThreshold} day${slaThreshold > 1 ? 's' : ''}`}
-                barPct={isNaN(autoKpis.onboardingSla) ? 0 : autoKpis.onboardingSla}
-                status={rateStatus(autoKpis.onboardingSla, 80)}
-                breakdowns={[
-                  { label: 'new', value: autoKpis.newPipelineClients },
-                  { label: 'within SLA', value: autoKpis.withinSla },
-                  { label: 'pending', value: autoKpis.pendingOnboarding },
-                  { label: 'avg days', value: isNaN(autoKpis.avgCompletionDays) ? '—' : autoKpis.avgCompletionDays.toFixed(1) },
-                ]}
-              />
-              {/* 6. Direct Resolution % + Escalation Rate */}
-              <KpiCard
-                label="Direct Resolution %"
-                value={fmtPct(kpis.directResolution)}
-                sub={`Escalation: ${fmtPct(kpis.escalationRate)}`}
-                goal="Goal: >= 80%"
-                barPct={isNaN(kpis.directResolution) ? 0 : (kpis.directResolution / 80) * 100}
-                status={rateStatus(kpis.directResolution, 80)}
-                breakdowns={[
-                  { label: 'received', value: kpis.issuesReceived },
-                  { label: 'resolved', value: kpis.issuesResolved },
-                  { label: 'escalated', value: kpis.casesEscalated },
-                ]}
-              />
-              {/* 7. Retention % / Churn % */}
-              <KpiCard
-                label="Retention %"
-                value={fmtPct(autoKpis.retention)}
-                sub={`Churn: ${fmtPct(autoKpis.churn)}`}
-                goal="Goal: >= 90%"
-                barPct={isNaN(autoKpis.retention) ? 0 : (autoKpis.retention / 90) * 100}
-                status={rateStatus(autoKpis.retention, 90)}
-                breakdowns={[
-                  { label: 'starting', value: autoKpis.startingActive },
-                  { label: 'retained', value: autoKpis.retained },
-                  { label: 'churned', value: autoKpis.churned },
-                ]}
-              />
-              {/* 8. Clients per FTE */}
-              <KpiCard
-                label="Clients per FTE"
-                value={kpis.fte > 0 ? (autoKpis.totalActive / kpis.fte).toFixed(1) : '—'}
-                barPct={100}
-                status="good"
-                breakdowns={[
-                  { label: 'clients', value: autoKpis.totalActive },
-                  { label: 'FTE', value: kpis.fte },
-                ]}
-              />
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-              {/* 9. Meaningful Actions per Work Hour */}
-              <KpiCard
-                label="Actions / Work Hour"
-                value={kpis.hoursWorked > 0 ? (kpis.meaningfulActions / kpis.hoursWorked).toFixed(1) : '—'}
-                barPct={100}
-                status="good"
-                breakdowns={[
-                  { label: 'actions', value: kpis.meaningfulActions },
-                  { label: 'hours', value: kpis.hoursWorked.toFixed(1) },
-                ]}
-              />
-              {/* 10. Avg Time per Client */}
-              <KpiCard
-                label="Avg Time per Client"
-                value={kpis.hoursWorked > 0 && autoKpis.totalActive > 0 ? `${(kpis.hoursWorked / autoKpis.totalActive).toFixed(1)}h` : '—'}
-                barPct={100}
-                status="good"
-                breakdowns={[
-                  { label: 'hours', value: kpis.hoursWorked.toFixed(1) },
-                  { label: 'clients', value: autoKpis.totalActive },
-                ]}
-              />
-              {/* 11. Capacity Utilization % */}
-              {(() => {
-                const utilization = kpis.estimatedMaxWorkload > 0 ? pct(autoKpis.totalActive, kpis.estimatedMaxWorkload) : NaN
-                const additionalCapacity = Math.max(0, kpis.estimatedMaxWorkload - autoKpis.totalActive)
-                return (
-                  <KpiCard
-                    label="Capacity Utilization %"
-                    value={fmtPct(utilization)}
-                    barPct={isNaN(utilization) ? 0 : utilization}
-                    status={isNaN(utilization) ? 'alert' : utilization <= 85 ? 'good' : utilization <= 95 ? 'warn' : 'alert'}
-                    breakdowns={[
-                      { label: 'current', value: autoKpis.totalActive },
-                      { label: 'max', value: kpis.estimatedMaxWorkload },
-                      { label: 'available', value: additionalCapacity },
-                    ]}
-                  />
-                )
-              })()}
-              {/* 12. Daily Task Completion % */}
-              <KpiCard
-                label="Task Completion %"
-                value={fmtPct(kpis.taskCompletion)}
-                goal="Goal: >= 85%"
-                barPct={isNaN(kpis.taskCompletion) ? 0 : (kpis.taskCompletion / 85) * 100}
-                status={rateStatus(kpis.taskCompletion, 85)}
-                breakdowns={[
-                  { label: 'due', value: kpis.tasksDueToday },
-                  { label: 'completed', value: kpis.tasksCompletedToday },
-                  { label: 'carried', value: kpis.tasksCarriedOver },
-                  { label: 'overdue', value: kpis.tasksOverdue },
-                ]}
-              />
+            {/* ── Table 1: Salud Operativa ── */}
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
+              <div className="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Table 1 — Salud Operativa</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-200 dark:border-zinc-800">
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide w-[220px]">KPI</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">What it measures</th>
+                      <th className="px-5 py-3 text-right text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide w-[100px]">Target</th>
+                      <th className="px-5 py-3 text-right text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide w-[100px]">Value</th>
+                      <th className="px-5 py-3 text-center text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide w-[80px]">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {/* T1-1: Client Follow-Up & Engagement */}
+                    {(() => {
+                      const val = kpis.followUpCompletion
+                      const st = rateStatus(val, 95)
+                      return (
+                        <tr>
+                          <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">Client Follow-Up & Engagement</td>
+                          <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                            <span>Follow-ups completed / due</span>
+                            <span className="flex gap-3 mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{kpis.followupsCompleted}</span> completed</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{kpis.followUpsDue}</span> due</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{sum(filteredReports, 'contacted_after_noshow')}</span> no-show contacted</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{kpis.totalConversations}</span> conversations</span>
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">&ge; 95%</td>
+                          <td className={cn('px-5 py-3 text-right text-sm font-bold', RATE_COLORS[st])}>{fmtPct(val)}</td>
+                          <td className="px-5 py-3 text-center">
+                            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold', CELL_BG[st])}>
+                              {st === 'good' ? 'On track' : st === 'warn' ? 'At risk' : 'Below'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })()}
+                    {/* T1-2: Client Resolution & Retention */}
+                    {(() => {
+                      const drVal = kpis.directResolution
+                      const drSt = rateStatus(drVal, 80)
+                      const arVal = dashKpis.atRiskRecoveryPct
+                      const arSt = rateStatus(arVal, 70)
+                      const worst = drSt === 'alert' || arSt === 'alert' ? 'alert' : drSt === 'warn' || arSt === 'warn' ? 'warn' : 'good'
+                      return (
+                        <tr>
+                          <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">Client Resolution & Retention</td>
+                          <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                            <div className="flex items-center gap-4">
+                              <span>Direct Resolution: <span className={cn('font-bold', RATE_COLORS[drSt])}>{fmtPct(drVal)}</span> <span className="text-[10px] text-zinc-400">(target &ge; 80%)</span></span>
+                              <span>At-Risk Recovery: <span className={cn('font-bold', RATE_COLORS[arSt])}>{fmtPct(arVal)}</span> <span className="text-[10px] text-zinc-400">(target &ge; 70%)</span></span>
+                            </div>
+                            <span className="flex gap-3 mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{kpis.issuesReceived}</span> issues</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{kpis.issuesResolved}</span> resolved</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{kpis.casesEscalated}</span> escalated</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{dashKpis.riskRecoveredCount}</span> recovered</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{dashKpis.recoveryDenominator}</span> risk events</span>
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">80% / 70%</td>
+                          <td className={cn('px-5 py-3 text-right text-sm font-bold', RATE_COLORS[worst])}>
+                            {fmtPct(drVal)} / {fmtPct(arVal)}
+                          </td>
+                          <td className="px-5 py-3 text-center">
+                            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold', CELL_BG[worst])}>
+                              {worst === 'good' ? 'On track' : worst === 'warn' ? 'At risk' : 'Below'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })()}
+                    {/* T1-3: Onboarding & Operations Accuracy */}
+                    {(() => {
+                      const slaVal = autoKpis.onboardingSla
+                      const slaSt = rateStatus(slaVal, 95)
+                      const cpSt = dashKpis.criticalPending === 0 ? 'good' : 'alert'
+                      const worst = slaSt === 'alert' || cpSt === 'alert' ? 'alert' : slaSt === 'warn' ? 'warn' : 'good'
+                      return (
+                        <tr>
+                          <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">Onboarding & Operations</td>
+                          <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                            <div className="flex items-center gap-4">
+                              <span>SLA Compliance: <span className={cn('font-bold', RATE_COLORS[slaSt])}>{fmtPct(slaVal)}</span> <span className="text-[10px] text-zinc-400">(target &ge; 95%)</span></span>
+                              <span>Critical Pending: <span className={cn('font-bold', dashKpis.criticalPending === 0 ? RATE_COLORS.good : RATE_COLORS.alert)}>{dashKpis.criticalPending}</span> <span className="text-[10px] text-zinc-400">(target: 0)</span></span>
+                            </div>
+                            <span className="flex gap-3 mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{autoKpis.newPipelineClients}</span> new</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{autoKpis.withinSla}</span> within SLA</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{autoKpis.pendingOnboarding}</span> pending</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{isNaN(autoKpis.avgCompletionDays) ? '—' : autoKpis.avgCompletionDays.toFixed(1)}</span> avg days</span>
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">95% / 0</td>
+                          <td className={cn('px-5 py-3 text-right text-sm font-bold', RATE_COLORS[worst])}>
+                            {fmtPct(slaVal)} / {dashKpis.criticalPending}
+                          </td>
+                          <td className="px-5 py-3 text-center">
+                            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold', CELL_BG[worst])}>
+                              {worst === 'good' ? 'On track' : worst === 'warn' ? 'At risk' : 'Below'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })()}
+                    {/* T1-4: Graduation & Expansion */}
+                    {(() => {
+                      const val = dashKpis.graduationExpansionPct
+                      const st = rateStatus(val, 70)
+                      return (
+                        <tr>
+                          <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">Graduation & Expansion</td>
+                          <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                            <span>Graduates with at least 1 outreach action</span>
+                            <span className="flex gap-3 mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{dashKpis.outreachedCount}</span> outreached</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{dashKpis.totalGraduated}</span> total graduates</span>
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">&ge; 70%</td>
+                          <td className={cn('px-5 py-3 text-right text-sm font-bold', RATE_COLORS[st])}>{fmtPct(val)}</td>
+                          <td className="px-5 py-3 text-center">
+                            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold', CELL_BG[st])}>
+                              {st === 'good' ? 'On track' : st === 'warn' ? 'At risk' : 'Below'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })()}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            {/* ── Operational Metrics (secondary) ── */}
-            <div className="mb-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-3">Operational Metrics</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <KpiCard
-                label="Coach Match Rate"
-                value={fmtPct(kpis.coachMatchRate)}
-                sub={`${kpis.coachMatchesCompleted} / ${kpis.newClientsReceived} matched`}
-                goal="Goal: >= 90%"
-                barPct={isNaN(kpis.coachMatchRate) ? 0 : (kpis.coachMatchRate / 90) * 100}
-                status={rateStatus(kpis.coachMatchRate, 90)}
-              />
-              <KpiCard
-                label="Follow-ups Completed"
-                value={String(kpis.followupsCompleted)}
-                sub={`${filteredReports.length} reports`}
-                barPct={100}
-                status="good"
-              />
-              <KpiCard
-                label="Total Conversations"
-                value={String(kpis.totalConversations)}
-                sub={`${filteredReports.length} reports`}
-                barPct={100}
-                status="good"
-              />
-              <KpiCard
-                label="Sessions Scheduled"
-                value={String(kpis.sessionsScheduled)}
-                sub={`${kpis.sessionsRescheduled} rescheduled`}
-                barPct={100}
-                status="good"
-              />
+            {/* ── Table 2: Impacto Financiero ── */}
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-6">
+              <div className="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Table 2 — Impacto Financiero</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-200 dark:border-zinc-800">
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide w-[220px]">KPI</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">What it measures</th>
+                      <th className="px-5 py-3 text-right text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide w-[140px]">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {/* T2-1: Revenue Retention */}
+                    {(() => {
+                      const val = dashKpis.revenueRetentionPct
+                      const st = rateStatus(val, 90)
+                      return (
+                        <tr>
+                          <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">Revenue Retention</td>
+                          <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                            <span>Monthly revenue retained from active students vs total period base</span>
+                            <span className="flex gap-3 mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">${dashKpis.activeRevenue.toLocaleString()}</span> active</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">${dashKpis.lostRevenue.toLocaleString()}</span> lost</span>
+                              <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">${dashKpis.totalPeriodRevenue.toLocaleString()}</span> total base</span>
+                            </span>
+                          </td>
+                          <td className={cn('px-5 py-3 text-right text-sm font-bold', RATE_COLORS[st])}>{fmtPct(val)}</td>
+                        </tr>
+                      )
+                    })()}
+                    {/* T2-2: Revenue Recovered */}
+                    <tr>
+                      <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">Revenue Recovered</td>
+                      <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                        <span>Monthly installment value of students recovered from at-risk in period</span>
+                        <span className="flex gap-3 mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                          <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{dashKpis.recoveredStudentIds}</span> students recovered</span>
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">
+                        ${dashKpis.revenueRecovered.toLocaleString()}
+                      </td>
+                    </tr>
+                    {/* T2-3: Expansion Revenue */}
+                    <tr>
+                      <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">Expansion Revenue</td>
+                      <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                        <span>Post-graduation purchases (workshops, SPC, coaching) in period</span>
+                      </td>
+                      <td className="px-5 py-3 text-right text-sm font-bold text-blue-600 dark:text-blue-400">
+                        ${dashKpis.expansionRevenue.toLocaleString()}
+                      </td>
+                    </tr>
+                    {/* T2-4: Revenue at Risk */}
+                    <tr>
+                      <td className="px-5 py-3 font-medium text-zinc-800 dark:text-zinc-200">Revenue at Risk</td>
+                      <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                        <span>Monthly installment value of currently at-risk students</span>
+                        <span className="flex gap-3 mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                          <span><span className="font-semibold text-zinc-500 dark:text-zinc-400">{dashKpis.currentlyAtRiskCount}</span> students at risk</span>
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right text-sm font-bold text-red-600 dark:text-red-400">
+                        ${dashKpis.revenueAtRisk.toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* ── Reports Table ── */}
