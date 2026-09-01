@@ -1,3 +1,13 @@
+export interface CallSaleMatch {
+  id: string
+  call_id: string
+  transaction_id: string
+  matched_by: 'auto' | 'manual'
+  linked_by: string | null
+  linked_at: string
+  created_at: string
+}
+
 export interface Transaction {
   id: string
   date: string

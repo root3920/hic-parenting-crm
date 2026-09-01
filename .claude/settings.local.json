@@ -89,7 +89,8 @@
       "WebFetch(domain:manychat.github.io)",
       "Bash(/dev/null source:*)",
       "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *.sql -o -name *.prisma \\\\\\))",
-      "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *.json -o -name *.ts \\\\\\) -path *supabase*)"
+      "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *.json -o -name *.ts \\\\\\) -path *supabase*)",
+      "Bash(echo \"$file\")"
     ]
   }
 }

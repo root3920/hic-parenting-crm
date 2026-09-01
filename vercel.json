@@ -15,6 +15,10 @@
     {
       "path": "/api/setter-portal/daily-assignment",
       "schedule": "10 6 * * *"
+    },
+    {
+      "path": "/api/cron/match-call-sales",
+      "schedule": "20 6 * * *"
     }
   ]
 }
