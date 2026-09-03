@@ -1,324 +1,157 @@
 'use client'
 
-import { useEffect, useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 export const dynamic = 'force-dynamic'
 
-const GROUP_TOTALS: Record<string, number> = {
-  firecracker: 7, cooker: 7, stonewall: 7,
-  'child-mirroring': 6, 'child-desensitization': 6, 'child-poking': 6,
-  'child-scanning': 7, 'child-shutdown': 8, 'child-impact': 8,
-  'co-micro': 5, 'co-undermined': 6, 'co-both': 8,
-  'co-shutdown': 3, 'co-impact': 7,
+/* ------------------------------------------------------------------ */
+/*  Checkbox item definitions                                         */
+/* ------------------------------------------------------------------ */
+
+interface CheckItem {
+  key: string
+  text: string
 }
 
-const GRAND_TOTAL = Object.values(GROUP_TOTALS).reduce((a, b) => a + b, 0)
-
-interface CheckSection {
-  group: string
-  tag?: string
-  emoji?: string
-  title: string
-  subtitle: string
-  description: string[]
-  subsectionLabel: string
-  items: string[]
-}
-
-const SECTIONS: CheckSection[] = [
-  {
-    group: 'firecracker',
-    tag: 'Reactive Type 1',
-    emoji: '\u{1F525}',
-    title: 'The Firecracker / Fire Alarm Pattern',
-    subtitle: 'Impulse reactivity',
-    description: [
-      'You react quickly when triggered \u2014 maybe you yell, snap, or say something you don\u2019t mean, and then feel guilty afterward.',
-      'Even though you know what to do, in the heat of the moment, it feels impossible to stay calm.',
-      'This is an impulsive reactive pattern that occurs when the nervous system escalates quickly, and the parent lacks the skills to prevent the escalation or body awareness to notice early signs of nervous system dysregulation.',
-    ],
-    subsectionLabel: 'Check the statements you relate to',
-    items: [
-      '\u201CIt just happens so fast \u2014 I can\u2019t control it.\u201D',
-      '\u201CI avoid getting angry because if I do, I know I can\u2019t control myself.\u201D',
-      '\u201CI feel like my co-parent judges me or doesn\u2019t trust me.\u201D',
-      '\u201CI know what to do, but I can\u2019t seem to do it when I\u2019m upset.\u201D',
-      '\u201CI feel like my kids don\u2019t believe my apologies anymore.\u201D',
-      '\u201CI see my children are scared of me.\u201D',
-      '\u201CMy coparent repeatedly tells me that I am being too harsh even when I feel I am not.\u201D',
-    ],
-  },
-  {
-    group: 'cooker',
-    tag: 'Reactive Type 2',
-    emoji: '\u{1F4A8}',
-    title: 'The Pressure Cooker Pattern',
-    subtitle: 'Suppression reactivity',
-    description: [
-      'When everything builds up inside, you try hard to stay calm \u2014 you hold, and hold, and hold\u2026 until suddenly, you can\u2019t do it anymore, and you react with snapping, yelling, saying hurtful things, or spanking.',
-      'You start the day patient and positive, but stress builds, and at some point, it overflows.',
-      'This is a suppression reactive pattern that occurs when the parent dismisses or suppresses their own dysregulation or anger. The escalation builds up until it overflows like a pressure cooker with no valve.',
-    ],
-    subsectionLabel: 'Check the statements you relate to',
-    items: [
-      '\u201CI don\u2019t want to lose it, but I can\u2019t keep holding it in.\u201D',
-      '\u201CI tell myself to stay calm, but my frustration increases.\u201D',
-      '\u201CI fake cool with my kids, but I am boiling inside.\u201D',
-      '\u201CBy the end of the day, I\u2019m emotionally exhausted and reactive.\u201D',
-      '\u201CI should be doing better \u2014 I\u2019ve learned so much already.\u201D',
-      '\u201CMy partner says they don\u2019t like that I correct their parenting all the time, but end up having the same reaction they are having anyway.\u201D',
-      '\u201CI see my children look confused and don\u2019t trust me because one moment I am connected and calm, and the next moment I am reactive.\u201D',
-    ],
-  },
-  {
-    group: 'stonewall',
-    tag: 'Reactive Type 3',
-    emoji: '\u{1F9CA}',
-    title: 'The Stonewall Parent',
-    subtitle: 'Silent / quiet reactivity',
-    description: [
-      'When you shut down or check out. This is silent reactivity.',
-      'You don\u2019t yell \u2014 instead, you disconnect or shut down. You might stay quiet, walk away, or emotionally \u201Ctune out.\u201D Sometimes you give in just to keep the peace or hand things over to your partner when it\u2019s too much.',
-      'This is a hidden type of reactivity because the parent is not visibly reactive or upset. According to science, this is the highest form of nervous system dysregulation, and it happens when the parent feels helpless and unable to respond.',
-    ],
-    subsectionLabel: 'Check the statements you relate to',
-    items: [
-      '\u201CI just need a break \u2014 I can\u2019t deal with this right now.\u201D',
-      '\u201CAs long as the kids are happy, I\u2019m happy, so I give in even though I know I should set a limit.\u201D',
-      '\u201CI emotionally check out. I am physically present but not emotionally present.\u201D',
-      '\u201CI feel permissive and I don\u2019t like it.\u201D',
-      '\u201CMy partner feels like they are alone in handling the children\u2019s behaviors.\u201D',
-      '\u201CI want to be firm and kind, but I don\u2019t know how.\u201D',
-      '\u201CIt seems my children can do whatever they want, and they don\u2019t see me in authority.\u201D',
-    ],
-  },
-  {
-    group: 'child-mirroring',
-    title: '1. Mirroring Behaviors',
-    subtitle: 'Children learn emotional regulation by watching us',
-    description: [
-      'When children grow up around frequent reactivity, yelling, emotional overwhelm, or dysregulation, they often mirror the same behaviors because that becomes their model for handling stress and emotions.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'My child becomes reactive, explosive, or emotionally intense with siblings.',
-      'My child talks to others with the same tone, attitude, or reactivity they experience at home.',
-      'My child becomes more reactive with me when I become reactive with them.',
-      'My child has received behavioral complaints at school, daycare, activities, or with peers.',
-      'My child mirrors emotional dysregulation with pets, siblings, or other children.',
-      'My child escalates emotionally instead of calming down during conflict.',
-    ],
-  },
-  {
-    group: 'child-desensitization',
-    title: '2. Desensitization to Reactivity',
-    subtitle: 'Children in reactive homes can become emotionally desensitized to calm communication',
-    description: [
-      'It\u2019s kind of like living next to a train track: at first, every train feels loud, but over time, the nervous system adapts and only reacts to the REALLY loud trains. Children can become so used to emotional intensity that calm requests no longer feel urgent to their nervous system.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'My child does not respond until I raise my voice or become emotionally intense.',
-      'I often feel like my child \u201Conly listens when I yell.\u201D',
-      'Calm communication often gets ignored in our home.',
-      'I notice myself escalating more and more just to get cooperation.',
-      'My child seems emotionally \u201Cused to\u201D yelling, threats, or reactive energy.',
-      'It feels like the emotional intensity in our home keeps increasing over time.',
-    ],
-  },
-  {
-    group: 'child-poking',
-    title: '3. \u201CPoking the Bear\u201D Behaviors',
-    subtitle: 'Testing, provoking, or pushing limits constantly',
-    description: [
-      'Some children begin testing, provoking, or pushing limits constantly. Not always because they want conflict\u2026 but waiting for the explosion can feel emotionally nerve-wracking and unpredictable. So their nervous system would rather \u201Cget the reaction over with now\u201D than stay anxiously waiting for it later.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'My child constantly pushes limits or tests boundaries.',
-      'My child seems to provoke reactions intentionally.',
-      'My child keeps escalating even when they know I\u2019m already overwhelmed.',
-      'It feels like my child keeps \u201Cpushing buttons.\u201D',
-      'My child struggles to settle until conflict or reactivity finally happens.',
-      'I feel like my child is always testing me emotionally.',
-    ],
-  },
-  {
-    group: 'child-scanning',
-    title: '4. Emotional Scanning Behaviors',
-    subtitle: 'Hyper-aware of parents\u2019 moods and emotional safety',
-    description: [
-      'Children naturally scan their parents for emotional safety. But in reactive homes, some children become hyper-aware of the parents\u2019 moods, tone, energy, or facial expressions because their nervous system is trying to predict emotional danger and stay safe. Some children become people pleasers; others become \u201Cfunny,\u201D overly playful, or highly accommodating to try to keep the peace.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'My child frequently asks: \u201CAre you mad?\u201D, \u201CAre you angry?\u201D, \u201CAre you okay?\u201D, \u201CAre you upset with me?\u201D',
-      'My child changes their behavior depending on my emotional state.',
-      'My child becomes hyper-aware of my moods, tone, facial expressions, or energy.',
-      'My child tries to keep everyone happy or peaceful.',
-      'My child acts overly funny, silly, playful, or \u201Con\u201D when tension is present.',
-      'My child seems emotionally responsible for managing other people\u2019s feelings.',
-      'My child appears anxious when they sense emotional tension in the home.',
-    ],
-  },
-  {
-    group: 'child-shutdown',
-    title: '5. Shutdown & Emotional Disconnection',
-    subtitle: 'Children protecting themselves by emotionally withdrawing',
-    description: [
-      'Some children do not become louder. Children may begin disconnecting emotionally to protect themselves. Over time, this can create emotional distance between parents and children.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'My child struggles to open up emotionally.',
-      'My child hides feelings, mistakes, or struggles.',
-      'My child emotionally shuts down during conflict.',
-      'My child avoids talking about emotions.',
-      'My child becomes quiet, withdrawn, or disconnected after reactive moments.',
-      'My child seems emotionally distant from me.',
-      'My child suppresses emotions instead of expressing them safely.',
-      'I feel like there is growing emotional distance between me and my child.',
-    ],
-  },
-  {
-    group: 'child-impact',
-    title: '6. Emotional Impact on the Child',
-    subtitle: 'Even when children cannot explain it with words',
-    description: [
-      'Even when children cannot explain it with words, reactive environments deeply affect their nervous system and emotional world. Children may feel emotionally unsafe, confused, anxious, or constantly on edge without fully understanding why.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'My child seems confused by the emotional environment at home.',
-      'My child appears emotionally overwhelmed frequently.',
-      'My child seems scared or intimidated during reactive moments.',
-      'My child appears sad, anxious, or emotionally heavy.',
-      'My child struggles to feel emotionally safe expressing feelings.',
-      'My child seems unsure of what version of me they are going to get.',
-      'My child becomes hypervigilant to emotional tension.',
-      'My child struggles to relax fully around me.',
-    ],
-  },
-  {
-    group: 'co-micro',
-    title: '1. Micromanaging & Policing Dynamic',
-    subtitle: 'Common when one parent is reactive and the other feels emotionally responsible',
-    description: [
-      'In this dynamic, one parent feels they constantly need to \u201Cstep in\u201D to prevent emotional damage or escalation. The other parent often feels criticized, controlled, or undermined. Over time, both parents become emotionally exhausted.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'I frequently step in during my co-parent\u2019s interactions with the kids.',
-      'I feel responsible for keeping the emotional peace in the home.',
-      'I feel emotionally \u201Con\u201D all the time because I don\u2019t feel safe relaxing my guard.',
-      'I worry my co-parent\u2019s reactions may emotionally hurt or scare the kids.',
-      'I feel resentment building because I feel alone emotionally.',
-    ],
-  },
-  {
-    group: 'co-undermined',
-    title: '2. Feeling Undermined, Controlled, or \u201CNever Good Enough\u201D',
-    subtitle: 'Common for the reactive parent with a less reactive coparent',
-    description: [
-      'When one parent is frequently corrected, interrupted, or managed by the other parent, they may begin feeling criticized, disrespected, incapable, or emotionally unsafe themselves. Even if the other parent\u2019s intentions are protective, the reactive parent may experience deep shame, defensiveness, or anger.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'I feel like my co-parent doesn\u2019t trust me with the kids.',
-      'I feel corrected or micromanaged in front of the children.',
-      'I feel like I can never do parenting \u201Cright.\u201D',
-      'I feel defensive during parenting conversations.',
-      'I feel like my authority gets undermined in front of the kids.',
-      'I feel emotionally disconnected from my co-parent after parenting conflicts.',
-    ],
-  },
-  {
-    group: 'co-both',
-    title: '3. Reactive vs. Reactive Dynamic',
-    subtitle: 'When both parents become emotionally reactive',
-    description: [
-      'When both parents are dysregulated, the home can quickly become emotionally chaotic. One parent\u2019s reactivity activates the other parent\u2019s nervous system, and escalation spreads through the whole family system. Children often mirror and absorb this tension.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'When one parent escalates, the other parent escalates too.',
-      'Parenting conflicts quickly turn into arguments between co-parents.',
-      'We become reactive toward each other in front of the kids.',
-      'The emotional energy in the house feels tense or chaotic.',
-      'One parent tries to correct the other parent while also struggling with reactivity themselves.',
-      'We feel emotionally triggered by each other\u2019s parenting styles.',
-      'It feels like everyone in the house becomes emotionally reactive together.',
-      'Parenting creates conflict in our relationship.',
-    ],
-  },
-  {
-    group: 'co-shutdown',
-    title: '4. Shutdown / Stonewalling Dynamic',
-    subtitle: 'When one or both parents emotionally withdraw',
-    description: [
-      'Not all reactive homes are loud. Some reactive homes become emotionally disconnected, passive, or shut down. In these homes, parents may avoid conflict, structure, or emotional connection because they fear escalation or don\u2019t know how to guide behavior calmly. This may create a permissive, disconnected, or emotionally distant family dynamic.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'When parenting gets too much for me, I tend to pass my child to my coparent and leave the room.',
-      'I avoid intervening during my child\u2019s chaos to avoid conflict with my coparent.',
-      'I feel like my co-parent emotionally checks out, or I emotionally check out.',
-    ],
-  },
-  {
-    group: 'co-impact',
-    title: '5. Emotional Impact on the Relationship',
-    subtitle: 'Over time, reactive parenting patterns can slowly erode trust and teamwork',
-    description: [
-      'Many couples stop feeling like partners and begin feeling like they are surviving parenting separately.',
-    ],
-    subsectionLabel: 'This may look like',
-    items: [
-      'Parenting has created emotional distance between us.',
-      'We argue more about parenting than anything else.',
-      'We feel disconnected after parenting conflicts.',
-      'We rarely feel like a calm, connected team.',
-      'There is tension between us around parenting decisions.',
-      'We feel emotionally exhausted by parenting.',
-      'We feel like we speak different languages when it comes to parenting.',
-    ],
-  },
+const FIRECRACKER_ITEMS: CheckItem[] = [
+  { key: 'firecracker_1', text: '\u201CIt just happens so fast \u2014 I can\u2019t control it.\u201D' },
+  { key: 'firecracker_2', text: '\u201CI avoid getting angry because if I do, I know I can\u2019t control myself.\u201D' },
+  { key: 'firecracker_3', text: '\u201CI feel like my co-parent judges me or doesn\u2019t trust me.\u201D' },
+  { key: 'firecracker_4', text: '\u201CI feel like my kids don\u2019t believe my apologies anymore.\u201D' },
+  { key: 'firecracker_5', text: '\u201CI see my children are scared of me.\u201D' },
+  { key: 'firecracker_6', text: '\u201CMy coparent repeatedly tells me that I am being too harsh even when I feel I am not.\u201D' },
 ]
 
+const PRESSURE_COOKER_ITEMS: CheckItem[] = [
+  { key: 'pressure_cooker_1', text: '\u201CI don\u2019t want to lose it, but I can\u2019t keep holding it in.\u201D' },
+  { key: 'pressure_cooker_2', text: '\u201CI tell myself to stay calm, but my frustration increases.\u201D' },
+  { key: 'pressure_cooker_3', text: '\u201CI fake cool with my kids, but I am boiling inside.\u201D' },
+  { key: 'pressure_cooker_4', text: '\u201CBy the end of the day, I\u2019m emotionally exhausted and reactive.\u201D' },
+  { key: 'pressure_cooker_5', text: '\u201CI see my children look confused and don\u2019t trust me because one moment I am connected and calm, and the next moment I am reactive.\u201D' },
+]
+
+const STONEWALL_ITEMS: CheckItem[] = [
+  { key: 'stonewall_1', text: '\u201CMy partner is better with the kids than me, I\u2019ll have them take the wheel.\u201D' },
+  { key: 'stonewall_2', text: '\u201CAs long as the kids are happy, I\u2019m happy, so you give in even though you know you should set a limit.\u201D' },
+  { key: 'stonewall_3', text: '\u201CYou emotionally check out. You are physically present but not emotionally present.\u201D' },
+  { key: 'stonewall_4', text: '\u201CYou feel permissive and don\u2019t like it.\u201D' },
+  { key: 'stonewall_5', text: '\u201CMy partner feels like they are alone in handling the children\u2019s behaviors.\u201D' },
+  { key: 'stonewall_6', text: '\u201CIt seems my children can do whatever they want, and they don\u2019t see me in authority.\u201D' },
+]
+
+const MIRRORING_ITEMS: CheckItem[] = [
+  { key: 'mirroring_1', text: 'My child becomes reactive, explosive, or emotionally intense with siblings.' },
+  { key: 'mirroring_2', text: 'My child talks to others with the same tone, attitude, or reactivity they experience at home.' },
+  { key: 'mirroring_3', text: 'My child becomes more reactive with me when I become reactive with them.' },
+  { key: 'mirroring_4', text: 'My child has received behavioral complaints at school, daycare, activities, or with peers.' },
+  { key: 'mirroring_5', text: 'My child mirrors emotional dysregulation with pets, siblings, or other children.' },
+  { key: 'mirroring_6', text: 'My child escalates emotionally instead of calming down during conflict.' },
+]
+
+const DESENSITIZATION_ITEMS: CheckItem[] = [
+  { key: 'desensitization_1', text: 'My child does not respond until I raise my voice or become emotionally intense.' },
+  { key: 'desensitization_2', text: 'I often feel like my child \u201Conly listens when I yell.\u201D' },
+  { key: 'desensitization_3', text: 'Calm communication often gets ignored in our home.' },
+  { key: 'desensitization_4', text: 'I notice myself escalating more and more just to get cooperation.' },
+  { key: 'desensitization_5', text: 'My child seems emotionally \u201Cused to\u201D yelling, threats, or reactive energy.' },
+  { key: 'desensitization_6', text: 'It feels like the emotional intensity in our home keeps increasing over time.' },
+]
+
+const POKING_ITEMS: CheckItem[] = [
+  { key: 'poking_1', text: 'My child seems to provoke reactions intentionally in siblings.' },
+  { key: 'poking_2', text: 'It feels like my child keeps \u201Cpushing my buttons.\u201D' },
+  { key: 'poking_3', text: 'My child knows the boundary, and does the opposite even after redirection.' },
+  { key: 'poking_4', text: 'After redirection, my child looks at me, smiles or smirks, and keeps doing the opposite.' },
+]
+
+const SCANNING_ITEMS: CheckItem[] = [
+  { key: 'scanning_1', text: 'My child frequently asks: \u201CAre you mad?\u201D \u201CAre you angry?\u201D \u201CAre you okay?\u201D \u201CAre you upset with me?\u201D \u201CDon\u2019t be angry, but I did\u2026\u201D' },
+  { key: 'scanning_2', text: 'My child changes their behavior depending on my emotional state.' },
+  { key: 'scanning_3', text: 'My child becomes hyper-aware of my moods, tone, facial expressions, or energy.' },
+  { key: 'scanning_4', text: 'My child tries to keep everyone happy or peaceful.' },
+  { key: 'scanning_5', text: 'My child acts overly funny, silly, playful, or \u201Con\u201D when tension is present.' },
+  { key: 'scanning_6', text: 'My child seems emotionally responsible for managing other people\u2019s feelings.' },
+]
+
+const SHUTDOWN_ITEMS: CheckItem[] = [
+  { key: 'shutdown_1', text: 'My child struggles to open up emotionally.' },
+  { key: 'shutdown_2', text: 'My child hides feelings, mistakes, or struggles.' },
+  { key: 'shutdown_3', text: 'My child emotionally shuts down during conflict.' },
+  { key: 'shutdown_4', text: 'My child avoids talking about emotions.' },
+  { key: 'shutdown_5', text: 'My child becomes quiet, withdrawn, or disconnected after reactive moments.' },
+  { key: 'shutdown_6', text: 'I feel like there is growing emotional distance between me and my child.' },
+]
+
+const POLICING_ITEMS: CheckItem[] = [
+  { key: 'policing_1', text: 'One of us often steps in during difficult parenting moments.' },
+  { key: 'policing_2', text: 'One of us feels criticized or undermined by the other.' },
+  { key: 'policing_3', text: 'We\u2019ve had conversations about \u201Cnot stepping in,\u201D but it keeps happening.' },
+  { key: 'policing_4', text: 'Our children have seen us disagree in the middle of discipline.' },
+  { key: 'policing_5', text: 'We both want to lead with safety, but we both have different concepts of what that is.' },
+]
+const POLICING_TRIED_ITEMS: CheckItem[] = [
+  { key: 'policing_tried_1', text: 'Agreement to be calmer with the kids.' },
+  { key: 'policing_tried_2', text: 'Agreeing not to interrupt each other.' },
+  { key: 'policing_tried_3', text: 'Agreement to keep all co-parenting disagreements private.' },
+]
+
+const UNEVEN_LOAD_ITEMS: CheckItem[] = [
+  { key: 'uneven_load_1', text: 'One of us carries most of the parenting and emotional load.' },
+  { key: 'uneven_load_2', text: 'One of us feels like the disciplinarian while the other one is the fun parent.' },
+  { key: 'uneven_load_3', text: 'The less involved parent wants to parent but feels incapable of meeting the other parent\u2019s expectations.' },
+  { key: 'uneven_load_4', text: 'During meltdowns or sibling fights, one parent naturally takes over.' },
+  { key: 'uneven_load_5', text: 'We\u2019ve divided responsibilities before, but we fall back into the same roles during conflict.' },
+  { key: 'uneven_load_6', text: 'If one of the children becomes reactive, the less involved parent quickly gives up and hands it over to the co-parent.' },
+]
+const UNEVEN_LOAD_TRIED_ITEMS: CheckItem[] = [
+  { key: 'uneven_load_tried_1', text: 'Dividing parenting responsibilities.' },
+  { key: 'uneven_load_tried_2', text: 'Agreements on teaming up in child discipline.' },
+]
+
+const DOMINO_ITEMS: CheckItem[] = [
+  { key: 'domino_1', text: 'When one of us gets overwhelmed, the other quickly does too.' },
+  { key: 'domino_2', text: 'We both become emotionally intense with the kids during conflict.' },
+  { key: 'domino_3', text: 'We\u2019ve reminded each other to \u201Cstay calm,\u201D but it rarely works.' },
+  { key: 'domino_4', text: 'Afterward, we wonder how things got so out of control.' },
+]
+const DOMINO_TRIED_ITEMS: CheckItem[] = [
+  { key: 'domino_tried_1', text: 'Trying harder to stay calm.' },
+  { key: 'domino_tried_2', text: 'Agreements to tag each other out.' },
+]
+
+/* Flat map of all checkbox items for submit */
+const ALL_ITEMS: CheckItem[] = [
+  ...FIRECRACKER_ITEMS, ...PRESSURE_COOKER_ITEMS, ...STONEWALL_ITEMS,
+  ...MIRRORING_ITEMS, ...DESENSITIZATION_ITEMS, ...POKING_ITEMS,
+  ...SCANNING_ITEMS, ...SHUTDOWN_ITEMS,
+  ...POLICING_ITEMS, ...POLICING_TRIED_ITEMS,
+  ...UNEVEN_LOAD_ITEMS, ...UNEVEN_LOAD_TRIED_ITEMS,
+  ...DOMINO_ITEMS, ...DOMINO_TRIED_ITEMS,
+]
+const ITEMS_MAP: Record<string, string> = Object.fromEntries(
+  ALL_ITEMS.map((i) => [i.key, i.text])
+)
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                         */
+/* ------------------------------------------------------------------ */
 
 export default function ChecklistPage() {
-  const [checked, setChecked] = useState<Record<string, boolean[]>>(() => {
-    const init: Record<string, boolean[]> = {}
-    SECTIONS.forEach((s) => {
-      init[s.group] = new Array(s.items.length).fill(false)
-    })
-    return init
-  })
-
-  const toggle = useCallback((group: string, idx: number) => {
-    setChecked((prev) => {
-      const next = { ...prev }
-      next[group] = [...prev[group]]
-      next[group][idx] = !next[group][idx]
-      return next
-    })
-  }, [])
-
+  const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  const getGroupCount = useCallback(
-    (group: string) => checked[group]?.filter(Boolean).length ?? 0,
-    [checked]
-  )
+  const toggle = useCallback((key: string) => {
+    setChecked((prev) => ({ ...prev, [key]: !prev[key] }))
+  }, [])
 
   const buildCheckedItems = useCallback(() => {
-    const result: Record<string, string[]> = {}
-    SECTIONS.forEach((s) => {
-      result[s.group] = s.items.filter((_, i) => checked[s.group]?.[i])
-    })
+    const result: Record<string, string> = {}
+    for (const [key, val] of Object.entries(checked)) {
+      if (val) result[key] = ITEMS_MAP[key]
+    }
     return result
   }, [checked])
 
@@ -339,7 +172,7 @@ export default function ChecklistPage() {
         })
         if (!res.ok) throw new Error('Submission failed')
         setSubmitted(true)
-        window.print()
+        window.location.href = 'https://enroll.hicparenting.com/confirmation-page'
       } catch {
         alert('Something went wrong. Please try again.')
       } finally {
@@ -362,70 +195,25 @@ export default function ChecklistPage() {
     return () => window.removeEventListener('scroll', handler)
   }, [])
 
-  const part1Groups = ['firecracker', 'cooker', 'stonewall']
-  const part2Groups = [
-    'child-mirroring',
-    'child-desensitization',
-    'child-poking',
-    'child-scanning',
-    'child-shutdown',
-    'child-impact',
-  ]
-  const part3Groups = [
-    'co-micro',
-    'co-undermined',
-    'co-both',
-    'co-shutdown',
-    'co-impact',
-  ]
-
-  const renderSection = (section: CheckSection) => (
-    <div className="card" key={section.group}>
-      <div className="card-header">
-        <div className="card-header-top">
-          <div>
-            {section.tag && <div className="section-tag">{section.tag}</div>}
-            <h2>
-              {section.emoji && (
-                <span className="emoji">{section.emoji}</span>
-              )}
-              {section.title}
-            </h2>
-            <div className="subtitle">{section.subtitle}</div>
-          </div>
-          {section.tag && (
-            <div className="counter-chip">
-              {getGroupCount(section.group)} checked
+  /* Render helpers */
+  const renderCheckItems = (items: CheckItem[]) => (
+    <ul className="check-list">
+      {items.map((item) => {
+        const isChecked = checked[item.key] ?? false
+        return (
+          <li
+            key={item.key}
+            className={`check-item${isChecked ? ' checked' : ''}`}
+            onClick={() => toggle(item.key)}
+          >
+            <div className="custom-check">
+              <span className="check-icon">{'\u2713'}</span>
             </div>
-          )}
-        </div>
-      </div>
-      <div className="card-body">
-        <div className="description-block">
-          {section.description.map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-        </div>
-        <div className="subsection-label">{section.subsectionLabel}</div>
-        <ul className="check-list">
-          {section.items.map((item, i) => {
-            const isChecked = checked[section.group]?.[i] ?? false
-            return (
-              <li
-                key={i}
-                className={`check-item${isChecked ? ' checked' : ''}`}
-                onClick={() => toggle(section.group, i)}
-              >
-                <div className="custom-check">
-                  <span className="check-icon">{'\u2713'}</span>
-                </div>
-                <span className="check-label">{item}</span>
-              </li>
-            )
-          })}
-        </ul>
-      </div>
-    </div>
+            <span className="check-label">{item.text}</span>
+          </li>
+        )
+      })}
+    </ul>
   )
 
   return (
@@ -454,116 +242,579 @@ export default function ChecklistPage() {
           <h1>Discover Your Reactivity Type</h1>
           <p>
             Hi there, parent! {'\uD83D\uDC4B'} Please complete the following
-            checklist to discover your particular reactive type before your
-            call.
+            checklist and submit the answers so our team can prepare for our
+            upcoming call.
           </p>
           <p>
-            This is an important step to make the best out of our time
-            together.
+            HIC Parenting is a parenting coaching agency with the mission of
+            helping reactive parents become secure parents by developing 3 core
+            secure parenting skills.
           </p>
-          <div className="stat-badge">
-            {'\u2728'} Helping 14,151 parents become secure parents
-          </div>
         </div>
 
         {/* 3 SKILLS */}
         <div className="skills-box">
-          <h3>The 3 Skills of a Secure Parent</h3>
+          <h3>The 3 Skills</h3>
           <div className="skill-item">
             <div className="skill-num">1</div>
             <p>
-              <strong>Emotional Regulation:</strong> It is not about not
-              getting angry or taking deep breaths. It{'\u2019'}s knowing what
-              to do with anger, frustration, overwhelm, and other emotions
-              and processing them safely while parenting your children.
+              <strong>Emotional Regulation:</strong> It is not about not getting
+              angry or taking deep breaths. It{'\u2019'}s knowing what to do with
+              anger, frustration, overwhelm, and other emotions and processing
+              them safely while parenting your children.
             </p>
           </div>
           <div className="skill-item">
             <div className="skill-num">2</div>
             <p>
-              <strong>Mindsight:</strong> It is not trying to speak kindly to
-              your children, but to have a full understanding of their needs
-              and speak to them in a way they understand and follow.
+              <strong>Mindsight:</strong> It is not trying to speak kindly to your
+              children, but to have a full understanding of their needs and speak
+              to them in a way they understand and follow.
             </p>
           </div>
           <div className="skill-item">
             <div className="skill-num">3</div>
             <p>
-              <strong>Positive Discipline:</strong> It{'\u2019'}s not about
-              raising your voice, repeating the same instruction, or
-              threatening them with losing electronics. It{'\u2019'}s about
-              developing their skills so they have the ability to follow
-              through and make better decisions.
+              <strong>Positive Discipline:</strong> It{'\u2019'}s not about raising
+              your voice, repeating the same instruction, or threatening them with
+              losing electronics. It{'\u2019'}s about developing their skills so
+              they have the ability to follow through and make better decisions.
             </p>
           </div>
         </div>
 
+        {/* INTRO TEXT */}
+        <div className="info-text-block">
+          <p>
+            Over the years, we{'\u2019'}ve discovered that most parents fall into
+            one of three Reactive types when things get tough.
+          </p>
+          <p>
+            This checklist will help you notice which one shows up for you (and
+            for your partner, too).
+          </p>
+          <p>
+            {'\u2728'}{' '}
+            <em>
+              There are no right or wrong answers {'\u2014'} just awareness and
+              growth.
+            </em>
+          </p>
+        </div>
+
         {/* INSTRUCTIONS */}
         <div className="instructions no-print">
+          <p>
+            <strong>Ready to reflect?</strong>
+          </p>
           <p>{'\u2705'} Check all the boxes that resonate with you.</p>
           <p>{'\u2705'} Ask your partner to do the same.</p>
           <p>
             {'\u2705'} Bring your results to your Free 1:1 Session {'\u2014'}{' '}
             we{'\u2019'}ll explore what this means for your family together.
           </p>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 1 — THE FIRECRACKER PATTERN                          */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>
+              <span className="emoji">{'\uD83D\uDD25'}</span> 1. The Firecracker
+              or Fire Alarm Pattern
+            </h2>
+            <div className="subtitle">Impulse reactivity</div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                You react quickly when triggered {'\u2014'} maybe you yell, snap,
+                or say something you don{'\u2019'}t mean, and then feel guilty
+                afterward.
+              </p>
+              <p>
+                Even though you know what to do, in the heat of the moment, it
+                feels impossible to stay calm.
+              </p>
+              <p>
+                This is an impulsive reactive pattern that occurs when the nervous
+                system escalates quickly, and the parent lacks the skills to
+                prevent the escalation or the body awareness to notice early signs
+                of nervous system dysregulation.
+              </p>
+            </div>
+            <div className="subsection-label">
+              Please check the statements you relate to. You might notice yourself
+              thinking or feeling:
+            </div>
+            {renderCheckItems(FIRECRACKER_ITEMS)}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 2 — THE PRESSURE COOKER PATTERN                      */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>
+              <span className="emoji">{'\uD83D\uDCA8'}</span> 2. The Pressure
+              Cooker Pattern
+            </h2>
+            <div className="subtitle">Suppressive Reactivity</div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                When everything builds up inside, you try hard to stay calm
+                {'\u2014'} you hold, and hold, and hold{'\u2026'} until suddenly,
+                you can{'\u2019'}t do it anymore, and you react with snapping,
+                yelling, saying hurtful things, or spanking.
+              </p>
+              <p>
+                You start the day patient and positive, but stress builds, and at
+                some point, it overflows.
+              </p>
+              <p>
+                This is a suppression-reactive pattern that occurs when the parent
+                dismisses or suppresses their own dysregulation or anger. The
+                escalation builds up until it overflows like a pressure cooker with
+                no valve.
+              </p>
+            </div>
+            <div className="subsection-label">
+              You might notice yourself thinking or feeling:
+            </div>
+            {renderCheckItems(PRESSURE_COOKER_ITEMS)}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 3 — THE STONEWALL PARENT                             */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>
+              <span className="emoji">{'\uD83E\uDDCA'}</span> 3. The Stonewall
+              Parent
+            </h2>
+            <div className="subtitle">Passive-Aggressive Reactivity</div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>When you shut down or check out.</p>
+              <p>
+                You don{'\u2019'}t yell {'\u2014'} instead, you disconnect or shut
+                down. You might stay quiet, walk away, or emotionally {'\u201C'}
+                tune out.{'\u201D'} Sometimes you give in just to keep the peace
+                or hand things over to your partner when it{'\u2019'}s too much.
+              </p>
+              <p>
+                This is a quiet reactive pattern. This is a hidden type of
+                reactivity because the parent is not visibly reactive or upset.
+                According to science, this is the highest form of nervous system
+                dysregulation, and it happens when the parent feels helpless and
+                unable to respond.
+              </p>
+            </div>
+            <div className="subsection-label">
+              Please check the statements you relate to the most. You might notice
+              yourself thinking or feeling:
+            </div>
+            {renderCheckItems(STONEWALL_ITEMS)}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* EMOTIONAL IMPACT ON CHILDREN — INTRO                         */}
+        {/* ============================================================ */}
+        <div className="big-divider">Emotional Impact of Reactivity on Children</div>
+        <div className="info-text-block">
+          <p>Reactive parenting not only affects behavior in the moment.</p>
           <p>
-            {'\u2728'}{' '}
-            <em>
-              There are no right or wrong answers {'\u2014'} just awareness
-              and growth.
-            </em>
+            Over time, children adapt to the emotional environment in which they
+            grow up. Sometimes the effects are loud and obvious. Sometimes they
+            are quiet and hidden underneath the surface.
+          </p>
+          <p>
+            This checklist is not about guilt or shame. It is about awareness.
+          </p>
+          <p>
+            Because when parents understand how reactivity impacts children
+            emotionally, behaviorally, and relationally, they are able to break
+            reactive cycles and create a more peaceful, secure family dynamic.
+          </p>
+          <p>
+            <strong>
+              Please check the ones you have noticed in your child(ren):
+            </strong>
           </p>
         </div>
 
-        {/* PART 1 */}
-        <div className="big-divider">Part 1 {'\u00B7'} Your Reactivity Type</div>
-        {SECTIONS.filter((s) => part1Groups.includes(s.group)).map(
-          renderSection
-        )}
-
-        {/* PART 2 */}
-        <div className="big-divider">
-          Part 2 {'\u00B7'} Emotional Impact on Children
+        {/* ============================================================ */}
+        {/* SECTION 4 — MIRRORING BEHAVIORS                              */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>1. Mirroring Behaviors</h2>
+            <div className="subtitle">
+              Children learn emotional regulation by watching us
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                When children grow up around frequent reactivity, yelling,
+                emotional overwhelm, or dysregulation, they often mirror the same
+                behaviors because that becomes their model for handling stress and
+                emotions.
+              </p>
+            </div>
+            <div className="subsection-label">This may look like</div>
+            {renderCheckItems(MIRRORING_ITEMS)}
+          </div>
         </div>
-        <p
-          style={{
-            textAlign: 'center',
-            color: 'var(--muted)',
-            fontSize: '0.9rem',
-            marginBottom: 28,
-            marginTop: -12,
-          }}
-        >
-          Reactive parenting not only affects behavior in the moment. This
-          checklist is not about guilt or shame {'\u2014'} it is about
-          awareness.
-        </p>
-        {SECTIONS.filter((s) => part2Groups.includes(s.group)).map(
-          renderSection
-        )}
 
-        {/* PART 3 */}
-        <div className="big-divider">
-          Part 3 {'\u00B7'} Impact on Co-Parenting Dynamic
+        {/* ============================================================ */}
+        {/* SECTION 5 — DESENSITIZATION TO REACTIVITY                    */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>2. Desensitization to Reactivity</h2>
+            <div className="subtitle">
+              Children in reactive homes can become emotionally desensitized to
+              calm communication
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                It{'\u2019'}s kind of like living next to a train track: at first,
+                every train feels loud, but over time, the nervous system adapts
+                and only reacts to the REALLY loud trains. Children can become so
+                used to emotional intensity that calm requests no longer feel
+                urgent to their nervous system.
+              </p>
+            </div>
+            <div className="subsection-label">This may look like</div>
+            {renderCheckItems(DESENSITIZATION_ITEMS)}
+          </div>
         </div>
-        <p
-          style={{
-            textAlign: 'center',
-            color: 'var(--muted)',
-            fontSize: '0.9rem',
-            marginBottom: 28,
-            marginTop: -12,
-          }}
-        >
-          Reactive patterns also deeply affect the relationship between
-          co-parents. This is not about blame {'\u2014'} it is about
-          awareness.
-        </p>
-        {SECTIONS.filter((s) => part3Groups.includes(s.group)).map(
-          renderSection
-        )}
 
-        {/* SUBMIT FORM */}
+        {/* ============================================================ */}
+        {/* SECTION 6 — "POKING THE BEAR" BEHAVIORS                      */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>3. {'\u201C'}Poking the Bear{'\u201D'} Behaviors</h2>
+            <div className="subtitle">
+              Testing, provoking, or pushing limits constantly
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                Some children begin testing, provoking, or pushing limits
+                constantly. Not always because they want conflict{'\u2026'} but
+                waiting for the explosion can feel emotionally nerve-wracking and
+                unpredictable. So their nervous system would rather {'\u201C'}get
+                the reaction over with now{'\u201D'} than stay anxiously waiting
+                for it later.
+              </p>
+            </div>
+            <div className="subsection-label">This may look like</div>
+            {renderCheckItems(POKING_ITEMS)}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 7 — EMOTIONAL SCANNING BEHAVIORS                     */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>4. Emotional Scanning Behaviors</h2>
+            <div className="subtitle">
+              Hyper-aware of parents{'\u2019'} moods and emotional safety
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                Children naturally scan their parents for emotional safety. But in
+                reactive homes, some children become hyper-aware of the parents
+                {'\u2019'} moods, tone, energy, or facial expressions because
+                their nervous system is trying to predict emotional danger and stay
+                safe. Some children become people-pleasers. Others become {'\u201C'}
+                funny,{'\u201D'} overly playful, or highly accommodating to try to
+                keep the peace.
+              </p>
+            </div>
+            <div className="subsection-label">This may look like</div>
+            {renderCheckItems(SCANNING_ITEMS)}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 8 — SHUTDOWN & EMOTIONAL DISCONNECTION               */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>5. Shutdown & Emotional Disconnection</h2>
+            <div className="subtitle">
+              Children protecting themselves by emotionally withdrawing
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>Some children do not become louder.</p>
+              <p>
+                Children may begin disconnecting emotionally to protect themselves.
+                Over time, this can create emotional distance between parents and
+                children.
+              </p>
+            </div>
+            <div className="subsection-label">This may look like</div>
+            {renderCheckItems(SHUTDOWN_ITEMS)}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* CO-PARENTING DYNAMIC — INTRO                                 */}
+        {/* ============================================================ */}
+        <div className="big-divider">
+          Impact of Reactive Patterns on the Co-Parenting Dynamic
+        </div>
+        <div className="info-text-block">
+          <p>Reactive parenting not only affects children.</p>
+          <p>
+            Over time, reactive patterns also deeply affect the relationship
+            between co-parents. Many couples slowly stop feeling like a team and
+            begin operating from: survival mode, tension, resentment, emotional
+            exhaustion, micromanaging, shutdown, or emotional disconnection.
+          </p>
+          <p>
+            This checklist is designed to help you recognize how reactive patterns
+            may already be affecting your co-parenting relationship. This is not
+            about blame. It is about awareness.
+          </p>
+          <p>
+            <strong>Please check the ones you relate to most.</strong>
+          </p>
+        </div>
+
+        <div className="info-text-block" style={{ marginBottom: 8 }}>
+          <h3
+            style={{
+              fontFamily: "'Lora', serif",
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              color: 'var(--blue)',
+              marginBottom: 10,
+            }}
+          >
+            Which Co-Parenting Dynamic Feels Most Like Your Family?
+          </h3>
+          <p>
+            Most couples don{'\u2019'}t have a communication problem. They have a
+            repeating co-parenting dynamic rooted in poor emotional safety and
+            underdeveloped skills to understand each other{'\u2019'}s needs,
+            regulate emotions, and lead securely.
+          </p>
+          <p>
+            Read through the three most common dynamics below and check the one
+            that feels most like your family today.
+          </p>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 9 — THE POLICING DYNAMIC                             */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>
+              <span className="emoji">{'\uD83D\uDEA8'}</span> The Policing
+              Dynamic
+            </h2>
+            <div className="subtitle">
+              {'\u201C'}I feel like I have to step in.{'\u201D'}
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                One parent sees the other becoming emotionally reactive with the
+                children and steps in to protect them. The other parent feels
+                criticized, undermined, or disrespected. Both parents love their
+                children deeply{'\u2014'}but they keep repeating the same pattern.
+              </p>
+            </div>
+            <div className="subsection-label">
+              {'\u2714'} This sounds like us...
+            </div>
+            {renderCheckItems(POLICING_ITEMS)}
+            <div className="subsection-label">We have tried this before:</div>
+            {renderCheckItems(POLICING_TRIED_ITEMS)}
+            <div className="why-block">
+              <strong>Why it doesn{'\u2019'}t work</strong>
+              <p>
+                When one parent{'\u2019'}s nervous system senses emotional danger,
+                protecting the child feels more urgent than honoring the agreement.
+                This isn{'\u2019'}t a communication problem; it{'\u2019'}s a
+                nervous system problem solved by developing secure parenting skills
+                so both parents feel emotionally safe with each other{'\u2019'}s
+                parenting or communication.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 10 — THE UNEVEN LOAD DYNAMIC                         */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>
+              <span className="emoji">{'\u2696\uFE0F'}</span> The Uneven Load
+              Dynamic
+            </h2>
+            <div className="subtitle">
+              {'\u201C'}I feel like I{'\u2019'}m carrying parenting alone.{'\u201D'}
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                One parent becomes the emotional leader of the family while the
+                other stays in the background{'\u2014'}not because they don
+                {'\u2019'}t care, but because they don{'\u2019'}t feel confident
+                stepping into difficult parenting moments, or when they have tried,
+                things tend to escalate from there.
+              </p>
+            </div>
+            <div className="subsection-label">
+              {'\u2714'} This sounds like us...
+            </div>
+            {renderCheckItems(UNEVEN_LOAD_ITEMS)}
+            <div className="subsection-label">We have tried this before:</div>
+            {renderCheckItems(UNEVEN_LOAD_TRIED_ITEMS)}
+            <div className="why-block">
+              <strong>Why it doesn{'\u2019'}t work</strong>
+              <p>
+                The issue isn{'\u2019'}t who packs lunches, does bedtime, or gets
+                involved in discipline. The pattern appears when emotions run high
+                because one parent doesn{'\u2019'}t yet feel emotionally safe or
+                equipped to lead through conflict, so they disengage. This is not
+                solved with another conversation but with developing secure
+                parenting skills to feel capable of leading your family in a secure
+                way when emotions run high.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 11 — THE DOMINO EFFECT DYNAMIC                       */}
+        {/* ============================================================ */}
+        <div className="card">
+          <div className="card-header">
+            <h2>
+              <span className="emoji">{'\uD83C\uDFB2'}</span> The Domino Effect
+              Dynamic
+            </h2>
+            <div className="subtitle">
+              {'\u201C'}When the calmer parent falls, everyone follows.{'\u201D'}
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="description-block">
+              <p>
+                Both parents deeply care about each other. But when one becomes
+                emotionally activated, the other joins the chaos in attempts to
+                help the co-parent instead of regulating the situation. Before long,
+                both parents are emotionally intense with the children, and the
+                whole family escalates together.
+              </p>
+            </div>
+            <div className="subsection-label">
+              {'\u2714'} This sounds like us...
+            </div>
+            {renderCheckItems(DOMINO_ITEMS)}
+            <div className="subsection-label">We have tried this before:</div>
+            {renderCheckItems(DOMINO_TRIED_ITEMS)}
+            <div className="why-block">
+              <strong>Why it doesn{'\u2019'}t work</strong>
+              <p>
+                When neither parent knows how to regulate themselves{'\u2014'}or
+                each other{'\u2014'}the child{'\u2019'}s emotions quickly overwhelm
+                the whole family. This isn{'\u2019'}t about trying harder or having
+                another conversation; it{'\u2019'}s about developing skills to
+                remain secure parents when dysregulation happens.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* WHAT ACTUALLY CHANGES REACTIVE PATTERNS                      */}
+        {/* ============================================================ */}
+        <div className="what-changes-box">
+          <h2>{'\uD83D\uDC99'} What Actually Changes Reactive Patterns?</h2>
+          <p>Most parents believe they need:</p>
+          <ul className="myth-list">
+            <li>{'\u274C'} More help on division of tasks among coparents</li>
+            <li>{'\u274C'} Better agreements</li>
+            <li>{'\u274C'} More parenting information</li>
+            <li>{'\u274C'} More patience</li>
+            <li>{'\u274C'} A vacation or less busy schedules</li>
+            <li>
+              {'\u274C'} To wait until the kids grow up (Reactivity travels
+              developmental stages AND generations)
+            </li>
+          </ul>
+          <p>
+            Those things help when everyone is calm, but not when emotions run
+            high.
+          </p>
+          <h3>What Makes Reactive Parents Become Secure Parents:</h3>
+          <p>
+            Reactive parents become secure parents when they integrate 3 Secure
+            Parenting Skills.
+          </p>
+          <p>
+            <strong>The Head, Heart, and Hands of a Secure Parent:</strong>
+          </p>
+          <div className="skill-item">
+            <div className="skill-num">{'\uD83E\uDDE0'}</div>
+            <p>
+              <strong>The Head. The Skill of Mindsight:</strong> It is not trying
+              to speak kindly to your children, but to have a full understanding of
+              their needs and speak to them in a way they understand and follow.
+            </p>
+          </div>
+          <div className="skill-item">
+            <div className="skill-num">{'\uD83D\uDC99'}</div>
+            <p>
+              <strong>The Heart. Emotional Regulation:</strong> It is not about not
+              getting angry or taking deep breaths. It{'\u2019'}s knowing what to
+              do with anger, frustration, overwhelm, and other emotions and
+              processing them safely while parenting your children.
+            </p>
+          </div>
+          <div className="skill-item">
+            <div className="skill-num">{'\uD83E\uDEF6'}</div>
+            <p>
+              <strong>The Hands. The Skill of Positive Discipline:</strong> It
+              {'\u2019'}s not about raising your voice, repeating the same
+              instruction, or threatening them with losing electronics. It{'\u2019'}
+              s about developing their skills so they have the ability to follow
+              through and make better decisions.
+            </p>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* SUBMIT FORM                                                  */}
+        {/* ============================================================ */}
         <div className="card no-print" style={{ marginTop: 36 }}>
           <div className="card-header">
             <h2>Save Your Results</h2>
@@ -605,39 +856,43 @@ export default function ChecklistPage() {
                 style={{ opacity: submitting ? 0.6 : 1 }}
               >
                 {submitted
-                  ? '\u2705 Saved!'
+                  ? '\u2705 Submitted!'
                   : submitting
-                    ? 'Saving...'
-                    : '\uD83D\uDDA8\uFE0F Save & Print My Results'}
+                    ? 'Submitting...'
+                    : 'Submit My Results'}
               </button>
             </form>
           </div>
         </div>
 
-        {/* REFLECTION */}
+        {/* ============================================================ */}
+        {/* REFLECTION                                                   */}
+        {/* ============================================================ */}
         <div className="reflection-box">
           <h2>Reflection</h2>
           <p>
             If you checked several of these boxes, it does{' '}
-            <strong>NOT</strong> mean your family is broken. It means your
-            family system may be stuck in reactivity patterns.
+            <strong>NOT</strong> mean your family is broken. It means your family
+            system may be stuck in reactivity patterns.
           </p>
           <div className="highlight">
             <strong>What to expect from your session with us:</strong>
             <br />
-            You will get a nuanced awareness of your particular dynamic, you
-            will get clear on what you want moving forward in your parenting,
-            and you will hear our recommendation based on your needs. At the
-            end of the session, if you believe private coaching is what you
-            need moving forward, let us know, and with your permission, we
-            will share with you how we help parents in coaching, and you
-            {'\u2019'}ll make an enrollment decision.
+            You will get a nuanced awareness of your particular dynamic; you will
+            get clear on what you want moving forward in your parenting, and you
+            will hear our recommendation based on your needs.
+            <br />
+            <br />
+            At the end of the session, if you believe private coaching is what you
+            need moving forward, let us know, and with your permission, we will
+            share with you how we help parents in coaching, and you{'\u2019'}ll
+            make an enrollment decision.
             <br />
             <br />
             <em>
               Coaching processes usually take months, and the level of support
-              varies based on your needs. Most of our coaching options are in
-              the low-thousands range USD.
+              varies based on your needs. Most of our coaching options are in the
+              low-thousands range USD.
             </em>
           </div>
         </div>
@@ -645,6 +900,10 @@ export default function ChecklistPage() {
     </>
   )
 }
+
+/* ------------------------------------------------------------------ */
+/*  Styles                                                            */
+/* ------------------------------------------------------------------ */
 
 const pageStyles = `
   :root {
@@ -739,17 +998,6 @@ const pageStyles = `
     margin: 0 auto 12px;
   }
 
-  .stat-badge {
-    display: inline-block;
-    background: linear-gradient(135deg, var(--orange), #e8902a);
-    color: white;
-    font-weight: 700;
-    font-size: 0.9rem;
-    padding: 8px 20px;
-    border-radius: 50px;
-    margin-top: 14px;
-  }
-
   .skills-box {
     background: linear-gradient(135deg, #EBF2FA, #FDF6E8);
     border: 1px solid var(--border);
@@ -792,6 +1040,19 @@ const pageStyles = `
 
   .skill-item strong { color: var(--blue); }
 
+  .info-text-block {
+    background: white;
+    border-radius: 14px;
+    padding: 22px 28px;
+    margin-bottom: 28px;
+    font-size: 0.93rem;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .info-text-block p { margin-bottom: 10px; }
+  .info-text-block p:last-child { margin-bottom: 0; }
+
   .instructions {
     background: #F0F7FF;
     border-left: 4px solid var(--blue);
@@ -816,16 +1077,6 @@ const pageStyles = `
   .card-header {
     padding: 22px 28px 18px;
     border-bottom: 1px solid var(--border);
-  }
-
-  .section-tag {
-    display: inline-block;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 6px;
   }
 
   .card-header h2 {
@@ -936,27 +1187,6 @@ const pageStyles = `
     font-weight: 500;
   }
 
-  .counter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--blue);
-    background: #EBF2FA;
-    padding: 4px 12px;
-    border-radius: 20px;
-    margin-left: auto;
-  }
-
-  .card-header-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
   .big-divider {
     text-align: center;
     font-family: 'Lora', serif;
@@ -975,6 +1205,69 @@ const pageStyles = `
     background: var(--orange);
     margin: 0 auto 16px;
     border-radius: 2px;
+  }
+
+  .why-block {
+    background: #FFF9F0;
+    border-left: 3px solid var(--orange);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    margin-top: 20px;
+    font-size: 0.9rem;
+  }
+
+  .why-block strong {
+    display: block;
+    color: var(--dark);
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+  }
+
+  .why-block p {
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .what-changes-box {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 28px;
+    margin-top: 36px;
+  }
+
+  .what-changes-box h2 {
+    font-family: 'Lora', serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 16px;
+  }
+
+  .what-changes-box h3 {
+    font-family: 'Lora', serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--blue);
+    margin: 20px 0 10px;
+  }
+
+  .what-changes-box p {
+    font-size: 0.93rem;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .myth-list {
+    list-style: none;
+    margin: 12px 0 16px;
+    padding: 0;
+  }
+
+  .myth-list li {
+    font-size: 0.93rem;
+    color: var(--text);
+    padding: 4px 0;
   }
 
   .reflection-box {

@@ -90,7 +90,8 @@
       "Bash(/dev/null source:*)",
       "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *.sql -o -name *.prisma \\\\\\))",
       "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *.json -o -name *.ts \\\\\\) -path *supabase*)",
-      "Bash(echo \"$file\")"
+      "Bash(echo \"$file\")",
+      "Bash(find /Users/federicoalarconu/hic-dashboard -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.sql \\\\\\) -path *checklist*)"
     ]
   }
 }
