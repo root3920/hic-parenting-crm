@@ -187,6 +187,7 @@ export default function SurveysPage() {
   const CALENDAR_OPTIONS = [
     'Free Coaching Session', 'VCT', 'VCT_MT', 'Interview', 'Use Class',
     'Spanish', 'Stop Reaction', 'Marcela', 'Jessica', 'Valentina', 'Juan Diego',
+    'Coparenting Coaching Session',
   ]
 
   useEffect(() => {

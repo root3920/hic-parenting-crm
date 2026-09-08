@@ -134,6 +134,7 @@ const CALENDAR_MAP: Record<string, string> = {
   'Jessica':               'https://api.hicparenting.com/widget/bookings/calendar-gn238u',
   'Valentina':             'https://api.hicparenting.com/widget/bookings/calendar-vs23fnijik',
   'Juan Diego':            'https://api.hicparenting.com/widget/bookings/calendar-juan',
+  'Coparenting Coaching Session': 'https://api.hicparenting.com/widget/bookings/calendar-coparenting',
 }
 
 const DEFAULT_CALENDAR = 'https://api.hicparenting.com/widget/bookings/calendar-qa'
