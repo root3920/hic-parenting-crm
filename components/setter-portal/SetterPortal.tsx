@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Loader2, RefreshCw, Inbox, User, PhoneOff } from 'lucide-react'
+import { Loader2, RefreshCw, Inbox, User, PhoneOff, ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 import { PipelineContactModal } from '@/components/contacts/PipelineContactModal'
 import { STAGE_LABELS, STAGE_COLORS, type PipelineTier } from '@/lib/pipeline-tiers'
+import { FollowupTracking } from '@/components/setter-portal/FollowupTracking'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ function QueueList({
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-type PortalView = 'daily' | 'cancelled'
+type PortalView = 'daily' | 'cancelled' | 'followup'
 
 export function SetterPortal() {
   const { profile } = useProfile()
@@ -328,25 +329,25 @@ export function SetterPortal() {
         </button>
       </div>
 
-      {/* View switcher — only shown to Juan Diego or admins */}
-      {showCancelledTab && (
-        <div className="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800">
-          <button
-            onClick={() => setView('daily')}
-            className={cn(
-              'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
-              view === 'daily'
-                ? 'border-[#ffbd59] text-[#ffbd59]'
-                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300',
-            )}
-          >
-            Daily Queue
-            {data && (
-              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-                {data.total}
-              </span>
-            )}
-          </button>
+      {/* View switcher */}
+      <div className="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        <button
+          onClick={() => setView('daily')}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+            view === 'daily'
+              ? 'border-[#ffbd59] text-[#ffbd59]'
+              : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300',
+          )}
+        >
+          Daily Queue
+          {data && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+              {data.total}
+            </span>
+          )}
+        </button>
+        {showCancelledTab && (
           <button
             onClick={() => setView('cancelled')}
             className={cn(
@@ -364,65 +365,84 @@ export function SetterPortal() {
               </span>
             )}
           </button>
-        </div>
-      )}
-
-      {/* Status tabs */}
-      <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl overflow-x-auto">
-        {STATUS_COLUMNS.map((col) => {
-          const count = currentData?.counts[col.key] ?? 0
-          const isActive = currentActiveTab === col.key
-          return (
-            <button
-              key={col.key}
-              onClick={() => setCurrentActiveTab(col.key)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all',
-                isActive
-                  ? 'bg-white dark:bg-zinc-900 shadow-sm ' + col.text
-                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300',
-              )}
-            >
-              {col.label}
-              <span
-                className={cn(
-                  'inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold',
-                  isActive
-                    ? col.bg + ' ' + col.text
-                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400',
-                )}
-              >
-                {count}
-              </span>
-            </button>
-          )
-        })}
+        )}
+        <button
+          onClick={() => setView('followup')}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+            view === 'followup'
+              ? 'border-[#3A6B9E] text-[#3A6B9E] dark:text-blue-400 dark:border-blue-400'
+              : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300',
+          )}
+        >
+          <ClipboardList className="h-3.5 w-3.5" />
+          Follow-up Tracking
+        </button>
       </div>
 
-      {/* Content */}
-      {currentLoading && !currentData ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
-        </div>
+      {/* Follow-up Tracking view */}
+      {view === 'followup' ? (
+        <FollowupTracking />
       ) : (
-        <QueueList
-          items={currentData?.items ?? []}
-          activeTab={currentActiveTab}
-          isAdmin={isAdmin}
-          isCancelledView={view === 'cancelled'}
-          updatingId={updatingId}
-          onStatusChange={handleStatusChange}
-          onSelectEmail={setSelectedEmail}
-        />
-      )}
+        <>
+          {/* Status tabs */}
+          <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl overflow-x-auto">
+            {STATUS_COLUMNS.map((col) => {
+              const count = currentData?.counts[col.key] ?? 0
+              const isActive = currentActiveTab === col.key
+              return (
+                <button
+                  key={col.key}
+                  onClick={() => setCurrentActiveTab(col.key)}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all',
+                    isActive
+                      ? 'bg-white dark:bg-zinc-900 shadow-sm ' + col.text
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300',
+                  )}
+                >
+                  {col.label}
+                  <span
+                    className={cn(
+                      'inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold',
+                      isActive
+                        ? col.bg + ' ' + col.text
+                        : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400',
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
 
-      {/* Contact detail modal (reused from Pipeline) */}
-      {selectedEmail && (
-        <PipelineContactModal
-          email={selectedEmail}
-          onClose={() => setSelectedEmail(null)}
-          onUpdated={view === 'cancelled' ? fetchCancelledQueue : fetchQueue}
-        />
+          {/* Content */}
+          {currentLoading && !currentData ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+            </div>
+          ) : (
+            <QueueList
+              items={currentData?.items ?? []}
+              activeTab={currentActiveTab}
+              isAdmin={isAdmin}
+              isCancelledView={view === 'cancelled'}
+              updatingId={updatingId}
+              onStatusChange={handleStatusChange}
+              onSelectEmail={setSelectedEmail}
+            />
+          )}
+
+          {/* Contact detail modal (reused from Pipeline) */}
+          {selectedEmail && (
+            <PipelineContactModal
+              email={selectedEmail}
+              onClose={() => setSelectedEmail(null)}
+              onUpdated={view === 'cancelled' ? fetchCancelledQueue : fetchQueue}
+            />
+          )}
+        </>
       )}
     </div>
   )
