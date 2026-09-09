@@ -429,6 +429,19 @@ export default function ChecklistPage() {
         {/* EMOTIONAL IMPACT ON CHILDREN — INTRO                         */}
         {/* ============================================================ */}
         <div className="big-divider">Emotional Impact of Reactivity on Children</div>
+        <div className="info-text-block" style={{ marginBottom: 8 }}>
+          <h3
+            style={{
+              fontFamily: "'Lora', serif",
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              color: 'var(--blue)',
+              marginBottom: 10,
+            }}
+          >
+            Checklist for Parents
+          </h3>
+        </div>
         <div className="info-text-block">
           <p>Reactive parenting not only affects behavior in the moment.</p>
           <p>
@@ -507,9 +520,6 @@ export default function ChecklistPage() {
         <div className="card">
           <div className="card-header">
             <h2>3. {'\u201C'}Poking the Bear{'\u201D'} Behaviors</h2>
-            <div className="subtitle">
-              Testing, provoking, or pushing limits constantly
-            </div>
           </div>
           <div className="card-body">
             <div className="description-block">
@@ -533,9 +543,6 @@ export default function ChecklistPage() {
         <div className="card">
           <div className="card-header">
             <h2>4. Emotional Scanning Behaviors</h2>
-            <div className="subtitle">
-              Hyper-aware of parents{'\u2019'} moods and emotional safety
-            </div>
           </div>
           <div className="card-body">
             <div className="description-block">
@@ -560,9 +567,6 @@ export default function ChecklistPage() {
         <div className="card">
           <div className="card-header">
             <h2>5. Shutdown & Emotional Disconnection</h2>
-            <div className="subtitle">
-              Children protecting themselves by emotionally withdrawing
-            </div>
           </div>
           <div className="card-body">
             <div className="description-block">
