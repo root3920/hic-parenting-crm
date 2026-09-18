@@ -27,6 +27,7 @@ const STATUS_STYLES: Record<string, string> = {
   'Cancelled':  'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
   'No show':    'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   'Rescheduled':'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  'Part 2':     'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
 }
 
 const CALL_TYPE_STYLES: Record<string, string> = {
@@ -36,7 +37,7 @@ const CALL_TYPE_STYLES: Record<string, string> = {
   'Interview':    'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
 }
 
-const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show'] as const
+const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show', 'Part 2'] as const
 
 const STATUS_DOT: Record<string, string> = {
   'Scheduled':   'bg-blue-500',
@@ -44,6 +45,7 @@ const STATUS_DOT: Record<string, string> = {
   'Rescheduled': 'bg-purple-500',
   'Cancelled':   'bg-red-500',
   'No show':     'bg-amber-500',
+  'Part 2':      'bg-indigo-500',
 }
 
 const CHECKLIST_SECTION_LABELS: Record<string, string> = {
@@ -114,6 +116,32 @@ function formatReportedAt(dateStr: string) {
 
 function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]?.toUpperCase() ?? '').join('')
+}
+
+function Part2Badge({ callId }: { callId: string }) {
+  const supabase = useMemo(() => createClient(), [])
+  const [orig, setOrig] = useState<{ full_name: string; start_date: string } | null>(null)
+
+  useEffect(() => {
+    supabase
+      .from('calls')
+      .select('full_name, start_date')
+      .eq('id', callId)
+      .single()
+      .then(({ data }) => { if (data) setOrig(data) })
+  }, [callId, supabase])
+
+  if (!orig) return null
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800">
+      <span className="h-2 w-2 rounded-full bg-indigo-500 shrink-0" />
+      <p className="text-xs text-indigo-700 dark:text-indigo-300">
+        <span className="font-semibold">Part 2</span> of call with{' '}
+        <span className="font-medium">{orig.full_name}</span> on{' '}
+        {new Date(orig.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+      </p>
+    </div>
+  )
 }
 
 interface Props {
@@ -273,6 +301,11 @@ export function CallDetailModal({ call, onClose, onStatusChange }: Props) {
               </div>
             )}
           </div>
+
+          {/* Part 2 badge */}
+          {call.part2_of_call_id && (
+            <Part2Badge callId={call.part2_of_call_id} />
+          )}
 
           {/* Date/Time */}
           <div className={cn('px-3 py-2 rounded-lg text-sm font-medium', isFuture ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400')}>

@@ -97,7 +97,8 @@
       "Bash(SB_URL=\"https://nlrxlikkhkdxrncqvxht.supabase.co\" SB_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5scnhsaWtraGtkeHJuY3F2eGh0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDg5ODA2MSwiZXhwIjoyMDkwNDc0MDYxfQ.ABluXyGVzaf0t1Bjt3vkYjaJ-sYPElMMcWO1MbxLUjk\" __NEW_LINE_650ae276292018f4__ curl -s \"$SB_URL/rest/v1/transactions?select=id,buyer_email&buyer_email=eq.mjvillacis7@gmail.com\" -H \"apikey: $SB_KEY\" -H \"Authorization: Bearer $SB_KEY\")",
       "Bash(python3 -m json.tool __NEW_LINE_650ae276292018f4__ echo \"---\" __NEW_LINE_650ae276292018f4__ curl -s \"$SB_URL/rest/v1/transactions?select=id,buyer_email&buyer_email=eq.vaneetcheema@gmail.com\" -H \"apikey: $SB_KEY\" -H \"Authorization: Bearer $SB_KEY\")",
       "Bash(python3 -m json.tool)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(2)"
     ]
   }
 }

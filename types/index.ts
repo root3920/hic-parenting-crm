@@ -116,7 +116,7 @@ export interface Call {
   phone: string | null
   meeting_url: string | null
   activity_type: string | null
-  status: 'Scheduled' | 'Rescheduled' | 'Showed Up' | 'Cancelled' | 'No show'
+  status: 'Scheduled' | 'Rescheduled' | 'Showed Up' | 'Cancelled' | 'No show' | 'Follow-up' | 'Part 2'
   call_type: 'Qualified' | 'Disqualified' | 'Onboarding' | 'Interview' | null
   calendar: string | null
   setter_name: string | null
@@ -132,6 +132,7 @@ export interface Call {
   call_summary: string | null
   reported_at: string | null
   reported_by: string | null
+  part2_of_call_id: string | null
 }
 
 export interface CloserDailyReport {

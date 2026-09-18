@@ -443,9 +443,12 @@ export default function CloserDashboardPage() {
   )
 
   // ── Filtered calls for the selected closer ──
+  // Exclude "Part 2" calls from KPI calculations — they represent continuations
+  // of an existing sale conversation, not new prospect interactions.
   const filteredCalls = useMemo(() => {
-    if (selectedCloser === 'All') return callsData
-    return callsData.filter((c) => c.closer_name === selectedCloser)
+    let data = callsData.filter((c) => c.status !== 'Part 2')
+    if (selectedCloser !== 'All') data = data.filter((c) => c.closer_name === selectedCloser)
+    return data
   }, [callsData, selectedCloser])
 
   // ── Dynamic goal for showed calls ──
@@ -776,7 +779,7 @@ export default function CloserDashboardPage() {
                 <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">calls avg before closing</p>
               </div>
             </div>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on {prospectKPIs.totalUniqueProspects} unique prospects ({filteredCalls.length} calls)</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-right mb-5">Based on {prospectKPIs.totalUniqueProspects} unique prospects ({filteredCalls.length} calls, excl. Part 2)</p>
 
             {/* ── Section 1b: KPI Goal Cards — offers & sales ── */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-1">
@@ -939,6 +942,7 @@ export default function CloserDashboardPage() {
                                   c.status === 'No show' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                                   c.status === 'Cancelled' ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' :
                                   c.status === 'Rescheduled' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                  c.status === 'Part 2' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
                                   'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                 )}>
                                   {c.status}

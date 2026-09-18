@@ -47,6 +47,7 @@ const STATUS_STYLES: Record<string, string> = {
   'No show':     'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   'Rescheduled': 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   'Follow-up':   'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'Part 2':      'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
 }
 
 const CALL_TYPE_STYLES: Record<string, string> = {
@@ -62,9 +63,10 @@ const PIE_COLORS: Record<string, string> = {
   'No show':     '#BA7517',
   'Rescheduled': '#534AB7',
   'Scheduled':   '#ffbd59',
+  'Part 2':      '#4F46E5',
 }
 
-const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show', 'Follow-up'] as const
+const STATUS_OPTIONS = ['Scheduled', 'Showed Up', 'Rescheduled', 'Cancelled', 'No show', 'Follow-up', 'Part 2'] as const
 
 const STATUS_DOT: Record<string, string> = {
   'Scheduled':   'bg-blue-500',
@@ -73,6 +75,7 @@ const STATUS_DOT: Record<string, string> = {
   'Cancelled':   'bg-red-500',
   'No show':     'bg-amber-500',
   'Follow-up':   'bg-cyan-500',
+  'Part 2':      'bg-indigo-500',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -213,6 +216,12 @@ export default function LlamadasPage() {
   const [editingDateId, setEditingDateId] = useState<string | null>(null)
   const [editingDateValue, setEditingDateValue] = useState('')
 
+  // Part 2 linking
+  const [part2Linking, setPart2Linking] = useState<{ callId: string; prospectName: string; prospectEmail: string | null } | null>(null)
+  const [part2Search, setPart2Search] = useState('')
+  const [part2Candidates, setPart2Candidates] = useState<Call[]>([])
+  const [part2Saving, setPart2Saving] = useState(false)
+
   // New call modal
   const [showNewCall, setShowNewCall] = useState(false)
   const [newCallSaving, setNewCallSaving] = useState(false)
@@ -350,19 +359,79 @@ export default function LlamadasPage() {
     setStatusFilter(prev => prev === key ? 'all' : key)
   }
 
-  type CallStatus = 'Showed Up' | 'Cancelled' | 'Rescheduled' | 'No show' | 'Scheduled'
+  type CallStatus = 'Showed Up' | 'Cancelled' | 'Rescheduled' | 'No show' | 'Scheduled' | 'Follow-up' | 'Part 2'
 
   async function updateCallStatus(callId: string, newStatus: CallStatus) {
+    // If "Part 2", open linking modal instead of saving immediately
+    if (newStatus === 'Part 2') {
+      const call = calls.find(c => c.id === callId)
+      if (call) {
+        setPart2Linking({ callId, prospectName: call.full_name, prospectEmail: call.email })
+        // Pre-search by prospect email/name
+        const searchTerm = call.email || call.full_name
+        setPart2Search(searchTerm)
+        // Load candidates: past calls for same prospect, excluding this call
+        let q = supabase
+          .from('calls')
+          .select('*')
+          .neq('id', callId)
+          .neq('status', 'Part 2')
+          .order('start_date', { ascending: false })
+          .limit(20)
+        if (call.email) {
+          q = q.eq('email', call.email)
+        } else {
+          q = q.ilike('full_name', `%${call.full_name}%`)
+        }
+        const { data } = await q
+        setPart2Candidates(data ?? [])
+      }
+      return
+    }
+
     setUpdatingId(callId)
-    const { error } = await supabase.from('calls').update({ status: newStatus }).eq('id', callId)
+    const updatePayload: Record<string, unknown> = { status: newStatus }
+    // Clear part2 link if changing away from Part 2
+    const existing = calls.find(c => c.id === callId)
+    if (existing?.part2_of_call_id) {
+      updatePayload.part2_of_call_id = null
+    }
+    const { error } = await supabase.from('calls').update(updatePayload).eq('id', callId)
     setUpdatingId(null)
     if (error) {
       toast.error('Error updating status')
       return
     }
-    setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus } : c))
+    setCalls(prev => prev.map(c => c.id === callId ? { ...c, status: newStatus, ...(updatePayload.part2_of_call_id === null ? { part2_of_call_id: null } : {}) } : c))
     setDetailCall(prev => prev?.id === callId ? { ...prev, status: newStatus } : prev)
     toast.success(`Status updated to ${newStatus}`)
+  }
+
+  async function handlePart2Link(originalCallId: string) {
+    if (!part2Linking) return
+    setPart2Saving(true)
+    const { error } = await supabase
+      .from('calls')
+      .update({ status: 'Part 2', part2_of_call_id: originalCallId })
+      .eq('id', part2Linking.callId)
+    setPart2Saving(false)
+    if (error) {
+      toast.error('Error linking Part 2')
+      return
+    }
+    setCalls(prev => prev.map(c =>
+      c.id === part2Linking.callId
+        ? { ...c, status: 'Part 2' as const, part2_of_call_id: originalCallId }
+        : c
+    ))
+    setDetailCall(prev =>
+      prev?.id === part2Linking.callId
+        ? { ...prev, status: 'Part 2' as const, part2_of_call_id: originalCallId }
+        : prev
+    )
+    toast.success('Marked as Part 2')
+    setPart2Linking(null)
+    setPart2Search('')
   }
 
   async function updateCallType(callId: string, newType: string) {
@@ -871,6 +940,18 @@ export default function LlamadasPage() {
                                       </>
                                     )}
                                   </div>
+                                  {call.part2_of_call_id && (() => {
+                                    const orig = calls.find(c => c.id === call.part2_of_call_id)
+                                    return (
+                                      <button
+                                        onClick={() => orig && setDetailCall(orig)}
+                                        className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                                        title={orig ? `Part 2 of: ${orig.full_name} — ${formatDateShort(orig.start_date, timezone)}` : 'Part 2 of another call'}
+                                      >
+                                        Pt 2 of {orig ? formatDateShort(orig.start_date, timezone).split(',')[0] : '...'}
+                                      </button>
+                                    )
+                                  })()}
                                 </td>
                                 {/* Closer */}
                                 <td className="py-2.5 px-3 whitespace-nowrap">
@@ -1302,6 +1383,77 @@ export default function LlamadasPage() {
                 className="px-3 py-1.5 text-xs rounded-md font-medium bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-60"
               >
                 {deleteLoading ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Part 2 linking modal */}
+      {part2Linking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => { setPart2Linking(null); setPart2Search('') }} />
+          <div className="relative bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 w-full max-w-md max-h-[80vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 pt-5 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Link Part 2 — Select Original Call</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Which call is <strong>{part2Linking.prospectName}</strong> continuing?
+              </p>
+              <div className="relative mt-3">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                <input
+                  type="text"
+                  value={part2Search}
+                  onChange={async (e) => {
+                    const v = e.target.value
+                    setPart2Search(v)
+                    if (v.length < 2) return
+                    const { data } = await supabase
+                      .from('calls')
+                      .select('*')
+                      .neq('id', part2Linking.callId)
+                      .neq('status', 'Part 2')
+                      .or(`email.ilike.%${v}%,full_name.ilike.%${v}%`)
+                      .order('start_date', { ascending: false })
+                      .limit(20)
+                    setPart2Candidates(data ?? [])
+                  }}
+                  placeholder="Search by name or email..."
+                  className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+            <div className="overflow-y-auto max-h-[50vh] px-2 py-2">
+              {part2Candidates.length === 0 ? (
+                <p className="text-xs text-zinc-400 text-center py-8">No calls found</p>
+              ) : (
+                <div className="space-y-1">
+                  {part2Candidates.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handlePart2Link(c.id)}
+                      disabled={part2Saving}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors disabled:opacity-50"
+                    >
+                      <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                        {initials(c.full_name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate">{c.full_name}</p>
+                        <p className="text-[10px] text-zinc-400 truncate">{c.email} · {formatDateShort(c.start_date, timezone)} {tzAbbr}</p>
+                      </div>
+                      <StatusPill status={c.status} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
+              <button
+                onClick={() => { setPart2Linking(null); setPart2Search('') }}
+                className="px-3 py-1.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
               </button>
             </div>
           </div>
