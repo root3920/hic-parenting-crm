@@ -59,7 +59,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: queueErr.message }, { status: 500 })
   }
 
-  const items = queueItems ?? []
+  // Deduplicate — the daily-assignment cron used to create duplicate rows
+  // per contact (one per day). Keep the row with the most "progressed" status
+  // so that a setter's real status update isn't masked by a stale row.
+  const STATUS_RANK: Record<string, number> = {
+    not_contacted: 1,
+    contacted: 2,
+    following_up: 3,
+    call_proposed: 4,
+    call_scheduled: 5,
+  }
+  const bestByEmail = new Map<string, (typeof queueItems)[0]>()
+  for (const item of queueItems ?? []) {
+    const existing = bestByEmail.get(item.contact_email)
+    if (!existing) {
+      bestByEmail.set(item.contact_email, item)
+    } else {
+      const existingRank = STATUS_RANK[existing.status] ?? 0
+      const itemRank = STATUS_RANK[item.status] ?? 0
+      if (
+        itemRank > existingRank ||
+        (itemRank === existingRank && item.assigned_date > existing.assigned_date)
+      ) {
+        bestByEmail.set(item.contact_email, item)
+      }
+    }
+  }
+  const items = Array.from(bestByEmail.values())
 
   // Enrich with contact info from value_ladder_contacts
   const emails = items.map((q) => q.contact_email)

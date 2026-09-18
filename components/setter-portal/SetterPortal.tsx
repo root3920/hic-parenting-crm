@@ -207,7 +207,7 @@ export function SetterPortal() {
   const fetchQueue = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/setter-portal/queue')
+      const res = await fetch('/api/setter-portal/queue', { cache: 'no-store' })
       const json = await res.json()
       if (json.error) {
         toast.error(json.error)
@@ -224,7 +224,7 @@ export function SetterPortal() {
   const fetchCancelledQueue = useCallback(async () => {
     setCancelledLoading(true)
     try {
-      const res = await fetch('/api/setter-portal/cancelled-queue')
+      const res = await fetch('/api/setter-portal/cancelled-queue', { cache: 'no-store' })
       const json = await res.json()
       if (json.error) {
         // Don't toast for 403 — just means user doesn't have access

@@ -2,7 +2,6 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 const CONTACTS_PER_SETTER = 20
-const RECYCLE_STALE_DAYS = 3
 
 function getServiceClient() {
   return createClient(
@@ -48,12 +47,9 @@ async function runDailyAssignment(req: NextRequest) {
   const supabase = getServiceClient()
   const today = new Date().toISOString().slice(0, 10)
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
-  const staleCutoff = new Date(Date.now() - RECYCLE_STALE_DAYS * 86400000).toISOString()
-
   const results = {
     setters_processed: 0,
     total_assigned: 0,
-    total_recycled: 0,
     errors: [] as string[],
   }
 
@@ -136,11 +132,15 @@ async function runDailyAssignment(req: NextRequest) {
   }
 
   // ── 3) Get contacts currently "in progress" (assigned in last 30 days, still active) ──
+  // Exclude ALL active statuses — not just 'not_contacted'/'contacted'.
+  // Previously, contacts with 'following_up', 'call_proposed', or 'call_scheduled'
+  // were re-assigned the next day with 'not_contacted', making it look like
+  // the setter's status change had reverted.
   const { data: recentAssignments } = await supabase
     .from('setter_daily_queue')
     .select('contact_email, setter_name, status')
     .gte('assigned_date', thirtyDaysAgo)
-    .in('status', ['not_contacted', 'contacted'])
+    .in('status', ['not_contacted', 'contacted', 'following_up', 'call_proposed', 'call_scheduled'])
 
   const inProgressEmails = new Set(
     (recentAssignments ?? []).map((a) => a.contact_email),
@@ -170,6 +170,10 @@ async function runDailyAssignment(req: NextRequest) {
   let freshIndex = 0
 
   // ── 5) Assign contacts per setter ───────────────────────────────────────
+  // NOTE: No recycling step — the GET handler's carryover logic already
+  // surfaces old items with active statuses. Creating new rows for recycled
+  // contacts caused duplicate rows that masked setters' status updates
+  // (the "phantom revert" bug).
   for (const setter of setters) {
     const setterName = setter.name
     let assigned = 0
@@ -181,7 +185,7 @@ async function runDailyAssignment(req: NextRequest) {
       status_updated_at: string
     }> = []
 
-    // 5a) Pull from fresh pool
+    // Pull from fresh pool only
     while (assigned < CONTACTS_PER_SETTER && freshIndex < freshPool.length) {
       const email = freshPool[freshIndex++]
       if (todayEmails.has(email)) continue
@@ -196,60 +200,7 @@ async function runDailyAssignment(req: NextRequest) {
       assigned++
     }
 
-    // 5b) Recycle: contacts previously assigned to THIS setter that are stale
-    if (assigned < CONTACTS_PER_SETTER) {
-      // Stale 'not_contacted' (never actioned, any date)
-      const { data: staleNotContacted } = await supabase
-        .from('setter_daily_queue')
-        .select('contact_email')
-        .eq('setter_name', setterName)
-        .eq('status', 'not_contacted')
-        .lt('assigned_date', today)
-        .limit(50)
-
-      for (const row of staleNotContacted ?? []) {
-        if (todayEmails.has(row.contact_email)) continue
-        toInsert.push({
-          contact_email: row.contact_email,
-          setter_name: setterName,
-          assigned_date: today,
-          status: 'not_contacted',
-          status_updated_at: new Date().toISOString(),
-        })
-        todayEmails.add(row.contact_email)
-        assigned++
-        results.total_recycled++
-        if (assigned >= CONTACTS_PER_SETTER) break
-      }
-
-      // Stale 'following_up' stuck for > RECYCLE_STALE_DAYS
-      if (assigned < CONTACTS_PER_SETTER) {
-        const { data: staleFollowUp } = await supabase
-          .from('setter_daily_queue')
-          .select('contact_email')
-          .eq('setter_name', setterName)
-          .eq('status', 'following_up')
-          .lt('status_updated_at', staleCutoff)
-          .limit(50)
-
-        for (const row of staleFollowUp ?? []) {
-          if (todayEmails.has(row.contact_email)) continue
-          toInsert.push({
-            contact_email: row.contact_email,
-            setter_name: setterName,
-            assigned_date: today,
-            status: 'following_up',
-            status_updated_at: new Date().toISOString(),
-          })
-          todayEmails.add(row.contact_email)
-          assigned++
-          results.total_recycled++
-          if (assigned >= CONTACTS_PER_SETTER) break
-        }
-      }
-    }
-
-    // 5c) Insert today's assignments (upsert to handle re-runs)
+    // Insert today's assignments (upsert to handle re-runs)
     if (toInsert.length > 0) {
       const { error: insertErr } = await supabase
         .from('setter_daily_queue')

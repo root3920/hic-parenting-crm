@@ -92,7 +92,7 @@ export function FollowupTracking() {
   const fetchContacts = useCallback(async (status: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/setter-portal/followup-contacts?status=${status}`)
+      const res = await fetch(`/api/setter-portal/followup-contacts?status=${status}`, { cache: 'no-store' })
       const json = await res.json()
       if (json.error) {
         toast.error(json.error)

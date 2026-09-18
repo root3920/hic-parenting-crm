@@ -65,14 +65,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: queueErr.message }, { status: 500 })
   }
 
-  // Carryover: previous days' not_contacted items
+  // Carryover: previous days' items that are still in progress
+  // (not just 'not_contacted' — include all active statuses so setters
+  // can see contacts they previously moved to 'following_up', 'call_proposed', etc.)
   let carryoverQueue: typeof todayQueue = []
   if (includeCarryover) {
     let carryoverQuery = svc
       .from('setter_daily_queue')
       .select('*')
       .lt('assigned_date', date)
-      .eq('status', 'not_contacted')
+      .in('status', ['not_contacted', 'contacted', 'following_up', 'call_proposed', 'call_scheduled'])
       .order('assigned_date', { ascending: false })
 
     if (!isAdmin) {
@@ -83,12 +85,36 @@ export async function GET(req: NextRequest) {
     carryoverQueue = carryover ?? []
   }
 
-  // Combine and deduplicate (prefer today's entry over carryover)
-  const todayEmails = new Set((todayQueue ?? []).map((q) => q.contact_email))
-  const allItems = [
-    ...(todayQueue ?? []),
-    ...carryoverQueue.filter((c) => !todayEmails.has(c.contact_email)),
-  ]
+  // Combine and deduplicate — prefer the row where the setter actually
+  // changed the status (i.e. most "progressed") over cron-created rows.
+  // This prevents the "phantom revert" bug where old duplicate rows with
+  // 'not_contacted' mask a setter's real status update.
+  const STATUS_RANK: Record<string, number> = {
+    not_contacted: 1,
+    contacted: 2,
+    following_up: 3,
+    call_proposed: 4,
+    call_scheduled: 5,
+  }
+  const rawItems = [...(todayQueue ?? []), ...carryoverQueue]
+  const bestByEmail = new Map<string, (typeof rawItems)[0]>()
+  for (const item of rawItems) {
+    const existing = bestByEmail.get(item.contact_email)
+    if (!existing) {
+      bestByEmail.set(item.contact_email, item)
+    } else {
+      const existingRank = STATUS_RANK[existing.status] ?? 0
+      const itemRank = STATUS_RANK[item.status] ?? 0
+      // Prefer higher status rank; if tied, prefer most recent assigned_date
+      if (
+        itemRank > existingRank ||
+        (itemRank === existingRank && item.assigned_date > existing.assigned_date)
+      ) {
+        bestByEmail.set(item.contact_email, item)
+      }
+    }
+  }
+  const allItems = Array.from(bestByEmail.values())
 
   // Enrich with contact info from value_ladder_contacts
   const emails = allItems.map((q) => q.contact_email)
@@ -194,17 +220,22 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  const { error } = await svc
+  const { data: updated, error } = await svc
     .from('setter_daily_queue')
     .update({
       status,
       status_updated_at: new Date().toISOString(),
     })
     .eq('id', id)
+    .select('id, status, status_updated_at')
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true })
+  if (!updated || updated.length === 0) {
+    return NextResponse.json({ error: 'Update matched 0 rows' }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true, updated: updated[0] })
 }
