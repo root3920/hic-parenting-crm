@@ -98,7 +98,9 @@
       "Bash(python3 -m json.tool __NEW_LINE_650ae276292018f4__ echo \"---\" __NEW_LINE_650ae276292018f4__ curl -s \"$SB_URL/rest/v1/transactions?select=id,buyer_email&buyer_email=eq.vaneetcheema@gmail.com\" -H \"apikey: $SB_KEY\" -H \"Authorization: Bearer $SB_KEY\")",
       "Bash(python3 -m json.tool)",
       "Bash(npx tsx:*)",
-      "Bash(2)"
+      "Bash(2)",
+      "Bash(do grep:*)",
+      "Bash(echo \"=== $f ===\")"
     ]
   }
 }

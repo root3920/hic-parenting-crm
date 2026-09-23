@@ -114,7 +114,8 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
   const { names: setterNames, loading: settersLoading } = useTeamMembers('setter')
   const isAdmin = profile?.role === 'admin'
   const isSetter = profile?.role === 'setter'
-  const canEdit = isAdmin || isSetter
+  const isCsmHt = profile?.role === 'csm_ht'
+  const canEdit = isAdmin || isSetter || isCsmHt
 
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -233,8 +234,8 @@ export function PipelineContactModal({ email, onClose, onUpdated }: PipelineCont
     }
   }
 
-  // Permission: setter can only edit contacts assigned to them or unassigned
-  const canEditThisContact = isAdmin || (isSetter && (!contact?.setter_assigned || contact.setter_assigned === mySetterName))
+  // Permission: setter can only edit contacts assigned to them or unassigned; csm_ht can edit any contact (like admin)
+  const canEditThisContact = isAdmin || isCsmHt || (isSetter && (!contact?.setter_assigned || contact.setter_assigned === mySetterName))
 
   // Phone from transactions
   const phone = transactions.find((t) => t.buyer_phone)?.buyer_phone ?? null

@@ -58,9 +58,10 @@ export async function PATCH(req: NextRequest) {
 
   const svc = getServiceClient()
   const isAdmin = profile.role === 'admin'
+  const isCsmHt = profile.role === 'csm_ht'
 
-  // For setter role: enforce permission rules
-  if (!isAdmin) {
+  // For non-admin roles: enforce permission rules
+  if (!isAdmin && !isCsmHt) {
     if (profile.role !== 'setter') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -113,6 +114,35 @@ export async function PATCH(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // ── Auto-increment continuation_opportunities for csm_ht users ──
+  // Triggers on: lead_status change, notes save, or last_contacted_at update
+  if (isCsmHt && (lead_status !== undefined || notes !== undefined || last_contacted_at !== undefined)) {
+    const csmName = profile.full_name
+    const today = new Date().toISOString().slice(0, 10)
+
+    try {
+      const { data: existing } = await svc
+        .from('csm_daily_activity')
+        .select('id, continuation_opportunities')
+        .eq('csm_name', csmName)
+        .eq('date', today)
+        .single()
+
+      if (existing) {
+        await svc
+          .from('csm_daily_activity')
+          .update({ continuation_opportunities: (existing.continuation_opportunities || 0) + 1 })
+          .eq('id', existing.id)
+      } else {
+        await svc
+          .from('csm_daily_activity')
+          .insert({ csm_name: csmName, date: today, continuation_opportunities: 1 })
+      }
+    } catch {
+      // Non-blocking: don't fail the main update if the report increment fails
+    }
   }
 
   return NextResponse.json({ ok: true })
