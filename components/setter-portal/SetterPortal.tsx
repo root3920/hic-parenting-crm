@@ -121,11 +121,16 @@ function QueueList({
                 <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
                   {item.contact_name || item.contact_email}
                 </p>
-                {item.is_carryover && (
-                  <span className="shrink-0 inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-                    Carryover
-                  </span>
-                )}
+                {item.is_carryover && (() => {
+                  const daysOld = Math.floor(
+                    (Date.now() - new Date(item.assigned_date + 'T12:00:00').getTime()) / 86400000,
+                  )
+                  return (
+                    <span className="shrink-0 inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                      Carryover{daysOld > 0 ? ` · ${daysOld}d` : ''}
+                    </span>
+                  )
+                })()}
                 {isCancelledView && item.cancelled_at && (
                   <span className="shrink-0 inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
                     Cancelled {new Date(item.cancelled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

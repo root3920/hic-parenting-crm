@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-const CONTACTS_PER_SETTER = 20
+const SETTER_NAME = 'Juan Diego Palacios'
 
 function getServiceClient() {
   return createClient(
@@ -13,17 +13,15 @@ function getServiceClient() {
 /**
  * POST /api/setter-portal/daily-assignment
  *
- * Daily cron (6:10am) that assigns up to 20 contacts per active setter.
+ * Daily cron (6:10am UTC) that assigns ALL newly eligible contacts
+ * to Juan Diego Palacios.
  *
  * Eligibility: pipeline stage 1-3 AND (contact_scores.score > 45 OR
  * spc_members.lead_score > 45 OR spc_members.status = 'active').
  *
- * Excludes contacts assigned to any setter in the last 30 days that are
- * still 'not_contacted' or 'contacted' (actively being worked).
- *
- * Recycling: if the fresh pool runs low, recycle contacts previously assigned
- * to the SAME setter whose status is still 'not_contacted' or stuck in
- * 'following_up' for more than RECYCLE_STALE_DAYS days.
+ * A contact only enters the queue once in its lifetime. After that,
+ * the GET handler's carryover logic keeps surfacing it until the
+ * setter changes its status.
  */
 // Vercel Cron Jobs send GET requests; also support POST for manual triggers
 export async function GET(req: NextRequest) {
@@ -45,31 +43,16 @@ async function runDailyAssignment(req: NextRequest) {
   }
 
   const supabase = getServiceClient()
-  const today = new Date().toISOString().slice(0, 10)
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+
   const results = {
-    setters_processed: 0,
+    total_eligible: 0,
+    already_in_queue: 0,
     total_assigned: 0,
     errors: [] as string[],
   }
 
-  // ── 1) Get active setters ───────────────────────────────────────────────
-  const { data: setters, error: settersErr } = await supabase
-    .from('team_members')
-    .select('name')
-    .eq('role', 'setter')
-    .eq('active', true)
-
-  if (settersErr || !setters?.length) {
-    return NextResponse.json({
-      ...results,
-      errors: [settersErr?.message || 'No active setters found'],
-    })
-  }
-
-  // ── 2) Build eligibility pool ───────────────────────────────────────────
+  // ── 1) Build eligibility pool ──────────────────────────────────────────
   // Start from the SMALLER scored/SPC sets, then validate against stages 1-3.
-  // This avoids the Supabase 1000-row default limit on the large contacts table.
 
   // Get emails with contact_scores.score > 45
   const { data: scoredContacts } = await supabase
@@ -131,89 +114,44 @@ async function runDailyAssignment(req: NextRequest) {
     })
   }
 
-  // ── 3) Get contacts currently "in progress" (assigned in last 30 days, still active) ──
-  // Exclude ALL active statuses — not just 'not_contacted'/'contacted'.
-  // Previously, contacts with 'following_up', 'call_proposed', or 'call_scheduled'
-  // were re-assigned the next day with 'not_contacted', making it look like
-  // the setter's status change had reverted.
-  const { data: recentAssignments } = await supabase
-    .from('setter_daily_queue')
-    .select('contact_email, setter_name, status')
-    .gte('assigned_date', thirtyDaysAgo)
-    .in('status', ['not_contacted', 'contacted', 'following_up', 'call_proposed', 'call_scheduled'])
+  results.total_eligible = eligibleEmails.length
 
-  const inProgressEmails = new Set(
-    (recentAssignments ?? []).map((a) => a.contact_email),
-  )
-
-  // ── 4) Get contacts already assigned TODAY (to avoid duplicates across setters) ──
-  const { data: todayAssignments } = await supabase
+  // ── 2) Exclude contacts already in setter_daily_queue (any status, any date) ──
+  // A contact only enters the queue once in its lifetime.
+  const { data: existingQueue } = await supabase
     .from('setter_daily_queue')
     .select('contact_email')
-    .eq('assigned_date', today)
 
-  const todayEmails = new Set(
-    (todayAssignments ?? []).map((a) => a.contact_email),
+  const alreadyInQueue = new Set(
+    (existingQueue ?? []).map((r) => r.contact_email),
   )
 
-  // Fresh pool: eligible, not in progress, not already assigned today
-  const freshPool = eligibleEmails.filter(
-    (email) => !inProgressEmails.has(email) && !todayEmails.has(email),
-  )
+  results.already_in_queue = alreadyInQueue.size
 
-  // Shuffle the fresh pool for fair distribution
-  for (let i = freshPool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[freshPool[i], freshPool[j]] = [freshPool[j], freshPool[i]]
-  }
+  const freshPool = eligibleEmails.filter((email) => !alreadyInQueue.has(email))
 
-  let freshIndex = 0
+  // ── 3) Insert all new contacts for Juan Diego ──────────────────────────
+  if (freshPool.length > 0) {
+    const now = new Date().toISOString()
+    const today = now.slice(0, 10)
 
-  // ── 5) Assign contacts per setter ───────────────────────────────────────
-  // NOTE: No recycling step — the GET handler's carryover logic already
-  // surfaces old items with active statuses. Creating new rows for recycled
-  // contacts caused duplicate rows that masked setters' status updates
-  // (the "phantom revert" bug).
-  for (const setter of setters) {
-    const setterName = setter.name
-    let assigned = 0
-    const toInsert: Array<{
-      contact_email: string
-      setter_name: string
-      assigned_date: string
-      status: string
-      status_updated_at: string
-    }> = []
+    const toInsert = freshPool.map((email) => ({
+      contact_email: email,
+      setter_name: SETTER_NAME,
+      assigned_date: today,
+      status: 'not_contacted',
+      status_updated_at: now,
+    }))
 
-    // Pull from fresh pool only
-    while (assigned < CONTACTS_PER_SETTER && freshIndex < freshPool.length) {
-      const email = freshPool[freshIndex++]
-      if (todayEmails.has(email)) continue
-      toInsert.push({
-        contact_email: email,
-        setter_name: setterName,
-        assigned_date: today,
-        status: 'not_contacted',
-        status_updated_at: new Date().toISOString(),
-      })
-      todayEmails.add(email)
-      assigned++
+    const { error: insertErr } = await supabase
+      .from('setter_daily_queue')
+      .upsert(toInsert, { onConflict: 'contact_email,assigned_date' })
+
+    if (insertErr) {
+      results.errors.push(insertErr.message)
+    } else {
+      results.total_assigned = toInsert.length
     }
-
-    // Insert today's assignments (upsert to handle re-runs)
-    if (toInsert.length > 0) {
-      const { error: insertErr } = await supabase
-        .from('setter_daily_queue')
-        .upsert(toInsert, { onConflict: 'contact_email,assigned_date' })
-
-      if (insertErr) {
-        results.errors.push(`${setterName}: ${insertErr.message}`)
-      } else {
-        results.total_assigned += toInsert.length
-      }
-    }
-
-    results.setters_processed++
   }
 
   return NextResponse.json(results)
