@@ -66,7 +66,7 @@ const ALL_NAV_ITEMS = [
   { href: '/instagram-dm', label: 'Instagram DM',  icon: MessageSquare,   roles: ['admin', 'setter'] as UserRole[] },
   { href: '/contacts',     label: 'Clients',      icon: BookUser,        roles: ['admin', 'setter'] as UserRole[] },
   { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
-  { href: '/calendar',     label: 'Calendar',     icon: CalendarDays,    roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
+  { href: '/calendar',     label: 'Calendar',     icon: CalendarDays,    roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht', 'coach'] as UserRole[] },
   { href: '/careers',      label: 'Careers',      icon: Briefcase,       roles: ['admin'] as UserRole[] },
 ]
 
