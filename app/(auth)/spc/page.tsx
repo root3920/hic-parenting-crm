@@ -2108,7 +2108,7 @@ export default function SpcPage() {
           .select('*')
           .ilike('offer_title', '%Secure Parent%')
           .order('date', { ascending: false }),
-        supabase.from('spc_member_notes').select('member_id, created_at'),
+        supabase.from('spc_member_notes').select('member_id, created_at').order('created_at', { ascending: true }).range(0, 49999),
         supabase.from('spc_members').select('email, converted_from_trial, converted_at').eq('converted_from_trial', true),
       ])
       setMembers(membersResult.data ?? [])
