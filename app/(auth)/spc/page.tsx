@@ -2083,15 +2083,18 @@ export default function SpcPage() {
     const memberId = selectedMember.data.email
     if (!memberId) return
     setAddingNote(true)
-    const { error } = await supabase.from('spc_member_notes').insert({
+    const { data, error } = await supabase.from('spc_member_notes').insert({
       member_id: memberId,
       note: noteText.trim(),
       created_by: profile?.full_name ?? 'Unknown',
-    })
+    }).select().single()
     setAddingNote(false)
     if (!error) {
       setNoteText('')
       fetchNotes(memberId)
+      if (data?.created_at) {
+        setLastNoteByEmail(prev => ({ ...prev, [memberId.toLowerCase()]: data.created_at }))
+      }
     }
   }
 
