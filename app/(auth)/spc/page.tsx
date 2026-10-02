@@ -2137,8 +2137,26 @@ export default function SpcPage() {
   }
 
   useEffect(() => {
+    async function fetchAllNotes() {
+      const PAGE = 1000
+      let from = 0
+      const all: { member_id: string; created_at: string }[] = []
+      while (true) {
+        const { data, error } = await supabase
+          .from('spc_member_notes')
+          .select('member_id, created_at')
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (error || !data || data.length === 0) break
+        all.push(...data)
+        if (data.length < PAGE) break
+        from += PAGE
+      }
+      return all
+    }
+
     async function fetchData() {
-      const [membersResult, cancelsResult, txResult, notesResult, conversionsResult] = await Promise.all([
+      const [membersResult, cancelsResult, txResult, allNotes, conversionsResult] = await Promise.all([
         supabase.from('spc_members').select('*').order('joined_at', { ascending: false }),
         supabase.from('spc_cancellations').select('*').order('cancelled_at', { ascending: false }),
         supabase
@@ -2146,7 +2164,7 @@ export default function SpcPage() {
           .select('*')
           .ilike('offer_title', '%Secure Parent%')
           .order('date', { ascending: false }),
-        supabase.from('spc_member_notes').select('member_id, created_at').order('created_at', { ascending: true }).range(0, 49999),
+        fetchAllNotes(),
         supabase.from('spc_members').select('email, converted_from_trial, converted_at').eq('converted_from_trial', true),
       ])
       setMembers(membersResult.data ?? [])
@@ -2159,7 +2177,7 @@ export default function SpcPage() {
       )
       // Build last-note-at map keyed by lowercase email
       const noteMap: Record<string, string> = {}
-      for (const n of (notesResult.data ?? [])) {
+      for (const n of allNotes) {
         const key = (n.member_id ?? '').toLowerCase()
         if (!key) continue
         if (!noteMap[key] || n.created_at > noteMap[key]) noteMap[key] = n.created_at
