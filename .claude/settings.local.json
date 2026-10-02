@@ -100,7 +100,8 @@
       "Bash(npx tsx:*)",
       "Bash(2)",
       "Bash(do grep:*)",
-      "Bash(echo \"=== $f ===\")"
+      "Bash(echo \"=== $f ===\")",
+      "Bash(cat \"/Users/federicoalarconu/hic-dashboard/app/\\(auth\\)/spc/page.tsx\")"
     ]
   }
 }

@@ -90,7 +90,38 @@ type SelectedMember =
   | { kind: 'member'; data: SpcMember }
   | { kind: 'cancellation'; data: SpcCancellation }
 
-type Tab = 'overview' | 'active' | 'club' | 'trials' | 'expired' | 'cancellations'
+type Tab = 'overview' | 'active' | 'club' | 'trials' | 'expired' | 'cancellations' | 'satisfaction'
+
+interface SatisfactionResponse {
+  id: string
+  email: string
+  name: string | null
+  membership_status: string | null
+  survey_date: string
+  csat: number
+  value_score: number
+  engagement: string
+  engagement_score: number
+  top_value: string | null
+  outcome: string[]
+  barrier: string | null
+  support_score: number
+  feedback: string | null
+  nps: number
+  testimonial_opportunity: string | null
+  recovery_permission: string | null
+  next_support: string | null
+  health_score: number
+  health_color: 'green' | 'yellow' | 'red'
+  is_advocate: boolean
+  is_coaching_opportunity: boolean
+  csm_followup_required: boolean
+  followup_status: string
+  followup_date: string | null
+  followup_notes: string | null
+  final_outcome: string | null
+  created_at: string
+}
 
 type ActiveSort = 'joined_desc' | 'joined_asc' | 'last_payment_desc' | 'last_payment_asc' | 'next_payment_desc' | 'next_payment_asc' | 'score_desc' | 'last_note_desc'
 type TrialSort = 'trial_start_desc' | 'trial_start_asc' | 'expires_asc' | 'score_desc' | 'last_note_desc'
@@ -1677,6 +1708,13 @@ export default function SpcPage() {
   const [lastNoteByEmail, setLastNoteByEmail] = useState<Record<string, string>>({})
   const [highlightNotes, setHighlightNotes] = useState(false)
 
+  // Satisfaction survey data
+  const [satisfactionResponses, setSatisfactionResponses] = useState<SatisfactionResponse[]>([])
+  const [satisfactionByEmail, setSatisfactionByEmail] = useState<Record<string, SatisfactionResponse>>({})
+  const [satFilter, setSatFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all')
+  const [satDetailId, setSatDetailId] = useState<string | null>(null)
+  const [satSaving, setSatSaving] = useState(false)
+
   // ── Add Member modal state ─────────────────────────────────────────────────
   const [addMemberOpen, setAddMemberOpen] = useState(false)
   const [addMemberSaving, setAddMemberSaving] = useState(false)
@@ -2138,6 +2176,23 @@ export default function SpcPage() {
           setLast4Dates(engData.last_4_dates ?? [])
         }
       } catch { /* engagement is non-critical */ }
+
+      // Fetch satisfaction survey data
+      try {
+        const satRes = await fetch('/api/spc/satisfaction')
+        if (satRes.ok) {
+          const satData = await satRes.json()
+          const responses: SatisfactionResponse[] = satData.data ?? []
+          setSatisfactionResponses(responses)
+          // Build map: email → most recent response (already sorted desc)
+          const byEmail: Record<string, SatisfactionResponse> = {}
+          for (const r of responses) {
+            const key = r.email.toLowerCase()
+            if (!byEmail[key]) byEmail[key] = r
+          }
+          setSatisfactionByEmail(byEmail)
+        }
+      } catch { /* satisfaction is non-critical */ }
     }
     fetchData()
   }, [])
@@ -2792,6 +2847,7 @@ export default function SpcPage() {
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
     { key: 'expired', label: `Expired${!loading ? ` (${expiredMembers.length})` : ''}` },
     { key: 'cancellations', label: `Cancellations${!loading ? ` (${cancellations.length})` : ''}` },
+    { key: 'satisfaction', label: `Satisfaction${satisfactionResponses.length ? ` (${satisfactionResponses.length})` : ''}` },
   ]
 
   return (
@@ -3786,6 +3842,7 @@ export default function SpcPage() {
                       <col className="hidden lg:table-column" style={{ width: 90 }} />
                       <col className="hidden lg:table-column" style={{ width: 80 }} />
                       <col className="hidden lg:table-column" style={{ width: 80 }} />
+                      <col className="hidden lg:table-column" style={{ width: 70 }} />
                     </colgroup>
                     <TableHeader>
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
@@ -3802,6 +3859,7 @@ export default function SpcPage() {
                         <TableHead className="text-xs hidden lg:table-cell">Engagement</TableHead>
                         <TableHead className="text-xs hidden lg:table-cell">Club</TableHead>
                         <TableHead className="text-xs hidden lg:table-cell">Last Note</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell">Health</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
@@ -3904,6 +3962,19 @@ export default function SpcPage() {
                               lastNoteAt={lastNoteByEmail[(m.email ?? '').toLowerCase()]}
                               onClick={(e) => { e.stopPropagation(); openModal({ kind: 'member', data: m }, true) }}
                             />
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {(() => {
+                              const sat = satisfactionByEmail[(m.email ?? '').toLowerCase()]
+                              if (!sat) return <span className="text-xs text-zinc-400">—</span>
+                              const dot = sat.health_color === 'green' ? '🟢' : sat.health_color === 'yellow' ? '🟡' : '🔴'
+                              return (
+                                <span className="inline-flex items-center gap-1 text-xs">
+                                  <span>{dot}</span>
+                                  <span className="font-semibold text-zinc-700 dark:text-zinc-300">{sat.health_score}</span>
+                                </span>
+                              )
+                            })()}
                           </TableCell>
                         </AnimatedTableRow>
                       ))}
@@ -4784,7 +4855,326 @@ export default function SpcPage() {
             </Card>
           </div>
         )}
+
+        {/* ── SATISFACTION ────────────────────────────────────────────── */}
+        {activeTab === 'satisfaction' && (
+          <div className="space-y-4">
+            {/* Stat cards */}
+            {(() => {
+              const total = satisfactionResponses.length
+              const green = satisfactionResponses.filter(r => r.health_color === 'green').length
+              const yellow = satisfactionResponses.filter(r => r.health_color === 'yellow').length
+              const red = satisfactionResponses.filter(r => r.health_color === 'red').length
+              const avgScore = total > 0 ? (satisfactionResponses.reduce((s, r) => s + Number(r.health_score), 0) / total).toFixed(1) : '—'
+              return (
+                <KPICardGrid>
+                  <KPICard title="Green" value={total > 0 ? `${Math.round((green / total) * 100)}%` : '—'} subtitle={`${green} responses`} />
+                  <KPICard title="Yellow" value={total > 0 ? `${Math.round((yellow / total) * 100)}%` : '—'} subtitle={`${yellow} responses`} />
+                  <KPICard title="Red" value={total > 0 ? `${Math.round((red / total) * 100)}%` : '—'} subtitle={`${red} responses`} />
+                  <KPICard title="Avg Health Score" value={avgScore} subtitle={`${total} total responses`} />
+                </KPICardGrid>
+              )
+            })()}
+
+            {/* Filters */}
+            <div className="flex items-center gap-2">
+              {(['all', 'green', 'yellow', 'red'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setSatFilter(f)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-semibold transition-colors',
+                    satFilter === f
+                      ? f === 'green' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : f === 'yellow' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                        : f === 'red' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200'
+                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                  )}
+                >
+                  {f === 'all' ? 'All' : f === 'green' ? '🟢 Green' : f === 'yellow' ? '🟡 Yellow' : '🔴 Red'}
+                </button>
+              ))}
+            </div>
+
+            {/* Table */}
+            <Card>
+              <CardContent className="p-0">
+                {satisfactionResponses.length === 0 ? (
+                  <EmptyState icon={<MessageSquare className="h-8 w-8 text-zinc-300" />} title="No satisfaction responses yet" description="Responses will appear here once members complete the survey." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                          <TableHead className="text-xs">Name</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
+                          <TableHead className="text-xs">Survey Date</TableHead>
+                          <TableHead className="text-xs">Health</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell">NPS</TableHead>
+                          <TableHead className="text-xs hidden lg:table-cell">Barrier</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell">Follow-up</TableHead>
+                          <TableHead className="text-xs hidden lg:table-cell">Follow-up Date</TableHead>
+                        </AnimatedTableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {satisfactionResponses
+                          .filter(r => satFilter === 'all' || r.health_color === satFilter)
+                          .map((r, i) => {
+                            const dot = r.health_color === 'green' ? '🟢' : r.health_color === 'yellow' ? '🟡' : '🔴'
+                            return (
+                              <AnimatedTableRow
+                                key={r.id}
+                                variants={rowVariants}
+                                initial="hidden"
+                                animate="visible"
+                                custom={i}
+                                className={cn(
+                                  i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
+                                  'cursor-pointer hover:bg-[#ffbd59]/10 dark:hover:bg-[#ffbd59]/10 transition-colors'
+                                )}
+                                onClick={() => setSatDetailId(r.id)}
+                              >
+                                <TableCell className="text-xs font-medium truncate">{r.name || '—'}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate">{r.email}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{formatDate(r.survey_date)}</TableCell>
+                                <TableCell className="text-xs">
+                                  <span className="inline-flex items-center gap-1">
+                                    <span>{dot}</span>
+                                    <span className="font-semibold text-zinc-700 dark:text-zinc-300">{r.health_score}</span>
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-xs hidden md:table-cell font-semibold">{r.nps}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 hidden lg:table-cell truncate max-w-[200px]">{r.barrier || '—'}</TableCell>
+                                <TableCell className="text-xs hidden md:table-cell">
+                                  <StatusPill
+                                    label={r.followup_status?.replace('_', ' ') ?? 'pending'}
+                                    variant={
+                                      r.followup_status === 'recovered' ? 'success'
+                                        : r.followup_status === 'cancellation_risk' || r.followup_status === 'cancelled' ? 'danger'
+                                        : r.followup_status === 'in_progress' || r.followup_status === 'monitoring' ? 'warning'
+                                        : r.followup_status === 'not_needed' ? 'success'
+                                        : 'info'
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell className="text-xs text-zinc-500 hidden lg:table-cell whitespace-nowrap">{r.followup_date ? formatDate(r.followup_date) : '—'}</TableCell>
+                              </AnimatedTableRow>
+                            )
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
+
+      {/* ── Satisfaction Detail Modal ── */}
+      {satDetailId && (() => {
+        const r = satisfactionResponses.find(x => x.id === satDetailId)
+        if (!r) return null
+        const dot = r.health_color === 'green' ? '🟢' : r.health_color === 'yellow' ? '🟡' : '🔴'
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setSatDetailId(null)} />
+            <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-2xl border border-zinc-200 dark:border-zinc-700 max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{r.name || r.email}</h3>
+                  <p className="text-xs text-zinc-400">{formatDate(r.survey_date)} — {dot} Health Score: {r.health_score}</p>
+                </div>
+                <button onClick={() => setSatDetailId(null)} className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="px-6 py-4 space-y-4">
+                {/* Responses */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">CSAT</p>
+                    <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{r.csat}/5</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Value Score</p>
+                    <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{r.value_score}/5</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Support Score</p>
+                    <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{r.support_score}/5</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">NPS</p>
+                    <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{r.nps}/10</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Engagement</p>
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100">{r.engagement}</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Top Value</p>
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100">{r.top_value || '—'}</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3 sm:col-span-2">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Outcomes</p>
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100">{r.outcome?.length ? r.outcome.join(', ') : '—'}</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3 sm:col-span-2">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Barrier</p>
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100">{r.barrier || '—'}</p>
+                  </div>
+                  {r.feedback && (
+                    <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3 sm:col-span-2">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Feedback</p>
+                      <p className="text-sm text-zinc-900 dark:text-zinc-100">{r.feedback}</p>
+                    </div>
+                  )}
+                  {r.testimonial_opportunity && (
+                    <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3 sm:col-span-2">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Testimonial</p>
+                      <p className="text-sm text-zinc-900 dark:text-zinc-100">{r.testimonial_opportunity}</p>
+                    </div>
+                  )}
+                  {r.recovery_permission && (
+                    <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3 sm:col-span-2">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Recovery Permission</p>
+                      <p className="text-sm text-zinc-900 dark:text-zinc-100">{r.recovery_permission}</p>
+                    </div>
+                  )}
+                  {r.next_support && (
+                    <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3 sm:col-span-2">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Next Support</p>
+                      <p className="text-sm text-zinc-900 dark:text-zinc-100">{r.next_support}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tags */}
+                <div className="flex gap-2 flex-wrap">
+                  {r.is_advocate && (
+                    <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">Advocate</span>
+                  )}
+                  {r.is_coaching_opportunity && (
+                    <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Coaching Opportunity</span>
+                  )}
+                </div>
+
+                {/* Follow-up section */}
+                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-3">
+                  <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">CSM Follow-up</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-zinc-400 uppercase mb-1">Status</label>
+                      <select
+                        value={r.followup_status ?? 'pending'}
+                        onChange={(e) => {
+                          const updated = satisfactionResponses.map(x =>
+                            x.id === r.id ? { ...x, followup_status: e.target.value } : x
+                          )
+                          setSatisfactionResponses(updated)
+                        }}
+                        className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="recovered">Recovered</option>
+                        <option value="monitoring">Monitoring</option>
+                        <option value="cancellation_risk">Cancellation Risk</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="not_needed">Not Needed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-zinc-400 uppercase mb-1">Follow-up Date</label>
+                      <input
+                        type="date"
+                        value={r.followup_date ?? ''}
+                        onChange={(e) => {
+                          const updated = satisfactionResponses.map(x =>
+                            x.id === r.id ? { ...x, followup_date: e.target.value || null } : x
+                          )
+                          setSatisfactionResponses(updated)
+                        }}
+                        className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-semibold text-zinc-400 uppercase mb-1">Notes</label>
+                      <textarea
+                        value={r.followup_notes ?? ''}
+                        onChange={(e) => {
+                          const updated = satisfactionResponses.map(x =>
+                            x.id === r.id ? { ...x, followup_notes: e.target.value || null } : x
+                          )
+                          setSatisfactionResponses(updated)
+                        }}
+                        rows={3}
+                        className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 resize-y"
+                        placeholder="Add follow-up notes..."
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-semibold text-zinc-400 uppercase mb-1">Final Outcome</label>
+                      <select
+                        value={r.final_outcome ?? ''}
+                        onChange={(e) => {
+                          const updated = satisfactionResponses.map(x =>
+                            x.id === r.id ? { ...x, final_outcome: e.target.value || null } : x
+                          )
+                          setSatisfactionResponses(updated)
+                        }}
+                        className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                      >
+                        <option value="">Select outcome...</option>
+                        <option value="Recovered">Recovered</option>
+                        <option value="Monitoring">Monitoring</option>
+                        <option value="Cancellation risk">Cancellation risk</option>
+                        <option value="Cancellation">Cancellation</option>
+                        <option value="Coaching opportunity">Coaching opportunity</option>
+                        <option value="Product issue identified">Product issue identified</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button
+                      disabled={satSaving}
+                      onClick={async () => {
+                        setSatSaving(true)
+                        try {
+                          const res = await fetch(`/api/spc/satisfaction/${r.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              followup_status: r.followup_status,
+                              followup_date: r.followup_date,
+                              followup_notes: r.followup_notes,
+                              final_outcome: r.final_outcome,
+                            }),
+                          })
+                          if (res.ok) {
+                            toast.success('Follow-up saved')
+                          } else {
+                            toast.error('Failed to save')
+                          }
+                        } catch {
+                          toast.error('Network error')
+                        } finally {
+                          setSatSaving(false)
+                        }
+                      }}
+                      className="px-4 py-2 text-sm rounded-lg bg-[#ffbd59] text-[#1a1a2e] hover:bg-[#e5a94f] disabled:opacity-50 transition-colors font-medium"
+                    >
+                      {satSaving ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Zoom Class Upload Modal ── */}
       {zoomModalOpen && (
