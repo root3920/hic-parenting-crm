@@ -4876,6 +4876,22 @@ export default function SpcPage() {
               )
             })()}
 
+            {/* Survey link */}
+            <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 py-3 border border-zinc-200 dark:border-zinc-700">
+              <Link2 className="h-4 w-4 text-zinc-400 shrink-0" />
+              <code className="text-xs text-zinc-600 dark:text-zinc-300 truncate flex-1">{typeof window !== 'undefined' ? window.location.origin : ''}/spc-survey</code>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/spc-survey`
+                  navigator.clipboard.writeText(url)
+                  toast.success('Survey link copied!')
+                }}
+                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#ffbd59] text-[#1a1a2e] hover:bg-[#e5a94f] transition-colors"
+              >
+                Copy Link
+              </button>
+            </div>
+
             {/* Filters */}
             <div className="flex items-center gap-2">
               {(['all', 'green', 'yellow', 'red'] as const).map(f => (
