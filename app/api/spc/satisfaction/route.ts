@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     let membershipStatus: string | null = null
     const { data: member } = await supabase
       .from('spc_members')
-      .select('name, status')
+      .select('name, status, phone')
       .ilike('email', email)
       .maybeSingle()
 
@@ -103,6 +103,23 @@ export async function POST(req: NextRequest) {
 
     if (health_color === 'red') {
       console.log('[SPC SATISFACTION] RED ALERT', email, { health_score, csat, value_score, nps, engagement_score, support_score })
+    }
+
+    // Fire-and-forget webhook to GHL
+    if (process.env.SPC_SATISFACTION_WEBHOOK_URL) {
+      try {
+        await fetch(process.env.SPC_SATISFACTION_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: member?.name || null,
+            email: email,
+            phone: member?.phone || null,
+          }),
+        })
+      } catch (webhookErr) {
+        console.error('[SPC Satisfaction] Webhook error (non-fatal):', webhookErr)
+      }
     }
 
     return NextResponse.json({ success: true, health_color, health_score, id: data?.id })
