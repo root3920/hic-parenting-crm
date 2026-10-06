@@ -1,17 +1,18 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useProfile } from '@/hooks/useProfile'
+import { TicketForm, CATEGORY_LABELS, PRIORITY_LABELS, CATEGORIES, PRIORITIES } from '@/components/tickets/TicketForm'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   LifeBuoy, Plus, Clock, CheckCircle, AlertTriangle, Loader2, Send,
-  ChevronLeft, ChevronRight, Search, X, Image as ImageIcon, Paperclip,
-  ArrowRight, MessageSquare, FileText, Zap,
+  ChevronLeft, ChevronRight, Search, Paperclip, Copy, Check, Globe,
+  ArrowRight, MessageSquare, FileText, Zap, Mail, ExternalLink,
 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -28,11 +29,15 @@ interface Ticket {
   status: string
   page_url: string | null
   attachment_urls: string[]
-  requester_id: string
+  requester_id: string | null
   requester_name: string | null
   requester_email: string | null
   requester_role: string | null
   admin_notes: string | null
+  source: string
+  contact_name: string | null
+  contact_email: string | null
+  contact_phone: string | null
   created_at: string
   started_at: string | null
   resolved_at: string | null
@@ -56,34 +61,12 @@ interface TicketEvent {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const CATEGORY_LABELS: Record<string, string> = {
-  crm_dashboard: 'CRM / Dashboard',
-  gohighlevel: 'GoHighLevel',
-  zapier_automatizaciones: 'Zapier / Automatizaciones',
-  email: 'Email',
-  acceso_contrasenas: 'Acceso / Contraseñas',
-  zoom_llamadas: 'Zoom / Llamadas',
-  hotmart_pagos: 'Hotmart / Pagos',
-  equipo_hardware: 'Equipo / Hardware',
-  otro: 'Otro',
-}
-
-const PRIORITY_LABELS: Record<string, string> = {
-  low: 'Baja',
-  medium: 'Media',
-  high: 'Alta',
-  urgent: 'Urgente',
-}
-
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente',
   in_progress: 'En curso',
   resolved: 'Resuelto',
   closed: 'Cerrado',
 }
-
-const CATEGORIES = Object.keys(CATEGORY_LABELS)
-const PRIORITIES = Object.keys(PRIORITY_LABELS)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -162,228 +145,17 @@ function NewTicketDialog({
   onOpenChange: (v: boolean) => void
   onCreated: () => void
 }) {
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('')
-  const [priority, setPriority] = useState('medium')
-  const [pageUrl, setPageUrl] = useState('')
-  const [description, setDescription] = useState('')
-  const [files, setFiles] = useState<File[]>([])
-  const [uploadedPaths, setUploadedPaths] = useState<string[]>([])
-  const [submitting, setSubmitting] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  function reset() {
-    setTitle(''); setCategory(''); setPriority('medium')
-    setPageUrl(''); setDescription(''); setFiles([])
-    setUploadedPaths([]); setSubmitting(false); setUploading(false)
-  }
-
-  async function uploadFile(file: File): Promise<string | null> {
-    const fd = new FormData()
-    fd.append('file', file)
-    const res = await fetch('/api/it-tickets/upload', { method: 'POST', body: fd })
-    if (!res.ok) {
-      const data = await res.json()
-      toast.error(data.error ?? 'Error subiendo archivo')
-      return null
-    }
-    const data = await res.json()
-    return data.path
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!title || title.length < 3) { toast.error('El título debe tener al menos 3 caracteres'); return }
-    if (!description || description.length < 10) { toast.error('La descripción debe tener al menos 10 caracteres'); return }
-    if (!category) { toast.error('Selecciona una categoría'); return }
-
-    setSubmitting(true)
-
-    // Upload pending files
-    const paths = [...uploadedPaths]
-    if (files.length > 0) {
-      setUploading(true)
-      for (const file of files) {
-        if (paths.length >= 3) break
-        const path = await uploadFile(file)
-        if (path) paths.push(path)
-      }
-      setUploading(false)
-    }
-
-    const res = await fetch('/api/it-tickets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title, description, category, priority,
-        page_url: pageUrl || undefined,
-        attachment_urls: paths,
-      }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      toast.error(data.error ?? 'Error creando ticket')
-      setSubmitting(false)
-      return
-    }
-
-    toast.success('Ticket creado correctamente')
-    reset()
-    onCreated()
-    onOpenChange(false)
-  }
-
-  function handleFiles(newFiles: FileList | File[]) {
-    const allowed = ['image/png', 'image/jpeg', 'image/webp']
-    const valid = Array.from(newFiles).filter(f => {
-      if (!allowed.includes(f.type)) { toast.error(`${f.name}: tipo no permitido`); return false }
-      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name}: excede 5 MB`); return false }
-      return true
-    })
-    setFiles(prev => [...prev, ...valid].slice(0, 3))
-  }
-
-  function handlePaste(e: React.ClipboardEvent) {
-    const items = e.clipboardData?.items
-    if (!items) return
-    const images: File[] = []
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith('image/')) {
-        const file = item.getAsFile()
-        if (file) images.push(file)
-      }
-    }
-    if (images.length > 0) {
-      e.preventDefault()
-      handleFiles(images)
-    }
-  }
-
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v) }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base">Nuevo Ticket IT</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2" onPaste={handlePaste}>
-          <div>
-            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1 block">Título *</label>
-            <input
-              value={title} onChange={e => setTitle(e.target.value)}
-              maxLength={120}
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/40"
-              placeholder="Describe brevemente el problema"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1 block">Categoría *</label>
-              <select
-                value={category} onChange={e => setCategory(e.target.value)}
-                className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-              >
-                <option value="">Seleccionar...</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1 block">Prioridad</label>
-              <select
-                value={priority} onChange={e => setPriority(e.target.value)}
-                className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-              >
-                {PRIORITIES.map(p => (
-                  <option key={p} value={p}>
-                    {PRIORITY_LABELS[p]}{p === 'urgent' ? ' (no puedo trabajar)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1 block">
-              ¿Dónde ocurrió? <span className="text-zinc-400 font-normal">(opcional)</span>
-            </label>
-            <input
-              value={pageUrl} onChange={e => setPageUrl(e.target.value)}
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/40"
-              placeholder="URL o nombre de la herramienta"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1 block">Descripción *</label>
-            <textarea
-              value={description} onChange={e => setDescription(e.target.value)}
-              rows={4}
-              maxLength={4000}
-              className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/40 resize-none"
-              placeholder="¿Qué intentabas hacer? ¿Qué pasó? ¿Desde cuándo ocurre?"
-            />
-            <p className="text-[10px] text-zinc-400 mt-0.5 text-right">{description.length}/4000</p>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1 block">
-              Captura de pantalla <span className="text-zinc-400 font-normal">(máx 3, pegar con Ctrl+V)</span>
-            </label>
-            <div
-              className="border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg p-4 text-center cursor-pointer hover:border-[#ffbd59]/50 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
-              onDrop={e => { e.preventDefault(); e.stopPropagation(); handleFiles(e.dataTransfer.files) }}
-            >
-              <ImageIcon className="h-5 w-5 mx-auto text-zinc-400 mb-1" />
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Arrastra imágenes aquí o haz clic para seleccionar
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                multiple
-                className="hidden"
-                onChange={e => { if (e.target.files) handleFiles(e.target.files) }}
-              />
-            </div>
-            {files.length > 0 && (
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {files.map((f, i) => (
-                  <div key={i} className="relative group">
-                    <img
-                      src={URL.createObjectURL(f)}
-                      alt={f.name}
-                      className="h-16 w-16 object-cover rounded-lg border border-zinc-200 dark:border-zinc-700"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
-                      className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-[#ffbd59] text-[#1a1a2e] hover:bg-[#ffbd59]/90 disabled:opacity-50 transition-colors"
-          >
-            {submitting ? (
-              <><Loader2 className="h-4 w-4 animate-spin" />{uploading ? 'Subiendo imágenes...' : 'Enviando...'}</>
-            ) : (
-              <><Send className="h-4 w-4" />Enviar ticket</>
-            )}
-          </button>
-        </form>
+        <TicketForm
+          mode="dashboard"
+          onSuccess={() => { onCreated(); onOpenChange(false) }}
+          className="mt-2"
+        />
       </DialogContent>
     </Dialog>
   )
@@ -515,12 +287,47 @@ function TicketDetail({
           <StatusBadge status={ticket.status} />
           <PriorityBadge priority={ticket.priority} />
           <span className="text-xs text-zinc-400">{CATEGORY_LABELS[ticket.category] ?? ticket.category}</span>
+          {ticket.source === 'public_form' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+              <Globe className="h-3 w-3" /> Formulario público
+            </span>
+          )}
         </div>
+
+        {/* External requester warning */}
+        {isAdmin && ticket.source === 'public_form' && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
+            <ExternalLink className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>Este ticket es de un solicitante externo. Contáctalo por email o teléfono para responder.</span>
+          </div>
+        )}
 
         {/* Info rows */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
           <div className="text-zinc-400">Solicitante</div>
           <div className="text-zinc-700 dark:text-zinc-300">{ticket.requester_name} ({ticket.requester_role})</div>
+          {ticket.source === 'public_form' && ticket.contact_email && <>
+            <div className="text-zinc-400">Email</div>
+            <div className="text-zinc-700 dark:text-zinc-300">
+              <a href={`mailto:${ticket.contact_email}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                <Mail className="h-3 w-3" /> {ticket.contact_email}
+              </a>
+            </div>
+          </>}
+          {ticket.source === 'public_form' && ticket.contact_phone && <>
+            <div className="text-zinc-400">Teléfono</div>
+            <div className="text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
+              <span>{ticket.contact_phone}</span>
+              <a
+                href={`https://wa.me/${ticket.contact_phone.replace(/[^0-9+]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-600 dark:text-green-400 hover:underline text-[10px] font-medium"
+              >
+                WhatsApp
+              </a>
+            </div>
+          </>}
           <div className="text-zinc-400">Fecha de solicitud</div>
           <div className="text-zinc-700 dark:text-zinc-300" title={formatFullDateTime(ticket.created_at)}>{formatDateTime(ticket.created_at)}</div>
           {ticket.resolved_at && <>
@@ -721,8 +528,12 @@ export default function TicketsITPage() {
   const [statusFilter, setStatusFilter] = useState<string>('open')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [sourceFilter, setSourceFilter] = useState('')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  // Copy link
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Dialogs
   const [newTicketOpen, setNewTicketOpen] = useState(false)
@@ -739,6 +550,7 @@ export default function TicketsITPage() {
     if (statusFilter && statusFilter !== 'all' && statusFilter !== 'open') params.set('status', statusFilter)
     if (priorityFilter) params.set('priority', priorityFilter)
     if (categoryFilter) params.set('category', categoryFilter)
+    if (sourceFilter) params.set('source', sourceFilter)
     if (debouncedSearch) params.set('q', debouncedSearch)
     params.set('page', String(page))
 
@@ -767,10 +579,10 @@ export default function TicketsITPage() {
     setTickets(list)
     setTotal(data.total ?? list.length)
     setLoading(false)
-  }, [statusFilter, priorityFilter, categoryFilter, debouncedSearch, page, isAdmin])
+  }, [statusFilter, priorityFilter, categoryFilter, sourceFilter, debouncedSearch, page, isAdmin])
 
   useEffect(() => { if (!profileLoading) fetchTickets() }, [fetchTickets, profileLoading])
-  useEffect(() => { setPage(0) }, [statusFilter, priorityFilter, categoryFilter, debouncedSearch])
+  useEffect(() => { setPage(0) }, [statusFilter, priorityFilter, categoryFilter, sourceFilter, debouncedSearch])
 
   // Admin KPIs
   const kpis = useMemo(() => {
@@ -829,6 +641,21 @@ export default function TicketsITPage() {
     <PageTransition>
       <div className="max-w-7xl mx-auto">
         <PageHeader title="Tickets IT" description="Reporta y da seguimiento a problemas técnicos">
+          {isAdmin && (
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/reportar-ticket`
+                navigator.clipboard.writeText(url)
+                setLinkCopied(true)
+                toast.success('Enlace del formulario público copiado')
+                setTimeout(() => setLinkCopied(false), 2000)
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              {linkCopied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+              {linkCopied ? 'Copiado' : 'Copiar enlace público'}
+            </button>
+          )}
           <button
             onClick={() => setNewTicketOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#ffbd59] text-[#1a1a2e] hover:bg-[#ffbd59]/90 transition-colors"
@@ -916,6 +743,16 @@ export default function TicketsITPage() {
                 <option value="">Todas las categorías</option>
                 {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
               </select>
+
+              <select
+                value={sourceFilter}
+                onChange={e => setSourceFilter(e.target.value)}
+                className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              >
+                <option value="">Todos los orígenes</option>
+                <option value="dashboard">Dashboard</option>
+                <option value="public_form">Formulario público</option>
+              </select>
             </>
           )}
 
@@ -996,7 +833,14 @@ export default function TicketsITPage() {
                             </td>
                             {isAdmin && (
                               <td className="py-2.5 px-3 whitespace-nowrap">
-                                <div className="text-zinc-700 dark:text-zinc-300">{t.requester_name}</div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-zinc-700 dark:text-zinc-300">{t.requester_name ?? t.contact_name}</span>
+                                  {t.source === 'public_form' && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300">
+                                      <Globe className="h-2.5 w-2.5 mr-0.5" />Público
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-[10px] text-zinc-400">{t.requester_role}</div>
                               </td>
                             )}

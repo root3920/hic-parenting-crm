@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes — no auth required
-  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback', '/apply', '/checklist', '/careers/dm-setter', '/careers/dm-setter-stage2', '/careers/closer', '/careers/csm', '/growth/new', '/spc-survey']
+  const PUBLIC_PATHS = ['/login', '/auth/setup', '/auth/callback', '/apply', '/checklist', '/careers/dm-setter', '/careers/dm-setter-stage2', '/careers/closer', '/careers/csm', '/growth/new', '/spc-survey', '/reportar-ticket']
   if (
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/invite') ||
@@ -84,6 +84,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/api/growth/coaches' ||
     pathname === '/api/growth/students' ||
     pathname === '/api/spc/satisfaction' ||
+    pathname.startsWith('/api/it-tickets/public') ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
   ) {
     return NextResponse.next()

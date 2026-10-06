@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status')
   const priority = searchParams.get('priority')
   const category = searchParams.get('category')
+  const source = searchParams.get('source')
   const q = searchParams.get('q')
   const pageParam = parseInt(searchParams.get('page') ?? '0', 10)
   const pageSize = 50
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
   if (status) query = query.eq('status', status)
   if (priority) query = query.eq('priority', priority)
   if (category) query = query.eq('category', category)
+  if (source) query = query.eq('source', source)
   if (q) {
     query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,ticket_number.eq.${parseInt(q) || 0}`)
   }

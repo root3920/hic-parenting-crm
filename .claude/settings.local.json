@@ -101,7 +101,9 @@
       "Bash(2)",
       "Bash(do grep:*)",
       "Bash(echo \"=== $f ===\")",
-      "Bash(cat \"/Users/federicoalarconu/hic-dashboard/app/\\(auth\\)/spc/page.tsx\")"
+      "Bash(cat \"/Users/federicoalarconu/hic-dashboard/app/\\(auth\\)/spc/page.tsx\")",
+      "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(public\\\\\\)/)",
+      "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(public\\\\\\)/apply/)"
     ]
   }
 }
