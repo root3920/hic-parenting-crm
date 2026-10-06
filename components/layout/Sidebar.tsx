@@ -29,6 +29,7 @@ import {
   HeartHandshake,
   Inbox,
   MessageSquare,
+  LifeBuoy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
@@ -68,6 +69,7 @@ const ALL_NAV_ITEMS = [
   { href: '/surveys',      label: 'Surveys',      icon: ClipboardList,   roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht'] as UserRole[] },
   { href: '/calendar',     label: 'Calendar',     icon: CalendarDays,    roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht', 'coach'] as UserRole[] },
   { href: '/careers',      label: 'Careers',      icon: Briefcase,       roles: ['admin'] as UserRole[] },
+  { href: '/tickets-it',   label: 'Tickets IT',   icon: LifeBuoy,        roles: ['admin', 'closer', 'setter', 'csm_spc', 'csm_ht', 'coach'] as UserRole[] },
 ]
 
 const ALL_QUICK_ACTIONS = [
