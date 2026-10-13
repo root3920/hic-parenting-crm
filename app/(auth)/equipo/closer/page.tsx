@@ -17,6 +17,8 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { GOALS, GoalConfig } from '@/lib/goals'
 import { getCurrentWeekRange } from '@/lib/dateUtils'
+import { getUtcRangeForLocalDate } from '@/lib/timezones'
+import { useUserTimezone } from '@/hooks/useUserTimezone'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, Cell,
@@ -343,6 +345,7 @@ function EditCloserReportModal({ report, onClose, onSaved }: { report: CloserDai
 export default function CloserDashboardPage() {
   const supabase = useMemo(() => createClient(), [])
   const { profile } = useProfile()
+  const { timezone, loading: tzLoading } = useUserTimezone()
   const isAdmin = profile?.role === 'admin'
   const [reports, setReports] = useState<CloserDailyReport[]>([])
   const [loading, setLoading] = useState(true)
@@ -372,7 +375,11 @@ export default function CloserDashboardPage() {
   }, [preset, customFrom, customTo])
 
   const fetchData = useCallback(async () => {
+    if (tzLoading) return
     setLoading(true)
+    // Compute timezone-aware UTC range for the date window
+    const fromRange = getUtcRangeForLocalDate(fromDate, timezone)
+    const toRange = getUtcRangeForLocalDate(toDate, timezone)
     const [reportsRes, callsRes, matchesRes] = await Promise.all([
       supabase
         .from('closer_daily_reports')
@@ -383,8 +390,8 @@ export default function CloserDashboardPage() {
       supabase
         .from('calls')
         .select('id, full_name, email, status, call_status, call_type, start_date, closer_name')
-        .gte('start_date', fromDate)
-        .lte('start_date', toDate + 'T23:59:59'),
+        .gte('start_date', fromRange.startIso)
+        .lt('start_date', toRange.endIso),
       supabase
         .from('call_sale_matches')
         .select('call_id, transaction_id, transactions(cost)')
@@ -400,7 +407,7 @@ export default function CloserDashboardPage() {
       tx_cost: (Array.isArray(m.transactions) ? m.transactions[0]?.cost : m.transactions?.cost) ?? 0,
     })))
     setLoading(false)
-  }, [supabase, fromDate, toDate])
+  }, [supabase, fromDate, toDate, timezone, tzLoading])
 
   useEffect(() => { fetchData() }, [fetchData])
 

@@ -9,7 +9,7 @@ import { ArrowLeft, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { formatTimeInTimezone } from '@/lib/timezones'
+import { formatTimeInTimezone, getUtcRangeForLocalDate, getTimezoneAbbr } from '@/lib/timezones'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { useProfile } from '@/hooks/useProfile'
 
@@ -284,7 +284,7 @@ function CallReportCard({ call, report, onUpdate, index, timezone }: {
 export default function NuevoReporteCloserPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
-  const { timezone } = useUserTimezone()
+  const { timezone, loading: tzLoading } = useUserTimezone()
   const [form, setForm] = useState<FormState>(initialState)
   const [submitting, setSubmitting] = useState(false)
   const [closerOptions, setCloserOptions] = useState<string[]>([])
@@ -301,6 +301,10 @@ export default function NuevoReporteCloserPage() {
   const [dayCalls, setDayCalls] = useState<DayCall[]>([])
   const [callsLoading, setCallsLoading] = useState(false)
   const [callReports, setCallReports] = useState<Record<string, CallReport>>({})
+  const [showAdjacentCalls, setShowAdjacentCalls] = useState(false)
+  const [adjacentCalls, setAdjacentCalls] = useState<DayCall[]>([])
+  const [adjacentLoading, setAdjacentLoading] = useState(false)
+  const [missedCallWarning, setMissedCallWarning] = useState<DayCall[]>([])
 
   // Load closer options from profiles table (via API to bypass RLS)
   useEffect(() => {
@@ -317,17 +321,18 @@ export default function NuevoReporteCloserPage() {
       })
   }, [])
 
-  // Fetch calls for selected date + closer
+  // Fetch calls for selected date + closer (timezone-aware)
   useEffect(() => {
-    if (!form.date || !form.closer_name) return
+    if (!form.date || !form.closer_name || tzLoading) return
     setCallsLoading(true)
     setCallReports({})
+    const { startIso, endIso } = getUtcRangeForLocalDate(form.date, timezone)
     supabase
       .from('calls')
       .select('id, start_date, full_name, email, phone, meeting_url, status, call_type, notes, call_status, next_step, call_summary')
       .eq('closer_name', form.closer_name)
-      .gte('start_date', `${form.date}T00:00:00`)
-      .lte('start_date', `${form.date}T23:59:59`)
+      .gte('start_date', startIso)
+      .lt('start_date', endIso)
       .order('start_date', { ascending: true })
       .then(({ data }) => {
         const calls = data ?? []
@@ -366,7 +371,7 @@ export default function NuevoReporteCloserPage() {
         setCallReports(initialReports)
         setCallsLoading(false)
       })
-  }, [supabase, form.date, form.closer_name])
+  }, [supabase, form.date, form.closer_name, timezone, tzLoading])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -394,6 +399,38 @@ export default function NuevoReporteCloserPage() {
       toast.error('Date and closer name are required')
       return
     }
+
+    // Safety check: look for calls in a wider window (day -12h / +12h)
+    // that might belong to this local day but were missed
+    if (missedCallWarning.length === 0) {
+      const { startIso, endIso } = getUtcRangeForLocalDate(form.date, timezone)
+      const wideStart = new Date(new Date(startIso).getTime() - 12 * 3600000).toISOString()
+      const wideEnd = new Date(new Date(endIso).getTime() + 12 * 3600000).toISOString()
+      const { data: wideCalls } = await supabase
+        .from('calls')
+        .select('id, start_date, full_name, email, phone, meeting_url, status, call_type, notes, call_status, next_step, call_summary')
+        .eq('closer_name', form.closer_name)
+        .gte('start_date', wideStart)
+        .lt('start_date', wideEnd)
+        .in('status', ['Scheduled', 'Showed Up', 'No show', 'Cancelled', 'Rescheduled'])
+
+      if (wideCalls) {
+        const dayCallIds = new Set(dayCalls.map(c => c.id))
+        // Check which wide calls fall on the report date in the user's timezone
+        const missed = wideCalls.filter(c => {
+          if (dayCallIds.has(c.id)) return false
+          const callLocalDate = new Date(c.start_date).toLocaleDateString('en-CA', { timeZone: timezone })
+          return callLocalDate === form.date
+        })
+        if (missed.length > 0) {
+          setMissedCallWarning(missed)
+          toast.error(`Found ${missed.length} call(s) that might belong to this day but are not shown. Review below before saving.`)
+          return
+        }
+      }
+    }
+    setMissedCallWarning([])
+
     setSubmitting(true)
 
     const { error } = await supabase.from('closer_daily_reports').insert({
@@ -530,13 +567,16 @@ export default function NuevoReporteCloserPage() {
                 Calls
               </span>
               <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                Day's calls
+                Day&apos;s calls
                 {!callsLoading && dayCalls.length > 0 && (
                   <span className="ml-1">
                     ({dayCalls.length})
                     {allReported && <span className="ml-1 text-green-500">✓</span>}
                   </span>
                 )}
+              </span>
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 ml-auto">
+                Timezone: {getTimezoneAbbr(timezone)}
               </span>
             </div>
 
@@ -562,6 +602,53 @@ export default function NuevoReporteCloserPage() {
                     timezone={timezone}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* Adjacent-day calls link */}
+            {form.closer_name && form.date && (
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (showAdjacentCalls) { setShowAdjacentCalls(false); return }
+                    setAdjacentLoading(true)
+                    setShowAdjacentCalls(true)
+                    const [y, m, d] = form.date.split('-').map(Number)
+                    const prev = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().split('T')[0]
+                    const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().split('T')[0]
+                    const prevRange = getUtcRangeForLocalDate(prev, timezone)
+                    const nextRange = getUtcRangeForLocalDate(next, timezone)
+                    const { data } = await supabase
+                      .from('calls')
+                      .select('id, start_date, full_name, email, phone, meeting_url, status, call_type, notes, call_status, next_step, call_summary')
+                      .eq('closer_name', form.closer_name)
+                      .or(`and(start_date.gte.${prevRange.startIso},start_date.lt.${prevRange.endIso}),and(start_date.gte.${nextRange.startIso},start_date.lt.${nextRange.endIso})`)
+                      .order('start_date', { ascending: true })
+                    setAdjacentCalls(data ?? [])
+                    setAdjacentLoading(false)
+                  }}
+                  className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors underline"
+                >
+                  {showAdjacentCalls ? 'Hide adjacent days' : 'Missing a call? View yesterday/tomorrow'}
+                </button>
+                {showAdjacentCalls && (
+                  <div className="mt-2 space-y-2">
+                    {adjacentLoading ? (
+                      <div className="h-16 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
+                    ) : adjacentCalls.length === 0 ? (
+                      <p className="text-xs text-zinc-400 py-2">No calls found for adjacent days</p>
+                    ) : (
+                      adjacentCalls.map(call => (
+                        <div key={call.id} className="bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 text-left text-xs border border-zinc-200 dark:border-zinc-700">
+                          <span className="text-zinc-400">{formatTime(call.start_date, timezone)}</span>
+                          <span className="ml-2 font-medium text-zinc-700 dark:text-zinc-300">{call.full_name}</span>
+                          <span className="ml-2 text-zinc-400">({call.status})</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </SectionCard>
@@ -619,6 +706,34 @@ export default function NuevoReporteCloserPage() {
               className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59] resize-y"
             />
           </SectionCard>
+
+          {/* Missed call warning */}
+          {missedCallWarning.length > 0 && (
+            <SectionCard className="border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20">
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">
+                Possible missed calls detected
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+                The following call(s) fall on {form.date} in your timezone but were not in the day&apos;s list. Please verify before saving.
+              </p>
+              {missedCallWarning.map(call => (
+                <div key={call.id} className="bg-white dark:bg-zinc-800 rounded-lg p-3 text-xs border border-amber-200 dark:border-amber-700 mb-2">
+                  <span className="text-zinc-400">{formatTime(call.start_date, timezone)}</span>
+                  <span className="ml-2 font-medium text-zinc-700 dark:text-zinc-300">{call.full_name}</span>
+                  <span className="ml-2 text-zinc-400">({call.status})</span>
+                </div>
+              ))}
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setMissedCallWarning([])}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  Dismiss &amp; save anyway
+                </button>
+              </div>
+            </SectionCard>
+          )}
 
           <div className="pt-2 pb-8">
             <button

@@ -84,6 +84,79 @@ export function formatFullDateInTimezone(dateStr: string, userTimezone: string):
   return `${weekdayEs}, ${day} de ${monthEs} · ${hour}:${minute}${dayPeriod}`
 }
 
+// Get the UTC range [startIso, endIso) for a local date in a given timezone.
+// startIso = UTC instant when dateStr begins in timeZone
+// endIso   = UTC instant when dateStr+1 begins in timeZone (exclusive upper bound)
+// Handles DST correctly (23h and 25h days) using Intl — no fixed offsets.
+export function getUtcRangeForLocalDate(
+  dateStr: string,
+  timeZone: string
+): { startIso: string; endIso: string } {
+  // Parse the local midnight of dateStr in the given timezone.
+  // We use formatToParts to find the real UTC offset for that instant.
+  function localMidnightToUtc(ymd: string, tz: string): string {
+    const [y, m, d] = ymd.split('-').map(Number)
+    // Create a rough UTC guess (midnight UTC on that date)
+    // then adjust by the offset we discover.
+    const guess = new Date(Date.UTC(y, m - 1, d, 12, 0, 0)) // noon UTC to avoid date-boundary issues
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric',
+      hour12: false,
+    })
+    // Binary-search style: we know the local date, we need the UTC instant
+    // where local time = 00:00:00 on that date.
+    // Approach: compute offset from a nearby UTC instant, then derive.
+    const parts = fmt.formatToParts(guess)
+    const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0')
+    const localAtGuess = new Date(Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')))
+    // offset = local - UTC  (in ms)
+    const offsetMs = localAtGuess.getTime() - guess.getTime()
+    // Midnight local on dateStr = Date.UTC(y, m-1, d, 0, 0, 0) - offsetMs
+    const midnightUtc = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - offsetMs)
+
+    // Verify: the offset might differ at midnight vs noon (DST boundary).
+    // Re-check the offset at the computed midnight.
+    const parts2 = fmt.formatToParts(midnightUtc)
+    const get2 = (type: string) => parseInt(parts2.find(p => p.type === type)?.value ?? '0')
+    const localAtMidnight = new Date(Date.UTC(get2('year'), get2('month') - 1, get2('day'), get2('hour'), get2('minute'), get2('second')))
+    const offsetMs2 = localAtMidnight.getTime() - midnightUtc.getTime()
+
+    if (offsetMs2 !== offsetMs) {
+      // Offset changed — recalculate with the correct offset
+      return new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - offsetMs2).toISOString()
+    }
+    return midnightUtc.toISOString()
+  }
+
+  // Next day string
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const nextDay = new Date(Date.UTC(y, m - 1, d + 1))
+  const nextDayStr = nextDay.toISOString().split('T')[0]
+
+  return {
+    startIso: localMidnightToUtc(dateStr, timeZone),
+    endIso: localMidnightToUtc(nextDayStr, timeZone),
+  }
+}
+
+// Get timezone abbreviation for display
+export function getTimezoneAbbr(timeZone: string): string {
+  const entry = US_TIMEZONES.find(tz => tz.value === timeZone)
+  if (entry) return entry.label
+  // Fallback: use Intl to get short name
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      timeZoneName: 'short',
+    }).formatToParts(new Date())
+    return parts.find(p => p.type === 'timeZoneName')?.value ?? timeZone
+  } catch {
+    return timeZone
+  }
+}
+
 // Check if a date is today in user timezone
 export function isToday(dateStr: string, userTimezone: string): boolean {
   if (!dateStr) return false
