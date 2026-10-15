@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -1437,8 +1437,6 @@ interface PaymentPlanData {
   }
 }
 
-type PpFilter = 'all' | 'at_risk' | 'on_track'
-
 // ─── Payment Plans Chart Tooltip ─────────────────────────────────────────────
 
 function PaymentChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; color: string }>; label?: string }) {
@@ -1457,11 +1455,127 @@ function PaymentChartTooltip({ active, payload, label }: { active?: boolean; pay
   return null
 }
 
+// ─── Payment Plan helpers ────────────────────────────────────────────────────
+
+type PlanGroup = 'overdue' | 'on_track' | 'completed'
+
+function getPlanGroup(s: PaymentPlanStudent): PlanGroup {
+  if (s.isOverdue) return 'overdue'
+  if (s.paid >= s.totalInstallments) return 'completed'
+  return 'on_track'
+}
+
+/** Normalize string for accent-insensitive search */
+function normalizeSearch(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+// ─── Reusable Plan Table ────────────────────────────────────────────────────
+
+function PlanTable({ students, group, emptyMsg }: { students: PaymentPlanStudent[]; group: PlanGroup; emptyMsg: string }) {
+  return (
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+              <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Student</th>
+              <th className="text-right px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">$/Installment</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Start Date</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Last Payment</th>
+              <th className="text-right px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Last Amount</th>
+              <th className="text-center px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Paid / Total</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider min-w-[140px]">Progress</th>
+              <th className="text-center px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+              <th className="text-right px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Pending</th>
+            </tr>
+          </thead>
+          <tbody>
+            {students.map((s) => (
+              <tr key={s.id} className={cn(
+                'border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors',
+                group === 'overdue' && 'bg-red-50/50 dark:bg-red-900/10'
+              )}>
+                <td className="px-4 py-3 font-medium text-zinc-800 dark:text-zinc-200">{s.name}</td>
+                <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{formatCurrency(s.amountPerInstallment)}</td>
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                  {new Date(s.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </td>
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                  {s.lastPaymentDate
+                    ? new Date(s.lastPaymentDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : '—'}
+                </td>
+                <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">
+                  {s.lastPaymentAmount != null ? formatCurrency(s.lastPaymentAmount) : '—'}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className={cn(
+                    'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold',
+                    s.paid === s.totalInstallments
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                  )}>
+                    {s.paid} / {s.totalInstallments}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-700 rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all',
+                          s.progressPct === 100 ? 'bg-green-500' : group === 'overdue' ? 'bg-red-500' : 'bg-blue-500'
+                        )}
+                        style={{ width: `${s.progressPct}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 w-8 text-right">{s.progressPct}%</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {group === 'overdue' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                      <AlertCircle className="h-3 w-3" /> Overdue ({s.overdueInstallments})
+                    </span>
+                  ) : group === 'completed' ? (
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                      Complete
+                    </span>
+                  ) : (
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                      On Track
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right font-medium text-zinc-700 dark:text-zinc-300">
+                  {s.pending > 0 ? formatCurrency(s.pending) : <span className="text-green-600 dark:text-green-400">Paid</span>}
+                </td>
+              </tr>
+            ))}
+            {students.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-4 py-8 text-center text-zinc-400 dark:text-zinc-500">
+                  {emptyMsg}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ─── Payment Plans Dashboard ─────────────────────────────────────────────────
 
 function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null; loading: boolean }) {
   const [expanded, setExpanded] = useState(true)
-  const [ppFilter, setPpFilter] = useState<PpFilter>('all')
+  const [overdueOpen, setOverdueOpen] = useState(true)
+  const [onTrackOpen, setOnTrackOpen] = useState(true)
+  const [completedOpen, setCompletedOpen] = useState(false)
+  const [ppSearch, setPpSearch] = useState('')
+  const overdueRef = useRef<HTMLDivElement>(null)
 
   if (loading) {
     return (
@@ -1484,33 +1598,53 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
 
   const { totals, students: allStudents } = data
 
-  // Filter students based on selected tab
-  const filteredStudents = allStudents.filter((s) => {
-    if (ppFilter === 'at_risk') return s.isOverdue
-    if (ppFilter === 'on_track') return !s.isOverdue
-    return true
-  })
+  // Apply search filter
+  const searchNorm = normalizeSearch(ppSearch)
+  const searchFiltered = searchNorm
+    ? allStudents.filter((s) => normalizeSearch(s.name).includes(searchNorm))
+    : allStudents
 
-  // Sort: overdue students first (by overdue count desc), then by name
-  const sortedStudents = [...filteredStudents].sort((a, b) => {
+  // Group students using the single classification function
+  const overdueStudents = searchFiltered.filter((s) => getPlanGroup(s) === 'overdue')
+  const onTrackStudents = searchFiltered.filter((s) => getPlanGroup(s) === 'on_track')
+  const completedStudents = searchFiltered.filter((s) => getPlanGroup(s) === 'completed')
+
+  // Sort each group
+  const sortedOverdue = [...overdueStudents].sort((a, b) => {
     if (a.overdueInstallments !== b.overdueInstallments) return b.overdueInstallments - a.overdueInstallments
+    if (a.pending !== b.pending) return b.pending - a.pending
+    return a.name.localeCompare(b.name)
+  })
+  const sortedOnTrack = [...onTrackStudents].sort((a, b) => {
+    const aDate = a.lastPaymentDate ?? ''
+    const bDate = b.lastPaymentDate ?? ''
+    if (aDate !== bDate) return aDate.localeCompare(bDate) // ascending — longest since payment first
+    return a.name.localeCompare(b.name)
+  })
+  const sortedCompleted = [...completedStudents].sort((a, b) => {
+    const aDate = a.lastPaymentDate ?? ''
+    const bDate = b.lastPaymentDate ?? ''
+    if (aDate !== bDate) return bDate.localeCompare(aDate) // descending — most recent first
     return a.name.localeCompare(b.name)
   })
 
-  const atRiskCount = allStudents.filter((s) => s.isOverdue).length
-  const onTrackCount = allStudents.filter((s) => !s.isOverdue).length
+  // Group totals for header
+  const overdueTotalCount = allStudents.filter((s) => getPlanGroup(s) === 'overdue').length
+  const onTrackTotalCount = allStudents.filter((s) => getPlanGroup(s) === 'on_track').length
+  const completedTotalCount = allStudents.filter((s) => getPlanGroup(s) === 'completed').length
 
-  const chartData = sortedStudents.map((s) => ({
+  // Pending $ per group
+  const overduePending = overdueStudents.reduce((sum, s) => sum + s.pending, 0)
+  const onTrackPending = onTrackStudents.reduce((sum, s) => sum + s.pending, 0)
+  const completedCollected = completedStudents.reduce((sum, s) => sum + s.collected, 0)
+
+  // Chart: only active students (overdue + on track)
+  const activeStudents = [...sortedOverdue, ...sortedOnTrack]
+  const chartData = activeStudents.map((s) => ({
     label: s.name.length > 15 ? s.name.slice(0, 15) + '…' : s.name,
     collected: s.collected,
     pending: s.pending,
   }))
-
-  const ppTabs: { key: PpFilter; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: allStudents.length },
-    { key: 'at_risk', label: 'At Risk', count: atRiskCount },
-    { key: 'on_track', label: 'On Track', count: onTrackCount },
-  ]
 
   return (
     <div className="mb-6">
@@ -1521,11 +1655,9 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
         <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
           <CreditCard className="h-4 w-4 text-[#ffbd59]" /> Payment Plans
           <span className="text-xs font-normal text-zinc-400">({totals.studentsWithPlan} students)</span>
-          {totals.totalOverdue > 0 && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-              {totals.totalOverdue} overdue
-            </span>
-          )}
+          <span className="text-xs font-normal text-zinc-400">
+            &middot; {overdueTotalCount} overdue &middot; {onTrackTotalCount} on track &middot; {completedTotalCount} completed
+          </span>
         </h3>
         {expanded
           ? <ChevronUp className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
@@ -1538,20 +1670,25 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
             {[
-              { label: 'Students w/ Plan', value: totals.studentsWithPlan, icon: <Users className="h-4 w-4" />, fmt: false, danger: false },
-              { label: 'Installments Paid', value: totals.totalPaid, icon: <CheckCircle2 className="h-4 w-4" />, fmt: false, danger: false },
-              { label: 'Installments Remaining', value: totals.totalRemaining, icon: <AlertCircle className="h-4 w-4" />, fmt: false, danger: false },
-              { label: 'Overdue Installments', value: totals.totalOverdue, icon: <AlertCircle className="h-4 w-4" />, fmt: false, danger: true },
-              { label: 'Total Collected', value: totals.totalCollected, icon: <DollarSign className="h-4 w-4" />, fmt: true, danger: false },
-              { label: 'Total Pending', value: totals.totalPending, icon: <TrendingUp className="h-4 w-4" />, fmt: true, danger: false },
-            ].map(({ label, value, icon, fmt, danger }) => (
+              { label: 'Students w/ Plan', value: totals.studentsWithPlan, icon: <Users className="h-4 w-4" />, fmt: false, danger: false, clickOverdue: false },
+              { label: 'Installments Paid', value: totals.totalPaid, icon: <CheckCircle2 className="h-4 w-4" />, fmt: false, danger: false, clickOverdue: false },
+              { label: 'Installments Remaining', value: totals.totalRemaining, icon: <AlertCircle className="h-4 w-4" />, fmt: false, danger: false, clickOverdue: false },
+              { label: 'Overdue Installments', value: totals.totalOverdue, icon: <AlertCircle className="h-4 w-4" />, fmt: false, danger: true, clickOverdue: true },
+              { label: 'Total Collected', value: totals.totalCollected, icon: <DollarSign className="h-4 w-4" />, fmt: true, danger: false, clickOverdue: false },
+              { label: 'Total Pending', value: totals.totalPending, icon: <TrendingUp className="h-4 w-4" />, fmt: true, danger: false, clickOverdue: false },
+            ].map(({ label, value, icon, fmt, danger, clickOverdue }) => (
               <div
                 key={label}
+                onClick={clickOverdue && value > 0 ? () => {
+                  setOverdueOpen(true)
+                  overdueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                } : undefined}
                 className={cn(
                   'rounded-xl border p-4',
                   danger && value > 0
                     ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                    : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
+                    : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800',
+                  clickOverdue && value > 0 && 'cursor-pointer hover:ring-2 hover:ring-red-300 dark:hover:ring-red-700 transition-shadow'
                 )}
               >
                 <div className="flex items-start justify-between mb-1">
@@ -1571,161 +1708,144 @@ function PaymentPlansDashboard({ data, loading }: { data: PaymentPlanData | null
             ))}
           </div>
 
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 mb-4 w-fit">
-            {ppTabs.map(({ key, label, count }) => (
-              <button
-                key={key}
-                onClick={() => setPpFilter(key)}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5',
-                  ppFilter === key
-                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                )}
-              >
-                {label}
-                <span className={cn(
-                  'text-xs px-1.5 py-0.5 rounded-full font-semibold',
-                  ppFilter === key
-                    ? key === 'at_risk' && count > 0
-                      ? 'bg-red-100 dark:bg-red-800/60 text-red-700 dark:text-red-300'
-                      : 'bg-blue-100 dark:bg-blue-800/60 text-blue-700 dark:text-blue-300'
-                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400'
-                )}>
-                  {count}
-                </span>
+          {/* Search */}
+          <div className="relative mb-4 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+            <input
+              type="text"
+              value={ppSearch}
+              onChange={(e) => setPpSearch(e.target.value)}
+              placeholder="Search student…"
+              className="w-full text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg pl-9 pr-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#ffbd59]/30 focus:border-[#ffbd59]"
+            />
+            {ppSearch && (
+              <button onClick={() => setPpSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
+                <X className="h-3.5 w-3.5" />
               </button>
-            ))}
+            )}
           </div>
 
-          {/* Table */}
-          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden mb-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                    <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Student</th>
-                    <th className="text-right px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">$/Installment</th>
-                    <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Start Date</th>
-                    <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Last Payment</th>
-                    <th className="text-right px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Last Amount</th>
-                    <th className="text-center px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Paid / Total</th>
-                    <th className="text-left px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider min-w-[140px]">Progress</th>
-                    <th className="text-center px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
-                    <th className="text-right px-4 py-2.5 font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Pending</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedStudents.map((s) => (
-                    <tr key={s.id} className={cn(
-                      'border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors',
-                      s.isOverdue && 'bg-red-50/50 dark:bg-red-900/10'
-                    )}>
-                      <td className="px-4 py-3 font-medium text-zinc-800 dark:text-zinc-200">{s.name}</td>
-                      <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{formatCurrency(s.amountPerInstallment)}</td>
-                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                        {new Date(s.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </td>
-                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                        {s.lastPaymentDate
-                          ? new Date(s.lastPaymentDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">
-                        {s.lastPaymentAmount != null ? formatCurrency(s.lastPaymentAmount) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={cn(
-                          'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold',
-                          s.paid === s.totalInstallments
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                        )}>
-                          {s.paid} / {s.totalInstallments}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-700 rounded-full overflow-hidden">
-                            <div
-                              className={cn(
-                                'h-full rounded-full transition-all',
-                                s.progressPct === 100 ? 'bg-green-500' : s.isOverdue ? 'bg-red-500' : 'bg-blue-500'
-                              )}
-                              style={{ width: `${s.progressPct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400 w-8 text-right">{s.progressPct}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {s.isOverdue ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-                            <AlertCircle className="h-3 w-3" /> Overdue ({s.overdueInstallments})
-                          </span>
-                        ) : s.paid === s.totalInstallments ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
-                            Complete
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                            On Track
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-zinc-700 dark:text-zinc-300">
-                        {s.pending > 0 ? formatCurrency(s.pending) : <span className="text-green-600 dark:text-green-400">Paid</span>}
-                      </td>
-                    </tr>
-                  ))}
-                  {sortedStudents.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-zinc-400 dark:text-zinc-500">
-                        No students match this filter.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {/* ── Section: Overdue ── */}
+          <div ref={overdueRef} className="mb-4">
+            <button
+              onClick={() => setOverdueOpen(!overdueOpen)}
+              className="flex items-center justify-between w-full mb-2 group"
+            >
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                <span className="text-sm font-semibold text-red-700 dark:text-red-400">Overdue</span>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                  {overdueStudents.length}
+                </span>
+                {overdueStudents.length > 0 && (
+                  <span className="text-xs text-red-500 dark:text-red-400">
+                    {formatCurrency(overduePending)} pending
+                  </span>
+                )}
+              </div>
+              {overdueOpen
+                ? <ChevronUp className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                : <ChevronDown className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+              }
+            </button>
+            {overdueOpen && (
+              <PlanTable students={sortedOverdue} group="overdue" emptyMsg="No students in this section." />
+            )}
+          </div>
+
+          {/* ── Section: On Track ── */}
+          <div className="mb-4">
+            <button
+              onClick={() => setOnTrackOpen(!onTrackOpen)}
+              className="flex items-center justify-between w-full mb-2 group"
+            >
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">On Track</span>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  {onTrackStudents.length}
+                </span>
+                {onTrackStudents.length > 0 && (
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(onTrackPending)} pending
+                  </span>
+                )}
+              </div>
+              {onTrackOpen
+                ? <ChevronUp className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                : <ChevronDown className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+              }
+            </button>
+            {onTrackOpen && (
+              <PlanTable students={sortedOnTrack} group="on_track" emptyMsg="No students in this section." />
+            )}
+          </div>
+
+          {/* ── Section: Completed ── */}
+          <div className="mb-4">
+            <button
+              onClick={() => setCompletedOpen(!completedOpen)}
+              className="flex items-center justify-between w-full mb-2 group"
+            >
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="text-sm font-semibold text-green-700 dark:text-green-400">Completed</span>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                  {completedStudents.length}
+                </span>
+                {completedStudents.length > 0 && (
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    {formatCurrency(completedCollected)} collected
+                  </span>
+                )}
+              </div>
+              {completedOpen
+                ? <ChevronUp className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                : <ChevronDown className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+              }
+            </button>
+            {completedOpen && (
+              <PlanTable students={sortedCompleted} group="completed" emptyMsg="No students in this section." />
+            )}
+          </div>
+
+          {/* Stacked Bar Chart — active students only */}
+          {activeStudents.length > 0 && (
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">Collected vs Pending per Student</p>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: activeStudents.length > 4 ? 40 : 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={activeStudents.length > 4
+                      ? { fontSize: 10, fill: '#71717a', textAnchor: 'end' as const }
+                      : { fontSize: 11, fill: '#71717a' }
+                    }
+                    angle={activeStudents.length > 4 ? -40 : 0}
+                    interval={0}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#71717a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                    width={45}
+                  />
+                  <Tooltip content={<PaymentChartTooltip />} cursor={{ fill: '#f4f4f5' }} />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    iconType="circle"
+                    iconSize={8}
+                  />
+                  <Bar dataKey="collected" name="Collected" stackId="a" fill="#1D9E75" radius={[0, 0, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="pending" name="Pending" stackId="a" fill="#ffbd59" radius={[3, 3, 0, 0]} maxBarSize={48} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          </div>
-
-          {/* Stacked Bar Chart */}
-          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">Collected vs Pending per Student</p>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: sortedStudents.length > 4 ? 40 : 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tick={sortedStudents.length > 4
-                    ? { fontSize: 10, fill: '#71717a', textAnchor: 'end' as const }
-                    : { fontSize: 11, fill: '#71717a' }
-                  }
-                  angle={sortedStudents.length > 4 ? -40 : 0}
-                  interval={0}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#71717a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                  width={45}
-                />
-                <Tooltip content={<PaymentChartTooltip />} cursor={{ fill: '#f4f4f5' }} />
-                <Legend
-                  wrapperStyle={{ fontSize: 11 }}
-                  iconType="circle"
-                  iconSize={8}
-                />
-                <Bar dataKey="collected" name="Collected" stackId="a" fill="#1D9E75" radius={[0, 0, 0, 0]} maxBarSize={48} />
-                <Bar dataKey="pending" name="Pending" stackId="a" fill="#ffbd59" radius={[3, 3, 0, 0]} maxBarSize={48} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </>
       )}
     </div>
