@@ -105,7 +105,9 @@
       "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(public\\\\\\)/)",
       "Bash(ls /Users/federicoalarconu/hic-dashboard/app/\\\\\\(public\\\\\\)/apply/)",
       "Bash(node -e \"console.log\\(process.version\\)\")",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Read(//Users/federicoalarconu/**)",
+      "Read(//Users/federicoalarconu/Desktop/**)"
     ]
   }
 }

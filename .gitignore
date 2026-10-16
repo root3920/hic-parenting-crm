@@ -38,3 +38,6 @@ next-env.d.ts
 node_modules
 .next
 .env*
+
+# sensitive data exports
+data/*.csv

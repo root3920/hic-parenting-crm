@@ -2247,6 +2247,7 @@ export default function SpcPage() {
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     .toISOString()
     .slice(0, 10)
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
   // ── Members ───────────────────────────────────────────────────────────────
   const activeMembers = useMemo(
@@ -2434,10 +2435,7 @@ export default function SpcPage() {
   // Use string comparison on YYYY-MM to avoid timezone issues with DATE fields
   const thisMonthCancels = nonTrialCancels.filter((c) => {
     if (!c.cancelled_at) return false
-    const cancelMonth = c.cancelled_at.slice(0, 7)
-    const now2 = new Date()
-    const currentMonth = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`
-    return cancelMonth === currentMonth
+    return c.cancelled_at.slice(0, 7) === currentMonth
   })
   const unknownDateCancels = cancellations.filter((c) => !c.cancelled_at).length
 
@@ -2480,6 +2478,96 @@ export default function SpcPage() {
       : churnRate <= 6
       ? 'bg-amber-100 text-amber-700'
       : 'bg-red-100 text-red-700'
+
+  // ── Monthly summary (always current month, independent of period selector) ──
+  const monthlySummary = useMemo(() => {
+    // 1. Churn Rate — reuse exact same thisMonthCancels / churnRate logic
+    const paidCancelsThisMonth = cancelsThisMonth  // = thisMonthCancels.length
+    const churnDenom = activeMembers.length + paidCancelsThisMonth
+    const churn = churnDenom > 0
+      ? parseFloat(((paidCancelsThisMonth / churnDenom) * 100).toFixed(1))
+      : 0
+
+    // 2. Trial → Active: current month conversions / (conversions + trial cancels this month)
+    const conversionsThisMonth = conversions.filter(
+      (c) => c.converted_at && c.converted_at.slice(0, 7) === currentMonth
+    ).length
+    const trialCancelsThisMonth = trialCancels.filter(
+      (c) => c.cancelled_at && c.cancelled_at.slice(0, 7) === currentMonth
+    ).length
+    const trialConvDenom = conversionsThisMonth + trialCancelsThisMonth
+    const trialConvMonth = trialConvDenom > 0
+      ? parseFloat(((conversionsThisMonth / trialConvDenom) * 100).toFixed(1))
+      : NaN
+    // All-time
+    const allTimeConvDenom = conversions.length + trialCancels.length
+    const trialConvAllTime = allTimeConvDenom > 0
+      ? parseFloat(((conversions.length / allTimeConvDenom) * 100).toFixed(1))
+      : NaN
+
+    // 3. Active count
+    const activeCount = activeMembers.length
+
+    // 4. Trial count
+    const trialCount = trialMembers.length
+
+    // 5. New trials this month — deduplicated by email across members + cancellations
+    const seenTrialEmails = new Set<string>()
+    // Current trial members with joined_at this month
+    const trialMembersThisMonth = members.filter((m) => {
+      if (m.status !== 'trial' || !m.joined_at) return false
+      return m.joined_at.slice(0, 7) === currentMonth
+    })
+    for (const m of trialMembersThisMonth) seenTrialEmails.add(m.email.toLowerCase())
+    // Active members who converted from trial this month
+    const convertedFromTrialThisMonth = members.filter((m) => {
+      if (m.status !== 'active' || !m.converted_from_trial) return false
+      if (!m.joined_at) return false
+      return m.joined_at.slice(0, 7) === currentMonth
+    })
+    for (const m of convertedFromTrialThisMonth) seenTrialEmails.add(m.email.toLowerCase())
+    // Trial cancellations this month (subscribed_at or cancelled_at month check)
+    // These are people who started as trial this month but already cancelled
+    const trialCancelledThisMonth = trialCancels.filter((c) => {
+      if (!c.email) return false
+      if (seenTrialEmails.has(c.email.toLowerCase())) return false // already counted
+      // Check if they subscribed this month
+      if (c.subscribed_at && c.subscribed_at.slice(0, 7) === currentMonth) return true
+      // Or cancelled this month (likely started recently)
+      if (c.cancelled_at && c.cancelled_at.slice(0, 7) === currentMonth) return true
+      return false
+    })
+    for (const c of trialCancelledThisMonth) {
+      if (c.email) seenTrialEmails.add(c.email.toLowerCase())
+    }
+
+    const newTrialsTotal = seenTrialEmails.size
+    const stillInTrial = trialMembersThisMonth.length
+    const converted = convertedFromTrialThisMonth.length
+    const cancelledFromTrial = trialCancelledThisMonth.length
+
+    // 6. Cancellations split
+    const activeCancelledThisMonth = paidCancelsThisMonth // same as churn numerator
+    const trialCancelledThisMonthCount = trialCancelsThisMonth
+
+    return {
+      churn,
+      churnDenom,
+      paidCancelsThisMonth,
+      trialConvMonth,
+      trialConvAllTime,
+      conversionsThisMonth,
+      trialConvDenom,
+      activeCount,
+      trialCount,
+      newTrialsTotal,
+      stillInTrial,
+      converted,
+      cancelledFromTrial,
+      activeCancelledThisMonth,
+      trialCancelledThisMonthCount,
+    }
+  }, [activeMembers, trialMembers, members, cancelsThisMonth, conversions, trialCancels, currentMonth])
 
   // Last 6 months for cancellations chart
   const last6Months: string[] = []
@@ -2965,6 +3053,112 @@ export default function SpcPage() {
         {/* ── CRECIMIENTO ───────────────────────────────────────────────── */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* ── Resumen clave del mes (always current month) ── */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">
+                Resumen clave del mes
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {/* 1. Churn Rate */}
+                <Card title="Cancelaciones de activos (pagos) del mes / (activos actuales + esas cancelaciones)">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1 font-medium uppercase tracking-wide">Tasa de Churn</p>
+                    {loading ? (
+                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <>
+                        <p className={cn('text-2xl font-bold', churnColor)}>{churnRate}%</p>
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                          {monthlySummary.paidCancelsThisMonth} cancelaciones / {monthlySummary.churnDenom} miembros
+                        </p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 2. Trial → Activo */}
+                <Card title="Conversiones de trial a activo / (conversiones + cancelaciones de trial) del mes">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1 font-medium uppercase tracking-wide">Trial → Activo</p>
+                    {loading ? (
+                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                          {isNaN(monthlySummary.trialConvMonth) ? '—' : `${monthlySummary.trialConvMonth}%`}
+                        </p>
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                          Histórico: {isNaN(monthlySummary.trialConvAllTime) ? '—' : `${monthlySummary.trialConvAllTime}%`}
+                        </p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 3. Activos actuales */}
+                <Card title="Miembros con status 'active' (excluye pausados)">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1 font-medium uppercase tracking-wide">Activos actuales</p>
+                    {loading ? (
+                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{monthlySummary.activeCount}</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 4. Trials actuales */}
+                <Card title="Miembros con status 'trial' actualmente">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1 font-medium uppercase tracking-wide">Trials actuales</p>
+                    {loading ? (
+                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{monthlySummary.trialCount}</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 5. Trials nuevos este mes */}
+                <Card title="Trials que iniciaron este mes (cualquier status actual), deduplicados por email entre miembros y cancelaciones">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1 font-medium uppercase tracking-wide">Trials nuevos (mes)</p>
+                    {loading ? (
+                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{monthlySummary.newTrialsTotal}</p>
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                          {monthlySummary.stillInTrial} en trial · {monthlySummary.converted} convirtieron · {monthlySummary.cancelledFromTrial} cancelaron
+                        </p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 6. Cancelaciones del mes */}
+                <Card title="Cancelaciones del mes calendario actual, separadas por tipo (activos pagos vs trials)">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1 font-medium uppercase tracking-wide">Cancelaciones (mes)</p>
+                    {loading ? (
+                      <div className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                    ) : (
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                          <span className="font-semibold">{monthlySummary.activeCancelledThisMonth}</span>
+                          <span className="text-zinc-400 dark:text-zinc-500 ml-1">activos cancelados</span>
+                        </p>
+                        <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                          <span className="font-semibold">{monthlySummary.trialCancelledThisMonthCount}</span>
+                          <span className="text-zinc-400 dark:text-zinc-500 ml-1">trials cancelados</span>
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
             {/* Period filter */}
             <div>
               <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden w-fit">
