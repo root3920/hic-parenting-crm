@@ -2470,6 +2470,10 @@ export default function SpcPage() {
     [escalatedMembers]
   )
 
+  // Exclude escalated cancellations from all metric calculations — defined early
+  // because cancelPlatforms and filteredCancellations reference it above.
+  const metricCancellations = cancellations.filter((c) => !isEscalatedCancel(c))
+
   const mrr = activeMembers.reduce(
     (s, m) => s + (m.plan === 'annual' ? (m.amount ?? 0) / 12 : (m.amount ?? 0)),
     0
@@ -2633,8 +2637,6 @@ export default function SpcPage() {
   }, [cancellations, cancelSearch, cancelSort, cancelDateFrom, cancelDateTo, cancelTypeFilter, cancelPlatformFilter])
 
   // ── Cancellation metrics ─────────────────────────────────────────────────
-  // Exclude escalated cancellations from all churn/metric calculations
-  const metricCancellations = cancellations.filter((c) => !isEscalatedCancel(c))
   const paidCancels = metricCancellations.filter(isPaidCancel)
   const trialCancels = metricCancellations.filter(isTrialCancel)
   const pendingCancels = metricCancellations.filter((c) => !isPaidCancel(c) && !isTrialCancel(c))
