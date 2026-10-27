@@ -476,6 +476,18 @@ function MemberProfileModal({
     escalated_notes: '',
   })
 
+
+  function resetEscalateForm() {
+    setEscalateForm({
+      escalated_program: 'PWU 1:1 - 6 meses',
+      escalated_contract_value: '',
+      escalated_installments: '',
+      escalated_first_payment: '',
+      escalated_at: new Date().toISOString().slice(0, 10),
+      escalated_notes: '',
+    })
+  }
+
   async function handleEscalate() {
     if (selected.kind !== 'member') return
     setEscalateSaving(true)
@@ -495,38 +507,91 @@ function MemberProfileModal({
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         toast.error(err.error ?? 'Failed to escalate')
+        // Revert the selector to the real status
+        setField('status', selected.data.status as MemberStatus)
         return
       }
       const { member: updated } = await res.json()
       toast.success('Member escalated to High Ticket')
       onMemberUpdate(updated)
       setEscalateOpen(false)
+      setIsEditing(false)
     } catch {
       toast.error('Failed to escalate member')
+      setField('status', selected.data.status as MemberStatus)
     } finally {
       setEscalateSaving(false)
     }
   }
 
-  async function handleRevertEscalation() {
+  function cancelEscalateForm() {
+    setEscalateOpen(false)
+    // Revert the status selector to the member's actual status
+    if (selected.kind === 'member') {
+      setField('status', selected.data.status as MemberStatus)
+    }
+    resetEscalateForm()
+  }
+
+  async function handleRevertEscalation(targetStatus?: MemberStatus) {
     if (selected.kind !== 'member') return
-    if (!confirm('Revert escalation? The member will return to their previous SPC status.')) return
+    const statusLabel = targetStatus ? STATUS_CONFIG[targetStatus]?.label ?? targetStatus : 'previous'
+    if (!confirm(`Esto quita al miembro de Escalados y lo devuelve a la lista de ${statusLabel}. ¿Continuar?`)) {
+      // Revert selector
+      setField('status', 'escalated')
+      return
+    }
     setEscalateSaving(true)
     try {
       const res = await fetch(`/api/spc/members/${selected.data.id}/escalate`, { method: 'DELETE' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         toast.error(err.error ?? 'Failed to revert')
+        setField('status', 'escalated')
         return
       }
-      const { member: updated } = await res.json()
-      toast.success('Escalation reverted')
-      onMemberUpdate(updated)
+      const { member: reverted } = await res.json()
+      // If user picked a specific target status different from the restored one, apply it
+      if (targetStatus && targetStatus !== reverted.status) {
+        setField('status', targetStatus)
+        // Update the selected data so handleSave knows the real current status
+        onMemberUpdate(reverted)
+        toast.success(`Escalation reverted. Click "Save Changes" to set status to ${statusLabel}.`)
+      } else {
+        toast.success('Escalation reverted')
+        onMemberUpdate(reverted)
+        setIsEditing(false)
+      }
     } catch {
       toast.error('Failed to revert escalation')
+      setField('status', 'escalated')
     } finally {
       setEscalateSaving(false)
     }
+  }
+
+  // Handle status button click in the edit form
+  function handleStatusSelect(key: MemberStatus) {
+    if (selected.kind !== 'member') return
+    const currentReal = selected.data.status as MemberStatus
+
+    if (key === 'escalated' && currentReal !== 'escalated') {
+      // Selecting Escalated on a non-escalated member → open form
+      setField('status', key)
+      resetEscalateForm()
+      setEscalateOpen(true)
+      return
+    }
+
+    if (key !== 'escalated' && currentReal === 'escalated') {
+      // De-escalating → confirm and revert via API
+      setField('status', key)
+      handleRevertEscalation(key)
+      return
+    }
+
+    // Normal status change
+    setField('status', key)
   }
 
   function setField<K extends keyof MemberEditForm>(key: K, value: MemberEditForm[K]) {
@@ -579,6 +644,12 @@ function MemberProfileModal({
 
   async function handleSave() {
     if (selected.kind !== 'member') return
+    // Escalated status must go through the escalation endpoint, not direct save
+    if (editForm.status === 'escalated' && selected.data.status !== 'escalated') {
+      resetEscalateForm()
+      setEscalateOpen(true)
+      return
+    }
     setSaving(true)
     try {
       const updatePayload: Record<string, unknown> = {
@@ -887,7 +958,7 @@ function MemberProfileModal({
           )}
           {selected.kind === 'member' && !isEditing && selected.data.status === 'escalated' && (
             <button
-              onClick={handleRevertEscalation}
+              onClick={() => handleRevertEscalation()}
               disabled={escalateSaving}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 transition-colors disabled:opacity-50"
               title="Revert escalation"
@@ -1370,14 +1441,15 @@ function MemberProfileModal({
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
                   Membership Status
                 </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(Object.entries(STATUS_CONFIG) as [MemberStatus, { label: string; cls: string }][]).filter(([key]) => key !== 'escalated').map(([key, cfg]) => (
+                <div className="grid grid-cols-5 gap-1.5">
+                  {(Object.entries(STATUS_CONFIG) as [MemberStatus, { label: string; cls: string }][]).map(([key, cfg]) => (
                     <button
                       key={key}
                       type="button"
-                      onClick={() => setField('status', key)}
+                      disabled={escalateSaving}
+                      onClick={() => handleStatusSelect(key)}
                       className={cn(
-                        'py-1.5 px-2 rounded-lg text-xs font-semibold border-2 transition-all',
+                        'py-1.5 px-2 rounded-lg text-xs font-semibold border-2 transition-all disabled:opacity-50',
                         editForm.status === key
                           ? cn('border-current', cfg.cls)
                           : 'border-transparent bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'
@@ -1664,7 +1736,7 @@ function MemberProfileModal({
               {escalateSaving ? 'Escalando…' : 'Confirmar escalamiento'}
             </button>
             <button
-              onClick={() => setEscalateOpen(false)}
+              onClick={cancelEscalateForm}
               className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
               Cancelar
