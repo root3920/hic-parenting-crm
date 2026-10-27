@@ -21,7 +21,10 @@ const EMAIL_CORRECTIONS: Record<string, string> = {
   'natalycardenasgrau08@gmail.cm': 'natalycardenasgrau08@gmail.com',
 }
 
-const SKIP_EMAILS = new Set(['theile.nycole@gmail.com'])
+// Dina Bychkova duplicate: Hotmart row (uppercase D) must be cancelled,
+// Kajabi row (lowercase) is the active subscription.
+const DINA_HOTMART_ID = '2e71fb83-ce45-4397-8a2e-b613aaac090f'
+const DINA_KAJABI_ID = 'c2f7e442-e4f7-4423-8c88-956a45875dd3'
 
 const EXCLUDED_EMAILS = new Set(['highimpactclub@gmail.com'])
 const EXCLUDED_DOMAINS = ['@hicparenting.com']
@@ -179,11 +182,6 @@ function buildActions(
       reports.push(`EXCLUDED: ${email} — ${name} — ${exclusion}`)
       continue
     }
-    if (SKIP_EMAILS.has(email)) {
-      reports.push(`SKIPPED: ${email} — ${name} — alias (no changes)`)
-      continue
-    }
-
     const db = dbByEmail[email]
     const rs = r.real_status
     const provider = mapProvider(r.payment_provider)
@@ -349,6 +347,21 @@ async function execute(supabase: SupabaseClient, actions: Action[], dryRun: bool
         stats.members_updated++
         continue
       }
+      // Protect escalated members — don't change their status
+      const { data: currentMember } = await supabase
+        .from('spc_members')
+        .select('status')
+        .eq('email', action.email)
+        .maybeSingle()
+      if (currentMember?.status === 'escalated') {
+        // Strip status from the update fields
+        const { status: _s, ...safeFields } = action.fields as Record<string, unknown>
+        if (Object.keys(safeFields).length > 0) {
+          await supabase.from('spc_members').update(safeFields).eq('email', action.email)
+        }
+        stats.members_updated++
+        continue
+      }
       const { data, error } = await supabase
         .from('spc_members')
         .update(action.fields)
@@ -420,10 +433,16 @@ async function execute(supabase: SupabaseClient, actions: Action[], dryRun: bool
   return stats
 }
 
+// ─── Duplicate check helpers ─────────────────────────────────────────────────
+
+function normName(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z ]/g, '').trim()
+}
+function digitsOnly(s: string): string { return s.replace(/\D/g, '') }
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  // Validate env
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {
@@ -433,20 +452,19 @@ async function main() {
   }
 
   const dryRun = !process.argv.includes('--apply')
-  console.log(`\n${'='.repeat(60)}`)
+  console.log(`\n${'='.repeat(70)}`)
   console.log(`  SPC Snapshot Sync — ${dryRun ? 'DRY RUN' : '🔴 APPLYING CHANGES'}`)
-  console.log(`${'='.repeat(60)}\n`)
+  console.log(`${'='.repeat(70)}\n`)
 
   // 1. Parse CSV
   const raw = readFileSync(CSV_PATH, 'utf-8')
   const rows = parseCSV(raw)
   console.log(`CSV: ${rows.length} data rows parsed (${EXPECTED_COLUMNS} columns each)`)
 
-  // 2. Connect to Supabase
+  // 2. Connect
   const supabase = createClient(url, key)
 
-  // 3. Fetch current DB state
-  // Try with new columns first, fall back to without them (pre-migration)
+  // 3. Fetch DB
   let dbMembers: DbMember[] | null = null
   let mErr: { message: string } | null = null
   const selectFull = 'id, email, name, status, plan, amount, provider, joined_at, next_payment_date, trial_end_date, payment_issue, months_unpaid'
@@ -454,7 +472,7 @@ async function main() {
 
   const res1 = await supabase.from('spc_members').select(selectFull)
   if (res1.error && res1.error.message.includes('payment_issue')) {
-    console.log('  (payment_issue column not found — using legacy select. Run migration 045 first for --apply)')
+    console.log('  (payment_issue column not found — run migration 045 before --apply)')
     const res2 = await supabase.from('spc_members').select(selectLegacy)
     dbMembers = (res2.data ?? []) as unknown as DbMember[]
     mErr = res2.error
@@ -471,9 +489,41 @@ async function main() {
 
   console.log(`DB: ${dbMembers!.length} members, ${dbCancels!.length} cancellations\n`)
 
+  // ── SECTION 0: Duplicate email detection ──────────────────────────────────
+  console.log(`${'='.repeat(70)}`)
+  console.log(`DUPLICATE EMAIL DETECTION`)
+  console.log(`${'='.repeat(70)}`)
+  const emailGroups: Record<string, DbMember[]> = {}
+  for (const m of dbMembers!) {
+    const e = (m.email as string).toLowerCase().trim()
+    if (!emailGroups[e]) emailGroups[e] = []
+    emailGroups[e].push(m)
+  }
+  const duplicates = Object.entries(emailGroups).filter(([, rows]) => rows.length > 1)
+  if (duplicates.length === 0) {
+    console.log('  No duplicate emails found.\n')
+  } else {
+    console.log(`  Found ${duplicates.length} duplicate email(s):\n`)
+    for (const [email, rows] of duplicates) {
+      console.log(`  ${email} (${rows.length} rows):`)
+      for (const r of rows) {
+        console.log(`    id=${r.id}  status=${r.status}  provider=${r.provider}  plan=${r.plan}  joined=${r.joined_at}  email_raw=${r.email}`)
+      }
+    }
+    console.log()
+  }
+
+  // Build dbByEmail — for duplicates, prefer the non-Hotmart / active row
   const dbByEmail: Record<string, DbMember> = {}
   for (const m of dbMembers!) {
-    dbByEmail[(m.email as string).toLowerCase().trim()] = m
+    const e = (m.email as string).toLowerCase().trim()
+    const existing = dbByEmail[e]
+    if (!existing) {
+      dbByEmail[e] = m
+    } else {
+      // Keep the one that is active + not Hotmart (prefer Kajabi/Stripe)
+      if (m.status === 'active' && m.provider !== 'Hotmart') dbByEmail[e] = m
+    }
   }
 
   const cancelsByEmail: Record<string, { email: string; cancelled_at: string }[]> = {}
@@ -483,71 +533,219 @@ async function main() {
     cancelsByEmail[e].push(c)
   }
 
-  // 4. Build action plan
+  // ── SECTION 1: Dina Bychkova duplicate resolution ─────────────────────────
+  console.log(`${'='.repeat(70)}`)
+  console.log(`DINA BYCHKOVA DUPLICATE RESOLUTION`)
+  console.log(`${'='.repeat(70)}`)
+  const dinaHotmart = dbMembers!.find(m => m.id === DINA_HOTMART_ID)
+  const dinaKajabi = dbMembers!.find(m => m.id === DINA_KAJABI_ID)
+  if (dinaHotmart && dinaKajabi) {
+    console.log(`\n  BEFORE:`)
+    console.log(`    Hotmart row (${DINA_HOTMART_ID}):`)
+    console.log(`      email=${dinaHotmart.email}  status=${dinaHotmart.status}  provider=${dinaHotmart.provider}  plan=${dinaHotmart.plan}  joined=${dinaHotmart.joined_at}`)
+    console.log(`    Kajabi row (${DINA_KAJABI_ID}):`)
+    console.log(`      email=${dinaKajabi.email}  status=${dinaKajabi.status}  provider=${dinaKajabi.provider}  plan=${dinaKajabi.plan}  joined=${dinaKajabi.joined_at}`)
+
+    console.log(`\n  AFTER (planned):`)
+    console.log(`    Hotmart row → status=cancelled, email normalized to lowercase`)
+    console.log(`      (prevents cron from overwriting Kajabi row via .eq('email', lowercase).maybeSingle())`)
+    console.log(`    Kajabi row  → lead_score=12, phone=13473873429 (transferred from Hotmart)`)
+    console.log(`    NO spc_cancellations insert (person stays active via Kajabi)`)
+  } else {
+    console.log(`  WARNING: Dina rows not found by ID. Skipping duplicate resolution.`)
+  }
+  console.log()
+
+  // ── SECTION 2: Build action plan ──────────────────────────────────────────
   const { actions, reports } = buildActions(rows, dbByEmail, cancelsByEmail)
 
-  // 5. Print action plan
-  console.log(`── REPORTS (${reports.length}) ──`)
+  // ── SECTION 3: Reports ────────────────────────────────────────────────────
+  console.log(`${'='.repeat(70)}`)
+  console.log(`REPORTS (no DB changes)`)
+  console.log(`${'='.repeat(70)}`)
   const excludedReports = reports.filter(r => r.startsWith('EXCLUDED'))
-  const skippedReports = reports.filter(r => r.startsWith('SKIPPED'))
   const shouldCancelReports = reports.filter(r => r.startsWith('SHOULD_CANCEL'))
-  console.log(`  Excluded: ${excludedReports.length}`)
+  console.log(`\n  Excluded (${excludedReports.length}):`)
   for (const r of excludedReports) console.log(`    ${r}`)
-  console.log(`  Skipped: ${skippedReports.length}`)
-  for (const r of skippedReports) console.log(`    ${r}`)
-  console.log(`  Should-cancel (report only): ${shouldCancelReports.length}`)
+  console.log(`\n  Should-cancel — REPORT ONLY (${shouldCancelReports.length}):`)
   for (const r of shouldCancelReports) console.log(`    ${r}`)
 
-  // Group actions by type
+  // ── SECTION 4: Detailed transitions (nominal lists) ───────────────────────
   const updates = actions.filter(a => a.type === 'update_member') as Extract<Action, { type: 'update_member' }>[]
   const inserts = actions.filter(a => a.type === 'insert_member') as Extract<Action, { type: 'insert_member' }>[]
   const cancelIns = actions.filter(a => a.type === 'insert_cancellation') as Extract<Action, { type: 'insert_cancellation' }>[]
 
-  console.log(`\n── MEMBER UPDATES (${updates.length}) ──`)
+  console.log(`\n${'='.repeat(70)}`)
+  console.log(`MEMBER STATUS TRANSITIONS`)
+  console.log(`${'='.repeat(70)}`)
 
-  // Group updates by transition
-  const byTransition: Record<string, typeof updates> = {}
+  const transitionGroups: Record<string, typeof updates> = {}
   for (const u of updates) {
-    const key = `${u.dbStatus} → ${u.newStatus}${u.fields.payment_issue ? ' (payment_issue)' : ''}`
-    if (!byTransition[key]) byTransition[key] = []
-    byTransition[key].push(u)
+    const key = `${u.dbStatus} → ${u.newStatus}${u.fields.payment_issue ? ' +payment_issue' : ''}`
+    if (!transitionGroups[key]) transitionGroups[key] = []
+    transitionGroups[key].push(u)
   }
-  for (const [transition, items] of Object.entries(byTransition).sort()) {
+
+  // Print each transition with full detail
+  for (const [transition, items] of Object.entries(transitionGroups).sort()) {
     console.log(`\n  ${transition} (${items.length}):`)
     for (const u of items) {
-      console.log(`    ${u.email.padEnd(45)} ${u.name.padEnd(30)} ${u.reason}`)
+      // Find CSV row for last_payment_at
+      const csvRow = rows.find(r => {
+        let e = r.email.toLowerCase().trim()
+        e = EMAIL_CORRECTIONS[e] || e
+        return e === u.email
+      })
+      const lpa = csvRow?.last_payment_at || '—'
+      console.log(`    ${u.email.padEnd(45)} ${u.name.padEnd(30)} last_payment: ${lpa}`)
     }
   }
 
-  console.log(`\n── NEW MEMBER INSERTS (${inserts.length}) ──`)
+  // ── SECTION 5: New paused inserts + duplicate check ───────────────────────
+  console.log(`\n${'='.repeat(70)}`)
+  console.log(`NEW PAUSED INSERTS — DUPLICATE CHECK (${inserts.length})`)
+  console.log(`${'='.repeat(70)}`)
   for (const ins of inserts) {
-    console.log(`  ${ins.email.padEnd(45)} ${ins.name.padEnd(30)} ${ins.reason}`)
+    const csvRow = rows.find(r => {
+      let e = r.email.toLowerCase().trim()
+      e = EMAIL_CORRECTIONS[e] || e
+      return e === ins.email
+    })
+    const csvPhone = digitsOnly(csvRow?.phone || '')
+    const csvName = normName(ins.name)
+    const nameParts = csvName.split(' ').filter(Boolean)
+
+    console.log(`\n  ${ins.email} — ${ins.name} — phone: ${csvRow?.phone || '(none)'}`)
+
+    // Phone match
+    if (csvPhone.length >= 7) {
+      const phoneDups = dbMembers!.filter(m => {
+        const dbPhone = digitsOnly((m as unknown as Record<string, string>).phone || '')
+        return dbPhone.length >= 7 && (dbPhone.includes(csvPhone) || csvPhone.includes(dbPhone))
+      })
+      if (phoneDups.length > 0) {
+        console.log(`    PHONE MATCH:`)
+        for (const d of phoneDups) console.log(`      ${d.email} — ${d.name} — status: ${d.status}`)
+      } else {
+        console.log(`    No phone match`)
+      }
+    } else {
+      console.log(`    No phone to check`)
+    }
+
+    // Name match
+    const nameDups = dbMembers!.filter(m => {
+      const dbName = normName(m.name)
+      if (dbName === csvName) return true
+      return nameParts.length >= 2 && nameParts.every(p => dbName.includes(p))
+    })
+    if (nameDups.length > 0) {
+      console.log(`    NAME MATCH:`)
+      for (const d of nameDups) console.log(`      ${d.email} — ${d.name} — status: ${d.status}`)
+    } else {
+      console.log(`    No name match`)
+    }
   }
 
-  console.log(`\n── CANCELLATION INSERTS (${cancelIns.length}) ──`)
+  // ── SECTION 6: spc_cancellations inserts ──────────────────────────────────
+  console.log(`\n${'='.repeat(70)}`)
+  console.log(`spc_cancellations TO INSERT (${cancelIns.length})`)
+  console.log(`${'='.repeat(70)}`)
   for (const ci of cancelIns) {
-    console.log(`  ${ci.email.padEnd(45)} ${ci.name.padEnd(30)} cancelled_at: ${(ci.fields.cancelled_at as string).slice(0, 10)}`)
+    // Verify final status of this email is not active/paused/trial
+    const finalUpdate = updates.find(u => u.email === ci.email)
+    const finalSt = finalUpdate ? finalUpdate.newStatus : (dbByEmail[ci.email]?.status ?? 'not_in_db')
+    const warn = ['active', 'paused', 'trial'].includes(finalSt) ? `  ⚠️ FINAL STATUS = ${finalSt}` : ''
+    console.log(`  ${ci.email.padEnd(45)} ${ci.name.padEnd(30)} cancelled_at: ${(ci.fields.cancelled_at as string).slice(0, 10)}  final: ${finalSt}${warn}`)
   }
 
-  // 6. Summary
-  console.log(`\n${'─'.repeat(60)}`)
+  // ── SECTION 7: Verification — projected final counts ──────────────────────
+  console.log(`\n${'='.repeat(70)}`)
+  console.log(`PROJECTED FINAL COUNTS`)
+  console.log(`${'='.repeat(70)}`)
+
+  // Simulate final state
+  const finalByEmail: Record<string, string> = {} // email -> status
+  for (const m of dbMembers!) {
+    const e = (m.email as string).toLowerCase().trim()
+    // For Dina Hotmart: will be cancelled
+    if (m.id === DINA_HOTMART_ID) {
+      finalByEmail[e + '__hotmart'] = 'cancelled'
+      continue
+    }
+    finalByEmail[e] = m.status
+  }
+  // Apply updates
+  for (const u of updates) {
+    finalByEmail[u.email] = u.newStatus
+  }
+  // Apply new inserts
+  for (const ins of inserts) {
+    finalByEmail[ins.email] = (ins.fields.status as string)
+  }
+
+  const counts: Record<string, number> = {}
+  for (const st of Object.values(finalByEmail)) {
+    counts[st] = (counts[st] || 0) + 1
+  }
+  for (const [s, c] of Object.entries(counts).sort()) console.log(`  ${s}: ${c}`)
+
+  // Unique active persons (dedup by lowercase email)
+  const activeEmails = new Set<string>()
+  for (const [key, st] of Object.entries(finalByEmail)) {
+    if (st === 'active' && !key.includes('__hotmart')) activeEmails.add(key)
+  }
+  const trialEmails = new Set<string>()
+  for (const [key, st] of Object.entries(finalByEmail)) {
+    if (st === 'trial' && !key.includes('__hotmart')) trialEmails.add(key)
+  }
+
+  console.log(`\n  Unique active persons:  ${activeEmails.size}`)
+  console.log(`  Unique trial persons:   ${trialEmails.size}`)
+  console.log(`  Active + Trial:         ${activeEmails.size + trialEmails.size}`)
+  console.log(`\n  Arithmetic: 84 (DB active post-Dina) − 6 (→cancelled) − 3 (→paused) + 2 (reactivations) + 1 (Julie Milne) = ${84 - 6 - 3 + 2 + 1}`)
+
+  // ── SECTION 8: Summary ────────────────────────────────────────────────────
+  console.log(`\n${'─'.repeat(70)}`)
   console.log(`SUMMARY:`)
+  console.log(`  Dina Hotmart fix:      1 (cancel + transfer data to Kajabi)`)
   console.log(`  Member updates:        ${updates.length}`)
   console.log(`  Member inserts:        ${inserts.length}`)
   console.log(`  Cancellation inserts:  ${cancelIns.length}`)
   console.log(`  Reports (no action):   ${reports.length}`)
-  console.log(`${'─'.repeat(60)}`)
+  console.log(`  payment_issue badges:  ${updates.filter(u => u.fields.payment_issue).length}`)
+  console.log(`${'─'.repeat(70)}`)
 
   if (dryRun) {
     console.log(`\n  ⚠️  DRY RUN — no changes written. Pass --apply to execute.\n`)
     return
   }
 
-  // 7. Execute
+  // ── EXECUTE ───────────────────────────────────────────────────────────────
+
+  // Step A: Dina duplicate resolution
+  if (dinaHotmart && dinaKajabi) {
+    console.log('\n  Resolving Dina duplicate...')
+    // Transfer lead_score and phone to Kajabi row
+    const { error: e1 } = await supabase.from('spc_members')
+      .update({ lead_score: 12, phone: '13473873429' })
+      .eq('id', DINA_KAJABI_ID)
+    if (e1) console.error(`  ERROR transferring data to Kajabi row: ${e1.message}`)
+    else console.log('  ✓ Transferred lead_score + phone to Kajabi row')
+
+    // Cancel Hotmart row + normalize email to lowercase
+    const { error: e2 } = await supabase.from('spc_members')
+      .update({ status: 'cancelled', email: 'dinabychkova@yahoo.com' })
+      .eq('id', DINA_HOTMART_ID)
+    if (e2) console.error(`  ERROR cancelling Hotmart row: ${e2.message}`)
+    else console.log('  ✓ Cancelled Hotmart row + normalized email')
+  }
+
+  // Step B: All other actions
   console.log(`\n  Executing ${actions.length} actions...\n`)
   const stats = await execute(supabase, actions, false)
 
-  console.log(`\n${'='.repeat(60)}`)
+  console.log(`\n${'='.repeat(70)}`)
   console.log(`RESULTS:`)
   console.log(`  Members updated:       ${stats.members_updated}`)
   console.log(`  Members inserted:      ${stats.members_inserted}`)
@@ -556,9 +754,9 @@ async function main() {
   if (stats.errors.length > 0) {
     for (const e of stats.errors) console.log(`    ${e}`)
   }
-  console.log(`${'='.repeat(60)}`)
+  console.log(`${'='.repeat(70)}`)
 
-  // 8. Verification query
+  // POST-SYNC VERIFICATION
   console.log(`\n── POST-SYNC VERIFICATION ──`)
   for (const status of ['active', 'trial', 'paused', 'expired', 'cancelled']) {
     const { count } = await supabase

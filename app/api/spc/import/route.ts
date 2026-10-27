@@ -229,12 +229,13 @@ export async function POST(req: NextRequest) {
           } else {
             upserted++
 
-            // Only update spc_members for new cancellations
+            // Only update spc_members for new cancellations (skip escalated)
             await supabaseAdmin
               .from('spc_members')
               .update({ status: 'cancelled' })
               .ilike('email', email)
               .in('status', ['active', 'trial'])
+              .neq('status', 'escalated')
           }
         }
       }
@@ -362,7 +363,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
 
       if (member) {
-        if (member.status === 'cancelled') {
+        if (member.status === 'cancelled' || member.status === 'escalated') {
           skippedAlreadyCancelled++
         } else {
           const { error: mErr } = await supabaseAdmin

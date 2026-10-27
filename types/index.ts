@@ -68,7 +68,7 @@ export interface SpcMember {
   phone?: string | null
   plan: 'monthly' | 'annual' | 'mid_ticket' | null
   amount: number | null
-  status: 'active' | 'trial' | 'cancelled' | 'expired'
+  status: 'active' | 'trial' | 'cancelled' | 'expired' | 'escalated'
   provider: 'Kajabi' | 'Stripe' | 'PayPal' | 'Hotmart' | null
   joined_at: string | null
   next_payment_date: string | null
@@ -80,6 +80,13 @@ export interface SpcMember {
   lead_score?: number | null
   converted_from_trial?: boolean | null
   converted_at?: string | null
+  escalated_at?: string | null
+  escalated_program?: string | null
+  escalated_contract_value?: number | null
+  escalated_installments?: number | null
+  escalated_first_payment?: number | null
+  escalated_notes?: string | null
+  status_before_escalation?: string | null
 }
 
 export interface SpcClassAttendance {

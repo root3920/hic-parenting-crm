@@ -110,6 +110,17 @@ export async function POST(req: NextRequest) {
 
         if (priceValue === 0) {
           // ── FREE TRIAL ──────────────────────────────────────────────
+          // Protect escalated members — don't overwrite their status
+          const { data: trialExisting } = await supabase
+            .from('spc_members')
+            .select('status')
+            .eq('email', email)
+            .maybeSingle()
+          if (trialExisting?.status === 'escalated') {
+            console.log(`[Hotmart Webhook] Free trial upsert skipped for escalated member: ${email}`)
+            break
+          }
+
           const joinedAt = approvedDate ?? now
           const trialEnd = new Date(joinedAt)
           trialEnd.setDate(trialEnd.getDate() + 30)
@@ -169,6 +180,28 @@ export async function POST(req: NextRequest) {
             .eq('email', email)
             .maybeSingle()
 
+          // Protect escalated members — allow payment data but not status change
+          if (existing?.status === 'escalated') {
+            console.log(`[Hotmart Webhook] Paid upsert: updating payment data only for escalated member: ${email}`)
+            await supabase.from('spc_members').update({
+              next_payment_date: nextPayment.toISOString().slice(0, 10),
+            }).eq('id', existing.id)
+            await supabase.from('transactions').insert({
+              date: dateStr,
+              offer_title: getOfferTitle(false),
+              cost: priceValue,
+              buyer_name: name,
+              buyer_email: email,
+              buyer_phone: phone,
+              currency,
+              transaction_id: transactionId,
+              source: 'Hotmart',
+              payment_source: paymentType,
+              status: 'completed',
+            })
+            break
+          }
+
           const convertedFromTrial = existing?.status === 'trial'
           // Use provider amount when available; fall back to standard pricing
           const effectiveAmount = priceValue > 0 ? priceValue : (plan === 'annual' ? 470 : 47)
@@ -221,12 +254,23 @@ export async function POST(req: NextRequest) {
           const nextPayment = new Date(now)
           nextPayment.setDate(nextPayment.getDate() + 30)
 
+          // Protect escalated — update payment date only, not status
+          const { data: renewMember } = await supabase
+            .from('spc_members')
+            .select('status')
+            .eq('email', email)
+            .maybeSingle()
+
+          const renewUpdate: Record<string, unknown> = {
+            next_payment_date: nextPayment.toISOString().slice(0, 10),
+          }
+          if (renewMember?.status !== 'escalated') {
+            renewUpdate.status = 'active'
+          }
+
           const { error: renewalError } = await supabase
             .from('spc_members')
-            .update({
-              next_payment_date: nextPayment.toISOString().slice(0, 10),
-              status: 'active',
-            })
+            .update(renewUpdate)
             .eq('email', email)
 
           if (renewalError) {
@@ -267,6 +311,21 @@ export async function POST(req: NextRequest) {
           .select('status, amount')
           .eq('email', email)
           .maybeSingle()
+
+        // Protect escalated members — don't change status or insert normal cancellation
+        if (cancelMember?.status === 'escalated') {
+          console.log(`[Hotmart Webhook] PURCHASE_CANCELED skipped for escalated member: ${email}`)
+          await supabase.from('spc_cancellations').insert({
+            name: name || 'Unknown',
+            email,
+            cancelled_at: now.toISOString(),
+            paid_cancel: false,
+            trial_cancel: false,
+            provider: 'Hotmart',
+            cancel_type: 'escalated',
+          })
+          break
+        }
 
         await supabase
           .from('spc_members')
@@ -324,6 +383,22 @@ export async function POST(req: NextRequest) {
           break
         }
 
+        // Protect escalated members
+        if (subMember.status === 'escalated') {
+          console.log(`[Hotmart Webhook] SUBSCRIPTION_CANCELLATION skipped for escalated member: ${subEmail}`)
+          await supabase.from('spc_cancellations').insert({
+            name: subName || 'Unknown',
+            email: subMember.email,
+            cancelled_at: cancelledAt,
+            paid_cancel: false,
+            trial_cancel: false,
+            provider: 'Hotmart',
+            cancel_type: 'escalated',
+          })
+          email = subEmail
+          break
+        }
+
         // Update using the member's id — unambiguous, avoids any email-matching issues
         const { data: updatedRow, error: subCancelError } = await supabase
           .from('spc_members')
@@ -374,6 +449,27 @@ export async function POST(req: NextRequest) {
 
       case 'PURCHASE_REFUNDED': {
         if (!email) break
+
+        // Protect escalated members
+        const { data: refundMember } = await supabase
+          .from('spc_members')
+          .select('status')
+          .eq('email', email)
+          .maybeSingle()
+
+        if (refundMember?.status === 'escalated') {
+          console.log(`[Hotmart Webhook] PURCHASE_REFUNDED skipped for escalated member: ${email}`)
+          await supabase.from('spc_cancellations').insert({
+            name: name || 'Unknown',
+            email,
+            cancelled_at: now.toISOString(),
+            paid_cancel: false,
+            trial_cancel: false,
+            provider: 'Hotmart',
+            cancel_type: 'escalated',
+          })
+          break
+        }
 
         await supabase
           .from('spc_members')

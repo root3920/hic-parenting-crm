@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
             provider: spcProvider,
             joined_at: date,
           })
-        } else if (existing.status !== 'cancelled') {
+        } else if (existing.status !== 'cancelled' && existing.status !== 'escalated') {
           await supabase.from('spc_members').update({ status: 'trial' }).eq('id', existing.id)
         }
       } else {
@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
               next_payment_date: npd.toISOString().slice(0, 10),
             }
 
-            if (existing.status === 'trial' || existing.status === 'expired') {
+            if ((existing.status === 'trial' || existing.status === 'expired') && existing.status !== 'escalated') {
               updateFields.status = 'active'
 
               // Check if this is a trial → paid conversion
@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
           converted_from_trial: false,
         })
         console.log('[SPC Webhook] Added RSC buyer as annual SPC member:', buyer_email)
-      } else if (existingRsc.status !== 'active') {
+      } else if (existingRsc.status !== 'active' && existingRsc.status !== 'escalated') {
         const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
         await supabase
           .from('spc_members')

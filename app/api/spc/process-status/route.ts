@@ -166,7 +166,15 @@ export async function POST(req: NextRequest) {
           const { error } = await supabase.from('spc_members').insert(memberData)
           if (error) {
             if (error.code === '23505') {
-              await supabase.from('spc_members').update(memberData).eq('email', email)
+              // Duplicate — check if escalated before overwriting
+              const { data: dupMember } = await supabase.from('spc_members').select('status').eq('email', email).maybeSingle()
+              if (dupMember?.status === 'escalated') {
+                // Only update payment data, not status
+                const { status: _s, ...safeData } = memberData
+                await supabase.from('spc_members').update(safeData).eq('email', email)
+              } else {
+                await supabase.from('spc_members').update(memberData).eq('email', email)
+              }
               results.hotmart_updated++
             } else {
               results.errors.push(`Sync insert ${email}: ${error.message}`)
@@ -176,22 +184,36 @@ export async function POST(req: NextRequest) {
             results.hotmart_created++
           }
         } else {
-          if (existing.status === 'active' && status === 'trial') {
-            memberData.status = 'active'
+          // Protect escalated members — update payment data but not status
+          if (existing.status === 'escalated') {
+            const { status: _s, ...safeData } = memberData
+            const { error } = await supabase
+              .from('spc_members')
+              .update(safeData)
+              .eq('id', existing.id)
+            if (error) {
+              results.errors.push(`Sync update ${email}: ${error.message}`)
+              continue
+            }
+            results.hotmart_updated++
+          } else {
+            if (existing.status === 'active' && status === 'trial') {
+              memberData.status = 'active'
+            }
+            if (existing.status === 'trial' && status === 'active') {
+              memberData.converted_from_trial = true
+              memberData.converted_at = todayStr
+            }
+            const { error } = await supabase
+              .from('spc_members')
+              .update(memberData)
+              .eq('id', existing.id)
+            if (error) {
+              results.errors.push(`Sync update ${email}: ${error.message}`)
+              continue
+            }
+            results.hotmart_updated++
           }
-          if (existing.status === 'trial' && status === 'active') {
-            memberData.converted_from_trial = true
-            memberData.converted_at = todayStr
-          }
-          const { error } = await supabase
-            .from('spc_members')
-            .update(memberData)
-            .eq('id', existing.id)
-          if (error) {
-            results.errors.push(`Sync update ${email}: ${error.message}`)
-            continue
-          }
-          results.hotmart_updated++
         }
 
         results.hotmart_synced++

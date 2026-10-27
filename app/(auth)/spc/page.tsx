@@ -65,7 +65,7 @@ interface SpcCancellation {
   subscribed_at: string | null
   amount: number
   plan: 'monthly' | 'annual' | 'mid_ticket' | null
-  cancel_type: 'paid_cancel' | 'pending_cancel' | 'trial_cancel' | null
+  cancel_type: 'paid_cancel' | 'pending_cancel' | 'trial_cancel' | 'escalated' | null
   created_at: string
   // columns added via CSV import
   subscription_id: string | null
@@ -90,7 +90,7 @@ type SelectedMember =
   | { kind: 'member'; data: SpcMember }
   | { kind: 'cancellation'; data: SpcCancellation }
 
-type Tab = 'overview' | 'active' | 'club' | 'trials' | 'expired' | 'cancellations' | 'satisfaction'
+type Tab = 'overview' | 'active' | 'club' | 'trials' | 'escalated' | 'expired' | 'cancellations' | 'satisfaction'
 
 interface SatisfactionResponse {
   id: string
@@ -164,6 +164,9 @@ function isTrialCancel(c: SpcCancellation) {
   if (c.trial_cancel === true) return true
   if (c.paid_cancel === true) return false
   return c.cancel_type === 'trial_cancel'
+}
+function isEscalatedCancel(c: SpcCancellation) {
+  return c.cancel_type === 'escalated'
 }
 
 function formatDateTime(d: string | null) {
@@ -267,7 +270,7 @@ function SpcModal({ onClose, children }: { onClose: () => void; children: React.
   )
 }
 
-type MemberStatus = 'active' | 'trial' | 'cancelled' | 'expired'
+type MemberStatus = 'active' | 'trial' | 'cancelled' | 'expired' | 'escalated'
 
 interface MemberEditForm {
   name: string
@@ -281,7 +284,7 @@ interface MemberEditForm {
   trial_end_date: string
 }
 
-type CancelTypeOrReactivate = 'paid_cancel' | 'pending_cancel' | 'trial_cancel' | 'reactivate_active' | 'reactivate_trial'
+type CancelTypeOrReactivate = 'paid_cancel' | 'pending_cancel' | 'trial_cancel' | 'escalated' | 'reactivate_active' | 'reactivate_trial'
 
 interface CancelEditForm {
   name: string
@@ -300,6 +303,7 @@ const STATUS_CONFIG: Record<MemberStatus, { label: string; cls: string }> = {
   trial:     { label: 'Trial',     cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
   cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
   expired:   { label: 'Expired',   cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
+  escalated: { label: 'Escalated', cls: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
 }
 
 function MemberProfileModal({
@@ -458,6 +462,71 @@ function MemberProfileModal({
       }
     } catch { toast.error('Failed to unlink') }
     setLinkingId(null)
+  }
+
+  // Escalation state
+  const [escalateOpen, setEscalateOpen] = useState(false)
+  const [escalateSaving, setEscalateSaving] = useState(false)
+  const [escalateForm, setEscalateForm] = useState({
+    escalated_program: 'PWU 1:1 - 6 meses',
+    escalated_contract_value: '',
+    escalated_installments: '',
+    escalated_first_payment: '',
+    escalated_at: new Date().toISOString().slice(0, 10),
+    escalated_notes: '',
+  })
+
+  async function handleEscalate() {
+    if (selected.kind !== 'member') return
+    setEscalateSaving(true)
+    try {
+      const res = await fetch(`/api/spc/members/${selected.data.id}/escalate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          escalated_program: escalateForm.escalated_program,
+          escalated_contract_value: parseFloat(escalateForm.escalated_contract_value) || null,
+          escalated_installments: parseInt(escalateForm.escalated_installments) || null,
+          escalated_first_payment: parseFloat(escalateForm.escalated_first_payment) || null,
+          escalated_at: escalateForm.escalated_at || null,
+          escalated_notes: escalateForm.escalated_notes || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? 'Failed to escalate')
+        return
+      }
+      const { member: updated } = await res.json()
+      toast.success('Member escalated to High Ticket')
+      onMemberUpdate(updated)
+      setEscalateOpen(false)
+    } catch {
+      toast.error('Failed to escalate member')
+    } finally {
+      setEscalateSaving(false)
+    }
+  }
+
+  async function handleRevertEscalation() {
+    if (selected.kind !== 'member') return
+    if (!confirm('Revert escalation? The member will return to their previous SPC status.')) return
+    setEscalateSaving(true)
+    try {
+      const res = await fetch(`/api/spc/members/${selected.data.id}/escalate`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? 'Failed to revert')
+        return
+      }
+      const { member: updated } = await res.json()
+      toast.success('Escalation reverted')
+      onMemberUpdate(updated)
+    } catch {
+      toast.error('Failed to revert escalation')
+    } finally {
+      setEscalateSaving(false)
+    }
   }
 
   function setField<K extends keyof MemberEditForm>(key: K, value: MemberEditForm[K]) {
@@ -807,6 +876,25 @@ function MemberProfileModal({
               <Pencil className="h-4 w-4" />
             </button>
           )}
+          {selected.kind === 'member' && !isEditing && selected.data.status !== 'escalated' && (
+            <button
+              onClick={() => setEscalateOpen(true)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-purple-700 bg-purple-100 hover:bg-purple-200 dark:text-purple-300 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 transition-colors"
+              title="Escalate to High Ticket"
+            >
+              ↗ Escalar
+            </button>
+          )}
+          {selected.kind === 'member' && !isEditing && selected.data.status === 'escalated' && (
+            <button
+              onClick={handleRevertEscalation}
+              disabled={escalateSaving}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 transition-colors disabled:opacity-50"
+              title="Revert escalation"
+            >
+              {escalateSaving ? 'Reverting…' : '↩ Revertir'}
+            </button>
+          )}
           <button
             onClick={async () => {
               if (selected.kind === 'cancellation') {
@@ -838,6 +926,33 @@ function MemberProfileModal({
           </button>
         </div>
       </div>
+
+      {/* Escalation info banner */}
+      {selected.kind === 'member' && selected.data.status === 'escalated' && !isEditing && (
+        <div className="mb-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl px-4 py-3">
+          <p className="text-xs font-semibold text-purple-800 dark:text-purple-200 mb-1">Escalado a High Ticket</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <span className="text-purple-600 dark:text-purple-400">Programa:</span>
+            <span className="font-medium text-purple-800 dark:text-purple-200">{selected.data.escalated_program}</span>
+            <span className="text-purple-600 dark:text-purple-400">Contrato:</span>
+            <span className="font-medium text-purple-800 dark:text-purple-200">{formatCurrency(selected.data.escalated_contract_value ?? 0)}</span>
+            <span className="text-purple-600 dark:text-purple-400">Cuotas:</span>
+            <span className="font-medium text-purple-800 dark:text-purple-200">{selected.data.escalated_installments} × {formatCurrency((selected.data.escalated_contract_value ?? 0) / (selected.data.escalated_installments ?? 1))}</span>
+            <span className="text-purple-600 dark:text-purple-400">1ra cuota cobrada:</span>
+            <span className="font-medium text-purple-800 dark:text-purple-200">{formatCurrency(selected.data.escalated_first_payment ?? 0)}</span>
+            <span className="text-purple-600 dark:text-purple-400">Fecha:</span>
+            <span className="font-medium text-purple-800 dark:text-purple-200">{selected.data.escalated_at ? formatDate(selected.data.escalated_at) : '—'}</span>
+            {selected.data.escalated_notes && (
+              <>
+                <span className="text-purple-600 dark:text-purple-400">Nota:</span>
+                <span className="font-medium text-purple-800 dark:text-purple-200">{selected.data.escalated_notes}</span>
+              </>
+            )}
+            <span className="text-purple-600 dark:text-purple-400">Status previo:</span>
+            <span className="font-medium text-purple-800 dark:text-purple-200">{selected.data.status_before_escalation ?? '—'}</span>
+          </div>
+        </div>
+      )}
 
       {/* Recovery banner for expired members */}
       {selected.kind === 'member' && selected.data.status === 'expired' && !isEditing && (
@@ -1256,7 +1371,7 @@ function MemberProfileModal({
                   Membership Status
                 </label>
                 <div className="grid grid-cols-4 gap-1.5">
-                  {(Object.entries(STATUS_CONFIG) as [MemberStatus, { label: string; cls: string }][]).map(([key, cfg]) => (
+                  {(Object.entries(STATUS_CONFIG) as [MemberStatus, { label: string; cls: string }][]).filter(([key]) => key !== 'escalated').map(([key, cfg]) => (
                     <button
                       key={key}
                       type="button"
@@ -1474,6 +1589,86 @@ function MemberProfileModal({
               member={selected.data}
               onUpdate={onMemberUpdate}
             />
+          </div>
+        </div>
+      )}
+      {/* Escalation form overlay */}
+      {escalateOpen && selected.kind === 'member' && (
+        <div className="absolute inset-0 bg-white/95 dark:bg-zinc-900/95 z-10 flex flex-col p-5 overflow-y-auto rounded-2xl">
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Escalar a High Ticket</h3>
+          <div className="space-y-3 flex-1">
+            <div>
+              <label className="text-xs font-medium text-zinc-500 mb-1 block">Programa</label>
+              <input
+                className={inputCls}
+                value={escalateForm.escalated_program}
+                onChange={(e) => setEscalateForm(f => ({ ...f, escalated_program: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-zinc-500 mb-1 block">Valor del contrato ($)</label>
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={escalateForm.escalated_contract_value}
+                  onChange={(e) => setEscalateForm(f => ({ ...f, escalated_contract_value: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-500 mb-1 block">Número de cuotas</label>
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={escalateForm.escalated_installments}
+                  onChange={(e) => setEscalateForm(f => ({ ...f, escalated_installments: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-zinc-500 mb-1 block">Primera cuota cobrada ($)</label>
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={escalateForm.escalated_first_payment}
+                  onChange={(e) => setEscalateForm(f => ({ ...f, escalated_first_payment: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-500 mb-1 block">Fecha de escalamiento</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={escalateForm.escalated_at}
+                  onChange={(e) => setEscalateForm(f => ({ ...f, escalated_at: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-zinc-500 mb-1 block">Notas</label>
+              <textarea
+                rows={3}
+                className={inputCls}
+                value={escalateForm.escalated_notes}
+                onChange={(e) => setEscalateForm(f => ({ ...f, escalated_notes: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-700">
+            <button
+              onClick={handleEscalate}
+              disabled={escalateSaving}
+              className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition-colors"
+            >
+              {escalateSaving ? 'Escalando…' : 'Confirmar escalamiento'}
+            </button>
+            <button
+              onClick={() => setEscalateOpen(false)}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}
@@ -2262,6 +2457,18 @@ export default function SpcPage() {
     () => [...members.filter((m) => m.status === 'expired')].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
     [members]
   )
+  const escalatedMembers = useMemo(
+    () => members.filter((m) => m.status === 'escalated'),
+    [members]
+  )
+  const escalatedTotalContract = useMemo(
+    () => escalatedMembers.reduce((s, m) => s + (m.escalated_contract_value ?? 0), 0),
+    [escalatedMembers]
+  )
+  const escalatedTotalCollected = useMemo(
+    () => escalatedMembers.reduce((s, m) => s + (m.escalated_first_payment ?? 0), 0),
+    [escalatedMembers]
+  )
 
   const mrr = activeMembers.reduce(
     (s, m) => s + (m.plan === 'annual' ? (m.amount ?? 0) / 12 : (m.amount ?? 0)),
@@ -2380,7 +2587,7 @@ export default function SpcPage() {
 
   const cancelPlatforms = useMemo(() => {
     const set = new Set<string>()
-    for (const c of cancellations) {
+    for (const c of metricCancellations) {
       const src = (c.source ?? '').trim()
       if (src) set.add(src)
     }
@@ -2388,7 +2595,7 @@ export default function SpcPage() {
   }, [cancellations])
 
   const filteredCancellations = useMemo(() => {
-    let list = cancellations.filter((c) => matchesSearch(c.name, c.email, cancelSearch))
+    let list = cancellations.filter((c) => !isEscalatedCancel(c) && matchesSearch(c.name, c.email, cancelSearch))
 
     // Date range filter
     if (cancelDateFrom) {
@@ -2426,18 +2633,20 @@ export default function SpcPage() {
   }, [cancellations, cancelSearch, cancelSort, cancelDateFrom, cancelDateTo, cancelTypeFilter, cancelPlatformFilter])
 
   // ── Cancellation metrics ─────────────────────────────────────────────────
-  const paidCancels = cancellations.filter(isPaidCancel)
-  const trialCancels = cancellations.filter(isTrialCancel)
-  const pendingCancels = cancellations.filter((c) => !isPaidCancel(c) && !isTrialCancel(c))
+  // Exclude escalated cancellations from all churn/metric calculations
+  const metricCancellations = cancellations.filter((c) => !isEscalatedCancel(c))
+  const paidCancels = metricCancellations.filter(isPaidCancel)
+  const trialCancels = metricCancellations.filter(isTrialCancel)
+  const pendingCancels = metricCancellations.filter((c) => !isPaidCancel(c) && !isTrialCancel(c))
   // Non-trial cancellations = paid + pending (CSV imports without type info)
-  const nonTrialCancels = cancellations.filter((c) => !isTrialCancel(c))
+  const nonTrialCancels = metricCancellations.filter((c) => !isTrialCancel(c))
   // Only count cancellations with a known cancelled_at date for churn
   // Use string comparison on YYYY-MM to avoid timezone issues with DATE fields
   const thisMonthCancels = nonTrialCancels.filter((c) => {
     if (!c.cancelled_at) return false
     return c.cancelled_at.slice(0, 7) === currentMonth
   })
-  const unknownDateCancels = cancellations.filter((c) => !c.cancelled_at).length
+  const unknownDateCancels = metricCancellations.filter((c) => !c.cancelled_at).length
 
   const mrrLost = paidCancels
     .filter((c) => c.cancelled_at && (c.cancelled_at.slice(0, 10) >= sixtyDaysAgo))
@@ -2577,7 +2786,7 @@ export default function SpcPage() {
   }
   const cancelsByMonth = last6Months.map((month) => ({
     date: month.slice(5), // "MM" for display
-    revenue: cancellations.filter((c) => c.cancelled_at && c.cancelled_at.slice(0, 7) === month).length,
+    revenue: metricCancellations.filter((c) => c.cancelled_at && c.cancelled_at.slice(0, 7) === month).length,
   }))
 
   // ── Growth period range ──────────────────────────────────────────────────
@@ -2643,7 +2852,7 @@ export default function SpcPage() {
 
   // ── Cancellation timeline (scoped to growth period) ──────────────────────
   const cancelTimelineData = useMemo(() => {
-    const periodCancels = cancellations.filter((c) => c.cancelled_at && inGrowthPeriod(c.cancelled_at))
+    const periodCancels = metricCancellations.filter((c) => c.cancelled_at && inGrowthPeriod(c.cancelled_at))
     const start = growthRange.start ? new Date(growthRange.start + 'T12:00:00') : null
     const end = new Date(growthRange.end + 'T12:00:00')
     const diffDays = start ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0
@@ -2951,8 +3160,9 @@ export default function SpcPage() {
     { key: 'active', label: `Active Members${!loading ? ` (${activeMembers.length})` : ''}` },
     { key: 'club', label: `Club Engagement${clubMembers.length ? ` (${clubMembers.length})` : ''}` },
     { key: 'trials', label: `Free Trials${!loading ? ` (${trialMembers.length})` : ''}` },
+    { key: 'escalated', label: `Escalados${!loading ? ` (${escalatedMembers.length})` : ''}` },
     { key: 'expired', label: `Expired${!loading ? ` (${expiredMembers.length})` : ''}` },
-    { key: 'cancellations', label: `Cancellations${!loading ? ` (${cancellations.length})` : ''}` },
+    { key: 'cancellations', label: `Cancellations${!loading ? ` (${metricCancellations.length})` : ''}` },
     { key: 'satisfaction', label: `Satisfaction${satisfactionResponses.length ? ` (${satisfactionResponses.length})` : ''}` },
   ]
 
@@ -3158,6 +3368,29 @@ export default function SpcPage() {
                 </Card>
               </div>
             </div>
+
+            {/* Escalados a High Ticket — always visible, independent of period */}
+            {!loading && escalatedMembers.length > 0 && (
+              <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-900/10">
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-[10px] text-purple-600 dark:text-purple-400 mb-2 font-medium uppercase tracking-wide">Escalados a High Ticket</p>
+                  <div className="flex items-center gap-6 flex-wrap">
+                    <div>
+                      <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{escalatedMembers.length}</p>
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500">miembros</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(escalatedTotalContract)}</p>
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500">valor total contratos</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(escalatedTotalCollected)}</p>
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500">cobrado (primeras cuotas)</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Period filter */}
             <div>
@@ -4553,6 +4786,90 @@ export default function SpcPage() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* ── ESCALADOS ──────────────────────────────────────────────────── */}
+        {activeTab === 'escalated' && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">{escalatedMembers.length} Escalados a High Ticket</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="p-6 space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-10 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded" />
+                  ))}
+                </div>
+              ) : escalatedMembers.length === 0 ? (
+                <EmptyState title="No escalated members" description="Members escalated to High Ticket (PWU 1:1) will appear here." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="hidden md:table-cell">Email</TableHead>
+                        <TableHead className="hidden md:table-cell">Phone</TableHead>
+                        <TableHead className="hidden md:table-cell">SPC Plan</TableHead>
+                        <TableHead className="hidden md:table-cell">Provider</TableHead>
+                        <TableHead className="hidden md:table-cell">SPC Since</TableHead>
+                        <TableHead>Escalated</TableHead>
+                        <TableHead>Program</TableHead>
+                        <TableHead className="text-right">Contract</TableHead>
+                        <TableHead className="text-right hidden md:table-cell">Installments</TableHead>
+                        <TableHead className="text-right">1st Payment</TableHead>
+                        <TableHead className="hidden lg:table-cell">SPC Status</TableHead>
+                      </AnimatedTableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {escalatedMembers.map((m, i) => {
+                        const spcStatus = m.status_before_escalation === 'cancelled'
+                          ? `SPC cancelado ${m.escalated_notes?.match(/\d{1,2}-[a-z]{3}/i)?.[0] ?? ''}`
+                          : m.status_before_escalation === 'trial'
+                          ? 'Sigue en trial'
+                          : m.status_before_escalation ?? '—'
+                        return (
+                          <AnimatedTableRow
+                            key={m.id}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="visible"
+                            custom={i}
+                            className={cn(
+                              i % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800/50',
+                              'cursor-pointer hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-colors'
+                            )}
+                            onClick={() => openModal({ kind: 'member', data: m })}
+                          >
+                            <TableCell className="font-medium text-sm">{m.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.phone ?? '—'}</TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <StatusPill
+                                label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
+                                variant={m.plan === 'annual' ? 'success' : 'info'}
+                              />
+                            </TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{m.escalated_at ? formatDate(m.escalated_at) : '—'}</TableCell>
+                            <TableCell className="text-xs font-medium text-purple-700 dark:text-purple-300 whitespace-nowrap">{m.escalated_program ?? '—'}</TableCell>
+                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(m.escalated_contract_value ?? 0)}</TableCell>
+                            <TableCell className="text-right text-xs hidden md:table-cell">{m.escalated_installments ?? '—'}</TableCell>
+                            <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(m.escalated_first_payment ?? 0)}</TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400">{spcStatus}</span>
+                            </TableCell>
+                          </AnimatedTableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* ── EXPIRED ───────────────────────────────────────────────────── */}
