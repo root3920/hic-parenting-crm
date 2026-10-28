@@ -2756,7 +2756,7 @@ export default function SpcPage() {
       }); break
     }
     return list
-  }, [cancellations, cancelSearch, cancelSort, cancelDateFrom, cancelDateTo, cancelTypeFilter, cancelPlatformFilter])
+  }, [cancellations, cancelSearch, cancelSort, cancelDateFrom, cancelDateTo, cancelTypeFilter, cancelPlatformFilter, memberPhoneByEmail]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cancellation metrics ─────────────────────────────────────────────────
   const paidCancels = metricCancellations.filter(isPaidCancel)
@@ -4396,18 +4396,19 @@ export default function SpcPage() {
                 <EmptyState title={activeSearch ? 'No matching members' : 'No active members'} description={activeSearch ? 'Try a different search term.' : 'Active subscribers will appear here.'} />
               ) : (
                 <div className="overflow-x-auto">
-                  <Table className="table-fixed w-full">
+                  <Table className="table-fixed" style={{ minWidth: 1480 }}>
                     <colgroup>
-                      <col style={{ width: 140 }} />
+                      <col style={{ width: 150 }} />
                       <col className="hidden md:table-column" style={{ width: 180 }} />
-                      <col style={{ width: 80 }} />
-                      <col style={{ width: 70 }} />
-                      <col className="hidden md:table-column" style={{ width: 90 }} />
-                      <col className="hidden md:table-column" style={{ width: 90 }} />
-                      <col className="hidden md:table-column" style={{ width: 60 }} />
-                      <col className="hidden md:table-column" style={{ width: 100 }} />
-                      <col className="hidden md:table-column" style={{ width: 100 }} />
-                      <col className="hidden lg:table-column" style={{ width: 60 }} />
+                      <col className="hidden md:table-column" style={{ width: 150 }} />
+                      <col style={{ width: 85 }} />
+                      <col style={{ width: 75 }} />
+                      <col className="hidden md:table-column" style={{ width: 80 }} />
+                      <col className="hidden md:table-column" style={{ width: 88 }} />
+                      <col className="hidden md:table-column" style={{ width: 40 }} />
+                      <col className="hidden md:table-column" style={{ width: 88 }} />
+                      <col className="hidden md:table-column" style={{ width: 88 }} />
+                      <col className="hidden lg:table-column" style={{ width: 56 }} />
                       <col className="hidden lg:table-column" style={{ width: 90 }} />
                       <col className="hidden lg:table-column" style={{ width: 80 }} />
                       <col className="hidden lg:table-column" style={{ width: 80 }} />
@@ -4415,21 +4416,21 @@ export default function SpcPage() {
                     </colgroup>
                     <TableHeader>
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                        <TableHead className="text-xs">Name</TableHead>
+                        <TableHead className="text-xs sticky left-0 z-10 bg-white dark:bg-zinc-900">Name</TableHead>
                         <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
                         <TableHead className="text-xs hidden md:table-cell">Phone</TableHead>
-                        <TableHead className="text-xs">Plan</TableHead>
-                        <TableHead className="text-xs text-right">Amount</TableHead>
-                        <TableHead className="text-xs hidden md:table-cell">Provider</TableHead>
-                        <TableHead className="text-xs hidden md:table-cell">Joined</TableHead>
-                        <TableHead className="text-xs hidden md:table-cell">Mo</TableHead>
-                        <TableHead className="text-xs hidden md:table-cell">Last Pay</TableHead>
-                        <TableHead className="text-xs hidden md:table-cell">Next Pay</TableHead>
-                        <TableHead className="text-xs hidden lg:table-cell">Score</TableHead>
-                        <TableHead className="text-xs hidden lg:table-cell">Engagement</TableHead>
-                        <TableHead className="text-xs hidden lg:table-cell">Club</TableHead>
-                        <TableHead className="text-xs hidden lg:table-cell">Last Note</TableHead>
-                        <TableHead className="text-xs hidden lg:table-cell">Health</TableHead>
+                        <TableHead className="text-xs whitespace-nowrap">Plan</TableHead>
+                        <TableHead className="text-xs text-right whitespace-nowrap">Amount</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Provider</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Joined</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Mo</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Last Pay</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Next Pay</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Score</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Engagement</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Club</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Last Note</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Health</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
@@ -4446,10 +4447,10 @@ export default function SpcPage() {
                           )}
                           onClick={() => openModal({ kind: 'member', data: m })}
                         >
-                          <TableCell className="text-xs font-medium truncate">{m.name}</TableCell>
-                          <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate">{m.email}</TableCell>
-                          <TableCell className="hidden md:table-cell"><PhoneCell phone={m.phone} /></TableCell>
-                          <TableCell className="text-xs">
+                          <TableCell className="text-xs font-medium truncate sticky left-0 z-10 bg-inherit" title={m.name ?? ''}>{m.name}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate" title={m.email ?? ''}>{m.email}</TableCell>
+                          <TableCell className="hidden md:table-cell whitespace-nowrap"><PhoneCell phone={m.phone} /></TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">
                             <StatusPill
                               label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
                               variant={m.plan === 'annual' ? 'success' : m.plan === 'mid_ticket' ? 'warning' : 'info'}
@@ -4458,7 +4459,7 @@ export default function SpcPage() {
                           <TableCell className="text-xs text-right font-semibold whitespace-nowrap">
                             {formatCurrency(m.amount ?? 0)}
                           </TableCell>
-                          <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                          <TableCell className="text-xs text-zinc-500 hidden md:table-cell whitespace-nowrap">{m.provider}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
                           <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">
                             {m.joined_at ? (() => {
@@ -4843,18 +4844,29 @@ export default function SpcPage() {
                   <EmptyState title={trialSearch ? 'No matching trials' : 'No free trials'} description={trialSearch ? 'Try a different search term.' : 'Trial members will appear here.'} />
                 ) : (
                   <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="table-fixed" style={{ minWidth: 920 }}>
+                      <colgroup>
+                        <col style={{ width: 150 }} />
+                        <col className="hidden md:table-column" style={{ width: 180 }} />
+                        <col className="hidden md:table-column" style={{ width: 150 }} />
+                        <col className="hidden md:table-column" style={{ width: 90 }} />
+                        <col style={{ width: 90 }} />
+                        <col style={{ width: 80 }} />
+                        <col className="hidden md:table-column" style={{ width: 100 }} />
+                        <col className="hidden lg:table-column" style={{ width: 56 }} />
+                        <col className="hidden lg:table-column" style={{ width: 80 }} />
+                      </colgroup>
                       <TableHeader>
                         <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                          <TableHead>Name</TableHead>
-                          <TableHead className="hidden md:table-cell">Email</TableHead>
-                          <TableHead className="hidden md:table-cell">Phone</TableHead>
-                          <TableHead className="hidden md:table-cell">Trial Start</TableHead>
-                          <TableHead>Expires</TableHead>
-                          <TableHead>Days Left</TableHead>
-                          <TableHead className="hidden md:table-cell">Payment Method</TableHead>
-                          <TableHead className="hidden lg:table-cell">Score</TableHead>
-                          <TableHead className="hidden lg:table-cell">Last Note</TableHead>
+                          <TableHead className="text-xs sticky left-0 z-10 bg-white dark:bg-zinc-900">Name</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell">Phone</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Trial Start</TableHead>
+                          <TableHead className="text-xs whitespace-nowrap">Expires</TableHead>
+                          <TableHead className="text-xs whitespace-nowrap">Days Left</TableHead>
+                          <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Payment Method</TableHead>
+                          <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Score</TableHead>
+                          <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Last Note</TableHead>
                         </AnimatedTableRow>
                       </TableHeader>
                       <TableBody>
@@ -4871,9 +4883,9 @@ export default function SpcPage() {
                             )}
                             onClick={() => openModal({ kind: 'member', data: m })}
                           >
-                            <TableCell className="font-medium text-sm">{m.name}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
-                            <TableCell className="hidden md:table-cell"><PhoneCell phone={m.phone} /></TableCell>
+                            <TableCell className="text-xs font-medium truncate sticky left-0 z-10 bg-inherit" title={m.name ?? ''}>{m.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate" title={m.email ?? ''}>{m.email}</TableCell>
+                            <TableCell className="hidden md:table-cell whitespace-nowrap"><PhoneCell phone={m.phone} /></TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{formatDate(m.joined_at)}</TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap">
                               {(() => {
@@ -4886,8 +4898,8 @@ export default function SpcPage() {
                                 return end ? formatDate(end) : '—'
                               })()}
                             </TableCell>
-                            <TableCell>{trialUrgencyPill(m)}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                            <TableCell className="whitespace-nowrap">{trialUrgencyPill(m)}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell whitespace-nowrap">{m.provider}</TableCell>
                             <TableCell className="hidden lg:table-cell">
                               {(() => {
                                 const cfg = leadScoreConfig(m.lead_score)
@@ -4933,21 +4945,35 @@ export default function SpcPage() {
                 <EmptyState title="No escalated members" description="Members escalated to High Ticket (PWU 1:1) will appear here." />
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="table-fixed" style={{ minWidth: 1200 }}>
+                    <colgroup>
+                      <col style={{ width: 140 }} />
+                      <col className="hidden md:table-column" style={{ width: 180 }} />
+                      <col className="hidden md:table-column" style={{ width: 150 }} />
+                      <col className="hidden md:table-column" style={{ width: 85 }} />
+                      <col className="hidden md:table-column" style={{ width: 80 }} />
+                      <col className="hidden md:table-column" style={{ width: 88 }} />
+                      <col style={{ width: 88 }} />
+                      <col style={{ width: 110 }} />
+                      <col style={{ width: 90 }} />
+                      <col className="hidden md:table-column" style={{ width: 85 }} />
+                      <col style={{ width: 95 }} />
+                      <col className="hidden lg:table-column" style={{ width: 120 }} />
+                    </colgroup>
                     <TableHeader>
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="hidden md:table-cell">Email</TableHead>
-                        <TableHead className="hidden md:table-cell">Phone</TableHead>
-                        <TableHead className="hidden md:table-cell">SPC Plan</TableHead>
-                        <TableHead className="hidden md:table-cell">Provider</TableHead>
-                        <TableHead className="hidden md:table-cell">SPC Since</TableHead>
-                        <TableHead>Escalated</TableHead>
-                        <TableHead>Program</TableHead>
-                        <TableHead className="text-right">Contract</TableHead>
-                        <TableHead className="text-right hidden md:table-cell">Installments</TableHead>
-                        <TableHead className="text-right">1st Payment</TableHead>
-                        <TableHead className="hidden lg:table-cell">SPC Status</TableHead>
+                        <TableHead className="text-xs sticky left-0 z-10 bg-white dark:bg-zinc-900">Name</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Phone</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">SPC Plan</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Provider</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">SPC Since</TableHead>
+                        <TableHead className="text-xs whitespace-nowrap">Escalated</TableHead>
+                        <TableHead className="text-xs whitespace-nowrap">Program</TableHead>
+                        <TableHead className="text-xs text-right whitespace-nowrap">Contract</TableHead>
+                        <TableHead className="text-xs text-right hidden md:table-cell whitespace-nowrap">Installments</TableHead>
+                        <TableHead className="text-xs text-right whitespace-nowrap">1st Payment</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">SPC Status</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
@@ -4970,19 +4996,19 @@ export default function SpcPage() {
                             )}
                             onClick={() => openModal({ kind: 'member', data: m })}
                           >
-                            <TableCell className="font-medium text-sm">{m.name}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
-                            <TableCell className="hidden md:table-cell"><PhoneCell phone={m.phone} /></TableCell>
-                            <TableCell className="hidden md:table-cell">
+                            <TableCell className="text-xs font-medium truncate sticky left-0 z-10 bg-inherit" title={m.name ?? ''}>{m.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate" title={m.email ?? ''}>{m.email}</TableCell>
+                            <TableCell className="hidden md:table-cell whitespace-nowrap"><PhoneCell phone={m.phone} /></TableCell>
+                            <TableCell className="hidden md:table-cell whitespace-nowrap">
                               <StatusPill
                                 label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
                                 variant={m.plan === 'annual' ? 'success' : 'info'}
                               />
                             </TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell whitespace-nowrap">{m.provider}</TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap">{m.escalated_at ? formatDate(m.escalated_at) : '—'}</TableCell>
-                            <TableCell className="text-xs font-medium text-purple-700 dark:text-purple-300 whitespace-nowrap">{m.escalated_program ?? '—'}</TableCell>
+                            <TableCell className="text-xs font-medium text-purple-700 dark:text-purple-300 whitespace-nowrap truncate" title={m.escalated_program ?? ''}>{m.escalated_program ?? '—'}</TableCell>
                             <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(m.escalated_contract_value ?? 0)}</TableCell>
                             <TableCell className="text-right text-xs hidden md:table-cell">{m.escalated_installments ?? '—'}</TableCell>
                             <TableCell className="text-right font-semibold text-sm whitespace-nowrap">{formatCurrency(m.escalated_first_payment ?? 0)}</TableCell>
@@ -5051,21 +5077,35 @@ export default function SpcPage() {
                 <EmptyState title={expiredSearch ? 'No matching members' : 'No expired members'} description={expiredSearch ? 'Try a different search term.' : 'Members with expired subscriptions will appear here.'} />
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="table-fixed" style={{ minWidth: 1200 }}>
+                    <colgroup>
+                      <col style={{ width: 150 }} />
+                      <col className="hidden md:table-column" style={{ width: 180 }} />
+                      <col className="hidden md:table-column" style={{ width: 150 }} />
+                      <col style={{ width: 85 }} />
+                      <col style={{ width: 75 }} />
+                      <col className="hidden md:table-column" style={{ width: 80 }} />
+                      <col className="hidden md:table-column" style={{ width: 88 }} />
+                      <col className="hidden md:table-column" style={{ width: 92 }} />
+                      <col className="hidden md:table-column" style={{ width: 92 }} />
+                      <col style={{ width: 88 }} />
+                      <col className="hidden lg:table-column" style={{ width: 56 }} />
+                      <col className="hidden lg:table-column" style={{ width: 80 }} />
+                    </colgroup>
                     <TableHeader>
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="hidden md:table-cell">Email</TableHead>
-                        <TableHead className="hidden md:table-cell">Phone</TableHead>
-                        <TableHead>Plan</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="hidden md:table-cell">Provider</TableHead>
-                        <TableHead className="hidden md:table-cell">Joined</TableHead>
-                        <TableHead className="hidden md:table-cell">Last Payment</TableHead>
-                        <TableHead className="hidden md:table-cell">Next Payment</TableHead>
-                        <TableHead>Days Expired</TableHead>
-                        <TableHead className="hidden lg:table-cell">Score</TableHead>
-                        <TableHead className="hidden lg:table-cell">Last Note</TableHead>
+                        <TableHead className="text-xs sticky left-0 z-10 bg-white dark:bg-zinc-900">Name</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Phone</TableHead>
+                        <TableHead className="text-xs whitespace-nowrap">Plan</TableHead>
+                        <TableHead className="text-xs text-right whitespace-nowrap">Amount</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Provider</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Joined</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Last Payment</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Next Payment</TableHead>
+                        <TableHead className="text-xs whitespace-nowrap">Days Expired</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Score</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Last Note</TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
@@ -5085,10 +5125,10 @@ export default function SpcPage() {
                             )}
                             onClick={() => openModal({ kind: 'member', data: m })}
                           >
-                            <TableCell className="font-medium text-sm">{m.name}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
-                            <TableCell className="hidden md:table-cell"><PhoneCell phone={m.phone} /></TableCell>
-                            <TableCell>
+                            <TableCell className="text-xs font-medium truncate sticky left-0 z-10 bg-inherit" title={m.name ?? ''}>{m.name}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate" title={m.email ?? ''}>{m.email}</TableCell>
+                            <TableCell className="hidden md:table-cell whitespace-nowrap"><PhoneCell phone={m.phone} /></TableCell>
+                            <TableCell className="whitespace-nowrap">
                               <StatusPill
                                 label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
                                 variant={m.plan === 'annual' ? 'success' : m.plan === 'mid_ticket' ? 'warning' : 'info'}
@@ -5097,7 +5137,7 @@ export default function SpcPage() {
                             <TableCell className="text-right font-semibold text-sm whitespace-nowrap">
                               {formatCurrency(m.amount ?? 0)}
                             </TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.provider}</TableCell>
+                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell whitespace-nowrap">{m.provider}</TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{m.joined_at ? formatDate(m.joined_at) : '—'}</TableCell>
                             <TableCell className="text-xs whitespace-nowrap hidden md:table-cell">
                               {lastPaymentByEmail[(m.email ?? '').toLowerCase()]
@@ -5414,21 +5454,35 @@ export default function SpcPage() {
                 ) : (
                   <>
                     <div className="overflow-x-auto">
-                      <Table>
+                      <Table className="table-fixed" style={{ minWidth: 1260 }}>
+                        <colgroup>
+                          <col style={{ width: 150 }} />
+                          <col className="hidden md:table-column" style={{ width: 180 }} />
+                          <col className="hidden md:table-column" style={{ width: 150 }} />
+                          <col style={{ width: 70 }} />
+                          <col style={{ width: 85 }} />
+                          <col style={{ width: 75 }} />
+                          <col className="hidden md:table-column" style={{ width: 80 }} />
+                          <col className="hidden lg:table-column" style={{ width: 90 }} />
+                          <col className="hidden sm:table-column" style={{ width: 90 }} />
+                          <col className="hidden lg:table-column" style={{ width: 92 }} />
+                          <col className="hidden sm:table-column" style={{ width: 60 }} />
+                          <col className="hidden lg:table-column" style={{ width: 80 }} />
+                        </colgroup>
                         <TableHeader>
                           <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
-                            <TableHead>Name</TableHead>
-                            <TableHead className="hidden md:table-cell">Email</TableHead>
-                            <TableHead className="hidden md:table-cell">Phone</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Plan</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                            <TableHead className="hidden md:table-cell">Platform</TableHead>
-                            <TableHead className="hidden lg:table-cell">Subscribed</TableHead>
-                            <TableHead className="hidden sm:table-cell">Cancelled</TableHead>
-                            <TableHead className="hidden lg:table-cell">Last Payment</TableHead>
-                            <TableHead className="text-right hidden sm:table-cell">Days</TableHead>
-                            <TableHead className="hidden lg:table-cell">Last Note</TableHead>
+                            <TableHead className="text-xs sticky left-0 z-10 bg-white dark:bg-zinc-900">Name</TableHead>
+                            <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
+                            <TableHead className="text-xs hidden md:table-cell">Phone</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Type</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Plan</TableHead>
+                            <TableHead className="text-xs text-right whitespace-nowrap">Amount</TableHead>
+                            <TableHead className="text-xs hidden md:table-cell whitespace-nowrap">Platform</TableHead>
+                            <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Subscribed</TableHead>
+                            <TableHead className="text-xs hidden sm:table-cell whitespace-nowrap">Cancelled</TableHead>
+                            <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Last Payment</TableHead>
+                            <TableHead className="text-xs text-right hidden sm:table-cell whitespace-nowrap">Days</TableHead>
+                            <TableHead className="text-xs hidden lg:table-cell whitespace-nowrap">Last Note</TableHead>
                           </AnimatedTableRow>
                         </TableHeader>
                         <TableBody>
@@ -5447,10 +5501,10 @@ export default function SpcPage() {
                                 )}
                                 onClick={() => openModal({ kind: 'cancellation', data: c })}
                               >
-                                <TableCell className="font-medium text-sm">{c.name}</TableCell>
-                                <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.email}</TableCell>
-                                <TableCell className="hidden md:table-cell"><PhoneCell phone={getCancellationPhone(c)} /></TableCell>
-                                <TableCell>
+                                <TableCell className="text-xs font-medium truncate sticky left-0 z-10 bg-inherit" title={c.name ?? ''}>{c.name}</TableCell>
+                                <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate" title={c.email ?? ''}>{c.email}</TableCell>
+                                <TableCell className="hidden md:table-cell whitespace-nowrap"><PhoneCell phone={getCancellationPhone(c)} /></TableCell>
+                                <TableCell className="whitespace-nowrap">
                                   {isTrialCancel(c) ? (
                                     <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Trial</span>
                                   ) : isPaidCancel(c) ? (
@@ -5459,7 +5513,7 @@ export default function SpcPage() {
                                     <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Pending</span>
                                   )}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="whitespace-nowrap">
                                   {c.plan && (
                                     <StatusPill label={c.plan === 'annual' ? 'Annual' : c.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'} variant={c.plan === 'annual' ? 'success' : c.plan === 'mid_ticket' ? 'warning' : 'info'} />
                                   )}
