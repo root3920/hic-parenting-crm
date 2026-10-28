@@ -2588,15 +2588,65 @@ export default function SpcPage() {
     return activeMembers.filter((m) => getEngagement(m.email).engagement_status === 'at_risk').length
   }, [activeMembers, engagementMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Phone helpers ────────────────────────────────────────────────────────
+  function formatPhone(raw: string | null | undefined): string {
+    if (!raw) return '—'
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return `+1 ${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`
+    }
+    return raw
+  }
+
+  function PhoneCell({ phone, className }: { phone: string | null | undefined; className?: string }) {
+    const display = formatPhone(phone)
+    if (display === '—') return <span className={cn('text-xs text-zinc-400', className)}>—</span>
+    return (
+      <button
+        type="button"
+        className={cn('text-xs text-zinc-500 truncate text-left hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors', className)}
+        title="Click to copy"
+        onClick={(e) => {
+          e.stopPropagation()
+          navigator.clipboard.writeText(phone!).then(() => toast.success('Phone copied'))
+        }}
+      >
+        {display}
+      </button>
+    )
+  }
+
+  // Build member-phone lookup for cancellation fallback
+  const memberPhoneByEmail = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const m of members) {
+      if (m.phone && m.email) map[m.email.toLowerCase()] = m.phone
+    }
+    return map
+  }, [members])
+
+  function getCancellationPhone(c: SpcCancellation): string | null {
+    if (c.customer_phone) return c.customer_phone
+    if (c.email) return memberPhoneByEmail[c.email.toLowerCase()] ?? null
+    return null
+  }
+
   // ── Filtered & sorted lists ─────────────────────────────────────────────
-  function matchesSearch(name: string | null, email: string | null, q: string): boolean {
+  function matchesSearch(name: string | null, email: string | null, q: string, phone?: string | null): boolean {
     if (!q) return true
     const lower = q.toLowerCase()
-    return (name ?? '').toLowerCase().includes(lower) || (email ?? '').toLowerCase().includes(lower)
+    if ((name ?? '').toLowerCase().includes(lower) || (email ?? '').toLowerCase().includes(lower)) return true
+    // Match phone by digits only
+    const qDigits = q.replace(/\D/g, '')
+    if (qDigits.length >= 3 && phone) {
+      const pDigits = phone.replace(/\D/g, '')
+      if (pDigits.includes(qDigits)) return true
+    }
+    return false
   }
 
   const filteredActiveMembers = useMemo(() => {
-    let list = activeMembers.filter((m) => matchesSearch(m.name, m.email, activeSearch))
+    let list = activeMembers.filter((m) => matchesSearch(m.name, m.email, activeSearch, m.phone))
     if (engagementFilter === 'at_risk') {
       list = list.filter((m) => getEngagement(m.email).engagement_status === 'at_risk')
     }
@@ -2614,7 +2664,7 @@ export default function SpcPage() {
   }, [activeMembers, activeSearch, activeSort, lastPaymentByEmail, lastNoteByEmail, engagementFilter, engagementMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredTrialMembers = useMemo(() => {
-    let list = sortedTrials.filter((m) => matchesSearch(m.name, m.email, trialSearch))
+    let list = sortedTrials.filter((m) => matchesSearch(m.name, m.email, trialSearch, m.phone))
     switch (trialSort) {
       case 'trial_start_desc': list.sort((a, b) => (b.joined_at ?? '').localeCompare(a.joined_at ?? '')); break
       case 'trial_start_asc': list.sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? '')); break
@@ -2632,7 +2682,7 @@ export default function SpcPage() {
   }
 
   const filteredExpiredMembers = useMemo(() => {
-    let list = expiredMembers.filter((m) => matchesSearch(m.name, m.email, expiredSearch))
+    let list = expiredMembers.filter((m) => matchesSearch(m.name, m.email, expiredSearch, m.phone))
     switch (expiredSort) {
       case 'joined_desc': list.sort((a, b) => (b.joined_at ?? '').localeCompare(a.joined_at ?? '')); break
       case 'joined_asc': list.sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? '')); break
@@ -2671,7 +2721,7 @@ export default function SpcPage() {
   }, [cancellations])
 
   const filteredCancellations = useMemo(() => {
-    let list = cancellations.filter((c) => !isEscalatedCancel(c) && matchesSearch(c.name, c.email, cancelSearch))
+    let list = cancellations.filter((c) => !isEscalatedCancel(c) && matchesSearch(c.name, c.email, cancelSearch, getCancellationPhone(c)))
 
     // Date range filter
     if (cancelDateFrom) {
@@ -3134,7 +3184,7 @@ export default function SpcPage() {
       const type = isTrialCancel(c) ? 'Trial' : isPaidCancel(c) ? 'Paid' : 'Pending'
       const days = c.subscribed_at && c.cancelled_at ? daysActive(c.subscribed_at, c.cancelled_at) : ''
       return [
-        csvEscape(c.name), csvEscape(c.email), csvEscape(c.customer_phone),
+        csvEscape(c.name), csvEscape(c.email), csvEscape(getCancellationPhone(c)),
         type, c.plan ?? '', c.amount, c.source ?? '',
         c.subscribed_at ?? '', c.cancelled_at ?? '', days,
         lastNoteByEmail[(c.email ?? '').toLowerCase()] ?? '',
@@ -4367,6 +4417,7 @@ export default function SpcPage() {
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
                         <TableHead className="text-xs">Name</TableHead>
                         <TableHead className="text-xs hidden md:table-cell">Email</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Phone</TableHead>
                         <TableHead className="text-xs">Plan</TableHead>
                         <TableHead className="text-xs text-right">Amount</TableHead>
                         <TableHead className="text-xs hidden md:table-cell">Provider</TableHead>
@@ -4397,6 +4448,7 @@ export default function SpcPage() {
                         >
                           <TableCell className="text-xs font-medium truncate">{m.name}</TableCell>
                           <TableCell className="text-xs text-zinc-500 hidden md:table-cell truncate">{m.email}</TableCell>
+                          <TableCell className="hidden md:table-cell"><PhoneCell phone={m.phone} /></TableCell>
                           <TableCell className="text-xs">
                             <StatusPill
                               label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
@@ -4796,6 +4848,7 @@ export default function SpcPage() {
                         <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
                           <TableHead>Name</TableHead>
                           <TableHead className="hidden md:table-cell">Email</TableHead>
+                          <TableHead className="hidden md:table-cell">Phone</TableHead>
                           <TableHead className="hidden md:table-cell">Trial Start</TableHead>
                           <TableHead>Expires</TableHead>
                           <TableHead>Days Left</TableHead>
@@ -4820,6 +4873,7 @@ export default function SpcPage() {
                           >
                             <TableCell className="font-medium text-sm">{m.name}</TableCell>
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
+                            <TableCell className="hidden md:table-cell"><PhoneCell phone={m.phone} /></TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap hidden md:table-cell">{formatDate(m.joined_at)}</TableCell>
                             <TableCell className="text-xs text-zinc-500 whitespace-nowrap">
                               {(() => {
@@ -4918,7 +4972,7 @@ export default function SpcPage() {
                           >
                             <TableCell className="font-medium text-sm">{m.name}</TableCell>
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
-                            <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.phone ?? '—'}</TableCell>
+                            <TableCell className="hidden md:table-cell"><PhoneCell phone={m.phone} /></TableCell>
                             <TableCell className="hidden md:table-cell">
                               <StatusPill
                                 label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
@@ -5002,6 +5056,7 @@ export default function SpcPage() {
                       <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
                         <TableHead>Name</TableHead>
                         <TableHead className="hidden md:table-cell">Email</TableHead>
+                        <TableHead className="hidden md:table-cell">Phone</TableHead>
                         <TableHead>Plan</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead className="hidden md:table-cell">Provider</TableHead>
@@ -5032,6 +5087,7 @@ export default function SpcPage() {
                           >
                             <TableCell className="font-medium text-sm">{m.name}</TableCell>
                             <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{m.email}</TableCell>
+                            <TableCell className="hidden md:table-cell"><PhoneCell phone={m.phone} /></TableCell>
                             <TableCell>
                               <StatusPill
                                 label={m.plan === 'annual' ? 'Annual' : m.plan === 'mid_ticket' ? 'Mid Ticket' : 'Monthly'}
@@ -5363,6 +5419,7 @@ export default function SpcPage() {
                           <AnimatedTableRow variants={rowVariants} initial="hidden" animate="visible" custom={0}>
                             <TableHead>Name</TableHead>
                             <TableHead className="hidden md:table-cell">Email</TableHead>
+                            <TableHead className="hidden md:table-cell">Phone</TableHead>
                             <TableHead>Type</TableHead>
                             <TableHead>Plan</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
@@ -5392,6 +5449,7 @@ export default function SpcPage() {
                               >
                                 <TableCell className="font-medium text-sm">{c.name}</TableCell>
                                 <TableCell className="text-xs text-zinc-500 hidden md:table-cell">{c.email}</TableCell>
+                                <TableCell className="hidden md:table-cell"><PhoneCell phone={getCancellationPhone(c)} /></TableCell>
                                 <TableCell>
                                   {isTrialCancel(c) ? (
                                     <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Trial</span>
