@@ -136,6 +136,13 @@ export default function FinancePage() {
   const [deleteConfirmed, setDeleteConfirmed] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Client name inline edit state
+  const [clientEditId, setClientEditId] = useState<string | null>(null)
+  const [clientEditValue, setClientEditValue] = useState('')
+  const [clientEditSaving, setClientEditSaving] = useState(false)
+  const [clientDupWarning, setClientDupWarning] = useState<{ id: string; message: string } | null>(null)
+  const [clientBulkPrompt, setClientBulkPrompt] = useState<{ id: string; newClient: string; oldClient: string; relatedIds: string[]; relatedCount: number } | null>(null)
+
   // Create commission form state
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
@@ -494,6 +501,121 @@ export default function FinancePage() {
     } catch (err) {
       console.error('[Finance] Save failed:', err)
       toast.error('Error saving')
+    }
+  }
+
+  // ── Inline client name edit ────────────────────────────────────────────────
+
+  function startClientEdit(c: FinanceCommission) {
+    setClientEditId(c.id)
+    setClientEditValue(c.client || '')
+    setClientDupWarning(null)
+  }
+
+  function cancelClientEdit() {
+    setClientEditId(null)
+    setClientEditValue('')
+    setClientDupWarning(null)
+  }
+
+  async function handleSaveClientEdit(id: string, allowDuplicate = false) {
+    const normalized = clientEditValue.trim().replace(/\s+/g, ' ')
+    if (!normalized) {
+      toast.error('El nombre del cliente no puede estar vacío')
+      return
+    }
+
+    const row = commissions.find(c => c.id === id)
+    if (!row) return
+
+    // Skip if unchanged
+    const oldNorm = (row.client || '').trim().replace(/\s+/g, ' ')
+    if (normalized === oldNorm) {
+      cancelClientEdit()
+      return
+    }
+
+    setClientEditSaving(true)
+    try {
+      const res = await fetch('/api/finance/commissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, field: 'client', value: normalized, allow_duplicate: allowDuplicate }),
+      })
+
+      if (res.status === 409) {
+        const data = await res.json()
+        setClientDupWarning({ id, message: data.message })
+        return
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error('Error: ' + (err.error || 'Failed to save'))
+        return
+      }
+
+      const data = await res.json()
+
+      // Optimistic update for this row
+      setCommissions(prev => prev.map(c => c.id === id ? { ...c, client: normalized } : c))
+      setClientEditId(null)
+      setClientDupWarning(null)
+      toast.success('Nombre actualizado')
+
+      // If there are related rows, prompt for bulk rename
+      if (data.related_count > 0) {
+        setClientBulkPrompt({
+          id,
+          newClient: normalized,
+          oldClient: row.client || '',
+          relatedIds: data.related_ids,
+          relatedCount: data.related_count,
+        })
+      }
+    } catch {
+      toast.error('Error al guardar')
+    } finally {
+      setClientEditSaving(false)
+    }
+  }
+
+  async function handleBulkRenameClient(apply: boolean) {
+    if (!clientBulkPrompt) return
+    if (!apply) {
+      setClientBulkPrompt(null)
+      return
+    }
+
+    try {
+      const res = await fetch('/api/finance/commissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: clientBulkPrompt.id,
+          action: 'bulk_rename_client',
+          ids: clientBulkPrompt.relatedIds,
+          new_client: clientBulkPrompt.newClient,
+          old_client: clientBulkPrompt.oldClient,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error('Error: ' + (err.error || 'Failed to bulk rename'))
+        return
+      }
+
+      const data = await res.json()
+      // Update all related rows in state
+      setCommissions(prev => prev.map(c =>
+        clientBulkPrompt.relatedIds.includes(c.id) ? { ...c, client: clientBulkPrompt.newClient } : c
+      ))
+      toast.success(`Nombre actualizado en ${data.updated_count} filas más`)
+    } catch {
+      toast.error('Error al actualizar')
+    } finally {
+      setClientBulkPrompt(null)
     }
   }
 
@@ -1153,7 +1275,38 @@ export default function FinancePage() {
                         return (
                           <AnimatedTableRow key={c.id} variants={rowVariants} initial="hidden" animate="visible" custom={i + 1} className="group even:bg-zinc-50/50 dark:even:bg-zinc-900/20">
                             <TableCell className="text-xs whitespace-nowrap">{c.payment_date ? new Date(c.payment_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</TableCell>
-                            <TableCell className="text-xs font-medium">{c.client || '—'}</TableCell>
+                            <TableCell className="text-xs font-medium max-w-[180px]">
+                              {clientEditId === c.id ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={clientEditValue}
+                                    onChange={(e) => setClientEditValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveClientEdit(c.id)
+                                      if (e.key === 'Escape') cancelClientEdit()
+                                    }}
+                                    onBlur={() => { if (!clientDupWarning) handleSaveClientEdit(c.id) }}
+                                    disabled={clientEditSaving}
+                                    className={cn(
+                                      'border border-[#ffbd59] rounded px-1.5 py-0.5 text-xs w-full bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none',
+                                      clientEditSaving && 'opacity-50'
+                                    )}
+                                  />
+                                  {clientEditSaving && <span className="text-[10px] text-zinc-400 animate-pulse">...</span>}
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => startClientEdit(c)}
+                                  className="text-left hover:text-[#89bcef] dark:hover:text-[#89bcef] group/cedit w-full truncate"
+                                  title={c.client || '—'}
+                                >
+                                  <span className="truncate">{c.client || <span className="text-zinc-300 dark:text-zinc-600">—</span>}</span>
+                                  <span className="opacity-0 group-hover/cedit:opacity-100 ml-1 text-[10px] text-[#ffbd59] inline-block shrink-0">&#9998;</span>
+                                </button>
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs" title={desc}>{truncDesc}</TableCell>
                             <TableCell className="text-xs text-right font-medium">{fmtCurrency(Number(c.amount))}</TableCell>
                             <TableCell className="text-xs">
@@ -1351,6 +1504,54 @@ export default function FinancePage() {
                       {createLoading ? 'Creando...' : 'Crear comisión'}
                     </Button>
                   )}
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* ── Client rename duplicate warning dialog ──────────────────────── */}
+            <Dialog open={!!clientDupWarning} onOpenChange={(open) => { if (!open) { setClientDupWarning(null) } }}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Posible duplicado</DialogTitle>
+                  <DialogDescription>
+                    El nuevo nombre del cliente coincide con otra comisión existente.
+                  </DialogDescription>
+                </DialogHeader>
+                {clientDupWarning && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    <p className="text-sm text-amber-800 dark:text-amber-300">{clientDupWarning.message}</p>
+                  </div>
+                )}
+                <DialogFooter>
+                  <DialogClose render={<Button variant="outline" />} onClick={() => { setClientDupWarning(null); cancelClientEdit() }}>Cancelar</DialogClose>
+                  <Button
+                    onClick={() => {
+                      if (clientDupWarning) {
+                        setClientDupWarning(null)
+                        handleSaveClientEdit(clientDupWarning.id, true)
+                      }
+                    }}
+                  >
+                    Guardar de todos modos
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* ── Bulk rename prompt dialog ───────────────────────────────────── */}
+            <Dialog open={!!clientBulkPrompt} onOpenChange={(open) => { if (!open) setClientBulkPrompt(null) }}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Aplicar a otras filas</DialogTitle>
+                  <DialogDescription>
+                    Hay {clientBulkPrompt?.relatedCount} comisión{(clientBulkPrompt?.relatedCount || 0) !== 1 ? 'es' : ''} más de este cliente.
+                    {clientBulkPrompt && <> ¿Cambiar &quot;{clientBulkPrompt.oldClient}&quot; a &quot;{clientBulkPrompt.newClient}&quot; en todas?</>}
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => handleBulkRenameClient(false)}>Solo esta fila</Button>
+                  <Button onClick={() => handleBulkRenameClient(true)}>Aplicar a todas</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

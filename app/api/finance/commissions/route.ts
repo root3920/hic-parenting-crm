@@ -72,7 +72,7 @@ export async function GET() {
 // ── POST: create commission with duplicate check ────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const { user, res } = await verifyAdmin()
+  const { res } = await verifyAdmin()
   if (res) return res
 
   const body = await req.json()
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
 // ── PATCH: update commission fields ─────────────────────────────────────────
 
 export async function PATCH(req: NextRequest) {
-  const { res } = await verifyAdmin()
+  const { user, res } = await verifyAdmin()
   if (res) return res
 
   const body = await req.json()
@@ -168,13 +168,144 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Missing id' }, { status: 400 })
   }
 
+  const supabase = getServiceClient()
+
+  // ── Special handling: client rename ────────────────────────────────────
+  if (field === 'client' || body.updates?.client !== undefined) {
+    const newClient = normalizeClient(String(body.updates?.client ?? value ?? ''))
+    if (!newClient) {
+      return NextResponse.json({ error: 'El nombre del cliente no puede estar vacío' }, { status: 400 })
+    }
+
+    // Fetch current row
+    const { data: row, error: fetchErr } = await supabase
+      .from('finance_commissions')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (fetchErr || !row) {
+      return NextResponse.json({ error: 'Commission not found' }, { status: 404 })
+    }
+
+    const oldClient = row.client || ''
+
+    // Skip if unchanged
+    if (normalizeClient(oldClient) === newClient) {
+      return NextResponse.json({ success: true, unchanged: true })
+    }
+
+    // Duplicate check: same normalized name + same date + same amount + same description, excluding this row
+    if (!body.allow_duplicate) {
+      const { data: candidates } = await supabase
+        .from('finance_commissions')
+        .select('*')
+        .eq('payment_date', row.payment_date)
+        .eq('amount', row.amount)
+        .neq('id', id)
+
+      if (candidates && candidates.length > 0) {
+        const newClientLower = normalizeClientForMatch(newClient)
+        const descBase = (row.payment_description || '').trim().toLowerCase()
+        const match = candidates.find(r => {
+          const rClient = normalizeClientForMatch(r.client || '')
+          const rDesc = (r.payment_description || '').trim().toLowerCase()
+          return rClient === newClientLower && (!descBase || rDesc === descBase)
+        })
+        if (match) {
+          return NextResponse.json({
+            error: 'duplicate',
+            message: `Ya existe una comisión de ${match.client} por $${match.amount} el ${match.payment_date}` +
+              (match.closer ? `, closer ${match.closer}` : '') +
+              (match.setter ? `, setter ${match.setter}` : ''),
+            existing: match,
+          }, { status: 409 })
+        }
+      }
+    }
+
+    // Audit: record the rename
+    await supabase.from('finance_commissions_audit').insert({
+      commission_id: row.id,
+      row_data: { ...row, _old_client: oldClient, _new_client: newClient },
+      action: 'rename_client',
+      changed_by: user!.id,
+    })
+
+    // Update client name
+    const { error: updateErr } = await supabase
+      .from('finance_commissions')
+      .update({ client: newClient })
+      .eq('id', id)
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    }
+
+    // Check for other rows with same old client name or same buyer_email for bulk rename
+    const oldClientNorm = normalizeClientForMatch(oldClient)
+    const { data: relatedRows } = await supabase
+      .from('finance_commissions')
+      .select('id, client, buyer_email')
+      .neq('id', id)
+
+    const matchingRows = (relatedRows || []).filter(r => {
+      const rClientNorm = normalizeClientForMatch(r.client || '')
+      return rClientNorm === oldClientNorm ||
+        (row.buyer_email && r.buyer_email && r.buyer_email.toLowerCase() === row.buyer_email.toLowerCase())
+    })
+
+    return NextResponse.json({
+      success: true,
+      old_client: oldClient,
+      new_client: newClient,
+      related_count: matchingRows.length,
+      related_ids: matchingRows.map(r => r.id),
+    })
+  }
+
+  // ── Bulk client rename (apply to related rows) ────────────────────────
+  if (body.action === 'bulk_rename_client') {
+    const { ids, new_client } = body
+    if (!ids?.length || !new_client) {
+      return NextResponse.json({ error: 'Missing ids or new_client' }, { status: 400 })
+    }
+    const normalizedNew = normalizeClient(new_client)
+
+    // Audit each row
+    const { data: rows } = await supabase
+      .from('finance_commissions')
+      .select('*')
+      .in('id', ids)
+
+    if (rows && rows.length > 0) {
+      const auditRows = rows.map(r => ({
+        commission_id: r.id,
+        row_data: { ...r, _old_client: r.client, _new_client: normalizedNew },
+        action: 'bulk_rename_client',
+        changed_by: user!.id,
+      }))
+      await supabase.from('finance_commissions_audit').insert(auditRows)
+    }
+
+    // Update all
+    const { error: bulkErr } = await supabase
+      .from('finance_commissions')
+      .update({ client: normalizedNew })
+      .in('id', ids)
+
+    if (bulkErr) {
+      return NextResponse.json({ error: bulkErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, updated_count: rows?.length || 0 })
+  }
+
+  // ── Standard field updates ────────────────────────────────────────────
   const allowedFields = [
     'closer_commission_status', 'setter_commission_status',
     'closer', 'setter', 'closer_commission', 'setter_commission',
     'total_commission', 'commission_paid', 'commission_pending', 'net_total',
   ]
 
-  // Support multi-field updates ({ id, updates: {...} }) or single-field ({ id, field, value })
   const updates: Record<string, unknown> = {}
   if (body.updates && typeof body.updates === 'object') {
     for (const [k, v] of Object.entries(body.updates)) {
@@ -188,7 +319,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'No allowed fields to update' }, { status: 400 })
   }
 
-  const supabase = getServiceClient()
   const { error } = await supabase
     .from('finance_commissions')
     .update(updates)
