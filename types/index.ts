@@ -313,6 +313,8 @@ export interface SpcReport {
 
 export interface FinanceCommission {
   id: string
+  payment_id: string | null
+  buyer_email: string | null
   payment_date: string
   client: string
   payment_description: string | null
@@ -328,6 +330,14 @@ export interface FinanceCommission {
   commission_pending: number | null
   net_total: number | null
   created_at: string
+}
+
+export interface FinanceCommissionAudit {
+  id: string
+  commission_id: string
+  row_data: Record<string, unknown>
+  deleted_by: string
+  deleted_at: string
 }
 
 export interface FinanceMonthly {

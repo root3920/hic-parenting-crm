@@ -311,37 +311,62 @@ export async function POST(req: NextRequest) {
       buyer_email &&
       (canonical.startsWith('Parenting With Understanding') || canonical === 'Secure Parent Collective' || canonical.includes('Program'))
     ) {
-      // Look up calls table for a call with same buyer_email to find closer/setter
-      const { data: callMatch } = await supabase
-        .from('calls')
-        .select('closer_name, setter_name')
-        .ilike('email', buyer_email)
-        .order('start_date', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      // Normalize client name: trim + collapse multiple spaces
+      const normalizedClient = (buyer_fullname || 'Unknown').trim().replace(/\s+/g, ' ')
 
-      const closerName = callMatch?.closer_name || null
-      const setterName = callMatch?.setter_name || null
-      const closerComm = closerName ? costNum * 0.15 : null
-      const setterComm = setterName ? costNum * 0.05 : null
-      const totalComm = (closerComm || 0) + (setterComm || 0)
+      // ── Duplicate check before inserting ──────────────────────────────────
+      const { data: existingComms } = await supabase
+        .from('finance_commissions')
+        .select('id, client, buyer_email, amount, payment_date')
+        .eq('payment_date', date)
+        .eq('amount', costNum)
 
-      await supabase.from('finance_commissions').insert({
-        payment_date: date,
-        client: buyer_fullname || 'Unknown',
-        payment_description: canonical,
-        amount: costNum,
-        closer: closerName,
-        closer_commission: closerComm,
-        closer_commission_status: closerName ? 'Pending' : 'N/A',
-        setter: setterName,
-        setter_commission: setterComm,
-        setter_commission_status: setterName ? 'Pending' : 'N/A',
-        total_commission: totalComm,
-        commission_paid: 0,
-        commission_pending: totalComm,
-        net_total: costNum - totalComm,
-      })
+      let isDuplicate = false
+      if (existingComms && existingComms.length > 0) {
+        const inputClientNorm = normalizedClient.toLowerCase()
+        isDuplicate = existingComms.some(row => {
+          const rowClientNorm = (row.client || '').trim().replace(/\s+/g, ' ').toLowerCase()
+          return rowClientNorm === inputClientNorm ||
+            (row.buyer_email && row.buyer_email.toLowerCase() === buyer_email.toLowerCase())
+        })
+      }
+
+      if (isDuplicate) {
+        console.log(`[Sales Webhook] Skipping duplicate commission: ${normalizedClient}, $${costNum}, ${date}, ${buyer_email}`)
+      } else {
+        // Look up calls table for a call with same buyer_email to find closer/setter
+        const { data: callMatch } = await supabase
+          .from('calls')
+          .select('closer_name, setter_name')
+          .ilike('email', buyer_email)
+          .order('start_date', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const closerName = callMatch?.closer_name || null
+        const setterName = callMatch?.setter_name || null
+        const closerComm = closerName ? costNum * 0.15 : null
+        const setterComm = setterName ? costNum * 0.05 : null
+        const totalComm = (closerComm || 0) + (setterComm || 0)
+
+        await supabase.from('finance_commissions').insert({
+          payment_date: date,
+          client: normalizedClient,
+          payment_description: canonical,
+          amount: costNum,
+          buyer_email: buyer_email,
+          closer: closerName,
+          closer_commission: closerComm,
+          closer_commission_status: closerName ? 'Pending' : 'N/A',
+          setter: setterName,
+          setter_commission: setterComm,
+          setter_commission_status: setterName ? 'Pending' : 'N/A',
+          total_commission: totalComm,
+          commission_paid: 0,
+          commission_pending: totalComm,
+          net_total: costNum - totalComm,
+        })
+      }
     }
 
     // ── Sync contact record ──────────────────────────────────────────────

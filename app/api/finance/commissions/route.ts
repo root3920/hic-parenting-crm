@@ -10,12 +10,21 @@ function getServiceClient() {
   )
 }
 
-export async function GET() {
-  // Verify the user is authenticated and is an admin
+/** Normalize client name: trim + collapse multiple spaces + lowercase for comparison */
+function normalizeClient(name: string): string {
+  return name.trim().replace(/\s+/g, ' ')
+}
+
+function normalizeClientForMatch(name: string): string {
+  return normalizeClient(name).toLowerCase()
+}
+
+/** Verify the user is admin, returns { user, error response } */
+async function verifyAdmin() {
   const userSupabase = await createServerSupabaseClient()
   const { data: { user } } = await userSupabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return { user: null, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
   const { data: profile } = await userSupabase
     .from('profiles')
@@ -23,8 +32,16 @@ export async function GET() {
     .eq('id', user.id)
     .single()
   if (profile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return { user: null, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
+  return { user, res: null }
+}
+
+// ── GET: fetch all PWU commissions ──────────────────────────────────────────
+
+export async function GET() {
+  const { res } = await verifyAdmin()
+  if (res) return res
 
   const supabase = getServiceClient()
 
@@ -52,21 +69,98 @@ export async function GET() {
   return NextResponse.json(all)
 }
 
-export async function PATCH(req: NextRequest) {
-  // Verify the user is authenticated and is an admin
-  const userSupabase = await createServerSupabaseClient()
-  const { data: { user } } = await userSupabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+// ── POST: create commission with duplicate check ────────────────────────────
+
+export async function POST(req: NextRequest) {
+  const { user, res } = await verifyAdmin()
+  if (res) return res
+
+  const body = await req.json()
+  const {
+    payment_date, client, payment_description, amount,
+    closer, setter, allow_duplicate,
+  } = body
+
+  if (!payment_date || !client || amount == null) {
+    return NextResponse.json({ error: 'Missing required fields: payment_date, client, amount' }, { status: 400 })
   }
-  const { data: profile } = await userSupabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
+
+  const normalizedName = normalizeClient(client)
+  const costNum = parseFloat(amount) || 0
+  const supabase = getServiceClient()
+
+  // ── Duplicate check ─────────────────────────────────────────────────────
+  if (!allow_duplicate) {
+    const { data: existing } = await supabase
+      .from('finance_commissions')
+      .select('*')
+      .eq('payment_date', payment_date)
+      .eq('amount', costNum)
+
+    if (existing && existing.length > 0) {
+      // Check for match by normalized client name or buyer_email
+      const descBase = (payment_description || '').trim().toLowerCase()
+      const match = existing.find(row => {
+        const rowClient = normalizeClientForMatch(row.client || '')
+        const inputClient = normalizeClientForMatch(normalizedName)
+        const clientMatch = rowClient === inputClient
+        const descMatch = !descBase || (row.payment_description || '').trim().toLowerCase() === descBase
+        return clientMatch && descMatch
+      })
+
+      if (match) {
+        return NextResponse.json({
+          error: 'duplicate',
+          message: `Ya existe una comisión de ${match.client} por $${match.amount} el ${match.payment_date}` +
+            (match.closer ? `, closer ${match.closer}` : '') +
+            (match.setter ? `, setter ${match.setter}` : ''),
+          existing: match,
+        }, { status: 409 })
+      }
+    }
+  }
+
+  // ── Calculate commissions ───────────────────────────────────────────────
+  const closerName = closer?.trim() || null
+  const setterName = setter?.trim() || null
+  const closerComm = closerName ? costNum * 0.15 : 0
+  const setterComm = setterName ? costNum * 0.05 : 0
+  const totalComm = closerComm + setterComm
+
+  const { data, error } = await supabase
+    .from('finance_commissions')
+    .insert({
+      payment_date,
+      client: normalizedName,
+      payment_description: payment_description?.trim() || 'Parenting With Understanding',
+      amount: costNum,
+      closer: closerName,
+      closer_commission: closerComm || null,
+      closer_commission_status: closerName ? 'Pending' : 'N/A',
+      setter: setterName,
+      setter_commission: setterComm || null,
+      setter_commission_status: setterName ? 'Pending' : 'N/A',
+      total_commission: totalComm,
+      commission_paid: 0,
+      commission_pending: totalComm,
+      net_total: costNum - totalComm,
+    })
+    .select()
     .single()
-  if (profile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  if (error) {
+    console.error('[API finance/commissions POST] Error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  return NextResponse.json(data, { status: 201 })
+}
+
+// ── PATCH: update commission fields ─────────────────────────────────────────
+
+export async function PATCH(req: NextRequest) {
+  const { res } = await verifyAdmin()
+  if (res) return res
 
   const body = await req.json()
   const { id, field, value } = body
@@ -104,4 +198,58 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   return NextResponse.json({ success: true })
+}
+
+// ── DELETE: delete commission with audit trail ──────────────────────────────
+
+export async function DELETE(req: NextRequest) {
+  const { user, res } = await verifyAdmin()
+  if (res) return res
+
+  const body = await req.json()
+  const { id } = body
+  if (!id) {
+    return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+  }
+
+  const supabase = getServiceClient()
+
+  // Fetch the row before deleting
+  const { data: row, error: fetchError } = await supabase
+    .from('finance_commissions')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !row) {
+    return NextResponse.json({ error: 'Commission not found' }, { status: 404 })
+  }
+
+  // Save audit copy
+  const { error: auditError } = await supabase
+    .from('finance_commissions_audit')
+    .insert({
+      commission_id: row.id,
+      row_data: row,
+      deleted_by: user!.id,
+      deleted_at: new Date().toISOString(),
+    })
+
+  if (auditError) {
+    console.error('[API finance/commissions DELETE] Audit insert failed:', auditError.message)
+    return NextResponse.json({ error: 'Failed to create audit record: ' + auditError.message }, { status: 500 })
+  }
+
+  // Delete the row
+  const { error: deleteError } = await supabase
+    .from('finance_commissions')
+    .delete()
+    .eq('id', id)
+
+  if (deleteError) {
+    console.error('[API finance/commissions DELETE] Delete failed:', deleteError.message)
+    return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true, deleted: row })
 }

@@ -18,9 +18,13 @@ import {
   BarChart, Bar, ComposedChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { DollarSign, Download, Search } from 'lucide-react'
+import { DollarSign, Download, Search, Trash2, Plus, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTeamMembers } from '@/hooks/useTeamMembers'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import type { FinanceCommission, FinanceMonthly } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -126,6 +130,17 @@ export default function FinancePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+
+  // Delete commission state
+  const [deleteTarget, setDeleteTarget] = useState<FinanceCommission | null>(null)
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  // Create commission form state
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createLoading, setCreateLoading] = useState(false)
+  const [createForm, setCreateForm] = useState({ payment_date: '', client: '', payment_description: 'Parenting With Understanding', amount: '', closer: '', setter: '' })
+  const [duplicateWarning, setDuplicateWarning] = useState<{ message: string; existing: FinanceCommission } | null>(null)
 
   // ── Fetch data ────────────────────────────────────────────────────────────
 
@@ -479,6 +494,73 @@ export default function FinancePage() {
     } catch (err) {
       console.error('[Finance] Save failed:', err)
       toast.error('Error saving')
+    }
+  }
+
+  // ── Delete commission ──────────────────────────────────────────────────────
+
+  async function handleDeleteCommission() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/finance/commissions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTarget.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error('Error: ' + (err.error || 'Failed to delete'))
+        return
+      }
+      setCommissions(prev => prev.filter(c => c.id !== deleteTarget.id))
+      toast.success('Comisión eliminada')
+    } catch {
+      toast.error('Error al eliminar')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
+      setDeleteConfirmed(false)
+    }
+  }
+
+  // ── Create commission ─────────────────────────────────────────────────────
+
+  async function handleCreateCommission(allowDuplicate = false) {
+    setCreateLoading(true)
+    setDuplicateWarning(null)
+    try {
+      const res = await fetch('/api/finance/commissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...createForm,
+          amount: parseFloat(createForm.amount) || 0,
+          allow_duplicate: allowDuplicate,
+        }),
+      })
+
+      if (res.status === 409) {
+        const data = await res.json()
+        setDuplicateWarning({ message: data.message, existing: data.existing })
+        return
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error('Error: ' + (err.error || 'Failed to create'))
+        return
+      }
+
+      const newRow = await res.json() as FinanceCommission
+      setCommissions(prev => [newRow, ...prev])
+      setShowCreateForm(false)
+      setCreateForm({ payment_date: '', client: '', payment_description: 'Parenting With Understanding', amount: '', closer: '', setter: '' })
+      toast.success('Comisión creada')
+    } catch {
+      toast.error('Error al crear')
+    } finally {
+      setCreateLoading(false)
     }
   }
 
@@ -1025,10 +1107,19 @@ export default function FinancePage() {
               <KPICard title="Pending" value={fmtCompact(summaryPending)} loading={loading} />
             </KPICardGrid>
 
-            {/* Record count */}
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {filteredCommissions.length} of {commissions.length} PWU commissions
-            </p>
+            {/* Record count + create button */}
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {filteredCommissions.length} of {commissions.length} PWU commissions
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setShowCreateForm(true); setDuplicateWarning(null) }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Nueva comisión
+              </Button>
+            </div>
 
             {/* Table */}
             <Card>
@@ -1048,13 +1139,14 @@ export default function FinancePage() {
                         <TableHead className="text-xs text-right">Setter Comm. (5%)</TableHead>
                         <TableHead className="text-xs">Setter Status</TableHead>
                         <TableHead className="text-xs text-right">Net Total</TableHead>
+                        <TableHead className="text-xs w-10"></TableHead>
                       </AnimatedTableRow>
                     </TableHeader>
                     <TableBody>
                       {loading ? (
-                        <tr><td colSpan={11} className="text-center py-12 text-sm text-zinc-400">Loading...</td></tr>
+                        <tr><td colSpan={12} className="text-center py-12 text-sm text-zinc-400">Loading...</td></tr>
                       ) : filteredCommissions.length === 0 ? (
-                        <tr><td colSpan={11} className="text-center py-12 text-sm text-zinc-400">No commissions found</td></tr>
+                        <tr><td colSpan={12} className="text-center py-12 text-sm text-zinc-400">No commissions found</td></tr>
                       ) : filteredCommissions.map((c, i) => {
                         const desc = c.payment_description || '—'
                         const truncDesc = desc.length > 40 ? desc.slice(0, 40) + '...' : desc
@@ -1117,6 +1209,15 @@ export default function FinancePage() {
                               <StatusDropdown commissionId={c.id} field="setter_commission_status" currentStatus={c.setter_commission_status || 'N/A'} />
                             </TableCell>
                             <TableCell className="text-xs text-right font-semibold">{fmtCurrency(Number(c.net_total))}</TableCell>
+                            <TableCell className="text-xs text-center px-1">
+                              <button
+                                onClick={() => { setDeleteTarget(c); setDeleteConfirmed(false) }}
+                                className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-zinc-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Eliminar comisión"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </TableCell>
                           </AnimatedTableRow>
                         )
                       })}
@@ -1125,6 +1226,134 @@ export default function FinancePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* ── Delete confirmation dialog ─────────────────────────────────── */}
+            <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmed(false) } }}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Eliminar comisión</DialogTitle>
+                  <DialogDescription>
+                    Esta acción no se puede deshacer (se guarda una copia en auditoría).
+                  </DialogDescription>
+                </DialogHeader>
+                {deleteTarget && (
+                  <div className="space-y-3">
+                    <div className="text-sm space-y-1 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3">
+                      <p><span className="text-zinc-500">Cliente:</span> <strong>{deleteTarget.client}</strong></p>
+                      <p><span className="text-zinc-500">Fecha:</span> {deleteTarget.payment_date ? new Date(deleteTarget.payment_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</p>
+                      <p><span className="text-zinc-500">Importe:</span> {fmtCurrency(Number(deleteTarget.amount))}</p>
+                      {deleteTarget.closer && <p><span className="text-zinc-500">Closer:</span> {deleteTarget.closer} ({deleteTarget.closer_commission_status})</p>}
+                      {deleteTarget.setter && <p><span className="text-zinc-500">Setter:</span> {deleteTarget.setter} ({deleteTarget.setter_commission_status})</p>}
+                    </div>
+
+                    {(deleteTarget.closer_commission_status === 'Paid' || deleteTarget.setter_commission_status === 'Paid') && (
+                      <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                        <div className="text-sm text-amber-800 dark:text-amber-300">
+                          <p className="font-medium">Esta comisión ya fue pagada</p>
+                          {deleteTarget.closer_commission_status === 'Paid' && <p>Closer {deleteTarget.closer}: {fmtCurrency(Number(deleteTarget.closer_commission))}</p>}
+                          {deleteTarget.setter_commission_status === 'Paid' && <p>Setter {deleteTarget.setter}: {fmtCurrency(Number(deleteTarget.setter_commission))}</p>}
+                          {!deleteConfirmed && (
+                            <button
+                              onClick={() => setDeleteConfirmed(true)}
+                              className="mt-2 text-xs font-medium underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+                            >
+                              Entiendo, quiero eliminarla de todos modos
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <DialogFooter>
+                  <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteCommission}
+                    disabled={deleting || (
+                      (deleteTarget?.closer_commission_status === 'Paid' || deleteTarget?.setter_commission_status === 'Paid') && !deleteConfirmed
+                    )}
+                  >
+                    {deleting ? 'Eliminando...' : 'Eliminar'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* ── Create commission dialog ────────────────────────────────────── */}
+            <Dialog open={showCreateForm} onOpenChange={(open) => { if (!open) { setShowCreateForm(false); setDuplicateWarning(null) } }}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Nueva comisión</DialogTitle>
+                  <DialogDescription>Crear una comisión manualmente.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Fecha de pago *</label>
+                      <input type="date" className={inputCls} value={createForm.payment_date} onChange={(e) => setCreateForm(f => ({ ...f, payment_date: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Importe *</label>
+                      <input type="number" step="0.01" min="0" className={inputCls} placeholder="0.00" value={createForm.amount} onChange={(e) => setCreateForm(f => ({ ...f, amount: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Cliente *</label>
+                    <input type="text" className={inputCls} placeholder="Nombre del cliente" value={createForm.client} onChange={(e) => setCreateForm(f => ({ ...f, client: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Descripción</label>
+                    <input type="text" className={inputCls} value={createForm.payment_description} onChange={(e) => setCreateForm(f => ({ ...f, payment_description: e.target.value }))} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Closer</label>
+                      <select className={selectCls + ' w-full'} value={createForm.closer} onChange={(e) => setCreateForm(f => ({ ...f, closer: e.target.value }))}>
+                        <option value="">— Ninguno —</option>
+                        {CLOSERS.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Setter</label>
+                      <select className={selectCls + ' w-full'} value={createForm.setter} onChange={(e) => setCreateForm(f => ({ ...f, setter: e.target.value }))}>
+                        <option value="">— Ninguno —</option>
+                        {SETTERS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {duplicateWarning && (
+                    <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                      <div className="text-sm text-amber-800 dark:text-amber-300">
+                        <p className="font-medium">Posible duplicado</p>
+                        <p>{duplicateWarning.message}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
+                  {duplicateWarning ? (
+                    <Button
+                      onClick={() => handleCreateCommission(true)}
+                      disabled={createLoading}
+                    >
+                      {createLoading ? 'Creando...' : 'Crear de todos modos'}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => handleCreateCommission(false)}
+                      disabled={createLoading || !createForm.payment_date || !createForm.client || !createForm.amount}
+                    >
+                      {createLoading ? 'Creando...' : 'Crear comisión'}
+                    </Button>
+                  )}
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
